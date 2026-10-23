@@ -48,10 +48,12 @@ final class EditorModel {
         rebuild(keepTime: false)
     }
 
-    /// First-open defaults: put the camera where the bubble was while recording.
+    /// First-open defaults: show the camera the way the bubble looked while recording.
     private static func defaults(for project: RecordingProject) -> EditSettings {
         var edit = EditSettings()
-        if let center = project.camera?.bubbleCenter {
+        if let bubble = project.camera?.bubble {
+            edit.camera = bubble
+        } else if let center = project.camera?.bubbleCenter {
             edit.camera.position = CGPoint(x: min(max(center.x, 0.08), 0.92), y: min(max(center.y, 0.1), 0.9))
         }
         return edit

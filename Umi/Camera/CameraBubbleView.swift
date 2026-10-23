@@ -1,0 +1,266 @@
+import AVFoundation
+import SwiftUI
+
+/// What the bubble looks like. Remembered between launches.
+nonisolated struct CameraBubbleStyle: Codable, Hashable, Sendable {
+    var shape = EditSettings.Camera.Shape.circle
+    var diameter: CGFloat = Size.medium.diameter
+    var mirrored = true
+    /// Bubble center in global AppKit coordinates (bottom-left origin); nil = default spot.
+    var center: CGPoint?
+
+    enum Size: String, CaseIterable, Sendable {
+        case small, medium, large
+
+        var diameter: CGFloat {
+            switch self {
+            case .small: 140
+            case .medium: 200
+            case .large: 300
+            }
+        }
+
+        var label: String {
+            switch self {
+            case .small: "S"
+            case .medium: "M"
+            case .large: "L"
+            }
+        }
+    }
+
+    static let diameterRange: ClosedRange<CGFloat> = 120...480
+
+    /// Corner radius for `diameter`, matching how the editor draws each shape.
+    static func cornerRadius(for shape: EditSettings.Camera.Shape, diameter: CGFloat) -> CGFloat {
+        switch shape {
+        case .circle: diameter / 2
+        case .squircle: diameter * 0.24
+        case .square: diameter * 0.06
+        }
+    }
+
+    private static let defaultsKey = "cameraBubble.style"
+
+    static func load() -> CameraBubbleStyle {
+        guard let data = UserDefaults.standard.data(forKey: defaultsKey),
+              var style = try? JSONDecoder().decode(CameraBubbleStyle.self, from: data)
+        else { return CameraBubbleStyle() }
+        style.diameter = min(max(style.diameter, diameterRange.lowerBound), diameterRange.upperBound)
+        return style
+    }
+
+    func save() {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        UserDefaults.standard.set(data, forKey: Self.defaultsKey)
+    }
+}
+
+extension EditSettings.Camera.Shape {
+    var bubbleIcon: String {
+        switch self {
+        case .circle: "circle"
+        case .squircle: "app"
+        case .square: "square"
+        }
+    }
+
+    var next: Self {
+        let all = Self.allCases
+        return all[(all.firstIndex(of: self)! + 1) % all.count]
+    }
+}
+
+@Observable
+final class CameraBubbleModel {
+    var style: CameraBubbleStyle
+    var isHovering = false
+
+    init(style: CameraBubbleStyle) {
+        self.style = style
+    }
+}
+
+/// Things the bubble's controls ask the controller to do (it owns the panel frame).
+struct CameraBubbleActions {
+    var setSize: (CameraBubbleStyle.Size) -> Void
+    var setShape: (EditSettings.Camera.Shape) -> Void
+    var toggleMirror: () -> Void
+    var hide: () -> Void
+    var drag: (_ ended: Bool) -> Void
+    var resize: (_ ended: Bool) -> Void
+}
+
+/// The live camera preview plus Loom-style hover controls. The controls exist only in
+/// this window; the camera track is recorded straight from the capture session.
+struct CameraBubbleView: View {
+    let session: AVCaptureSession
+    let model: CameraBubbleModel
+    let actions: CameraBubbleActions
+
+    var body: some View {
+        GeometryReader { proxy in
+            let side = min(proxy.size.width, proxy.size.height)
+            let radius = CameraBubbleStyle.cornerRadius(for: model.style.shape, diameter: side)
+            let shape = RoundedRectangle(cornerRadius: radius, style: .circular)
+
+            ZStack {
+                CameraPreview(session: session, mirrored: model.style.mirrored)
+                if model.isHovering {
+                    controls(side: side)
+                        .transition(.opacity)
+                }
+            }
+            .frame(width: side, height: side)
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(.white.opacity(0.9), lineWidth: 3))
+            .overlay(alignment: .bottomTrailing) {
+                if model.isHovering { resizeHandle(side: side, radius: radius) }
+            }
+            .contentShape(shape)
+            .gesture(windowGesture(actions.drag))
+            .animation(.spring(duration: 0.3), value: model.style.shape)
+            .animation(.easeOut(duration: 0.15), value: model.isHovering)
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+    }
+
+    private func controls(side: CGFloat) -> some View {
+        let compact = side < 170
+        return ZStack {
+            LinearGradient(colors: [.black.opacity(0.45), .clear, .clear, .black.opacity(0.45)], startPoint: .top, endPoint: .bottom)
+                .allowsHitTesting(false)
+            VStack {
+                HStack(spacing: 4) {
+                    ForEach(CameraBubbleStyle.Size.allCases, id: \.self) { size in
+                        let selected = abs(model.style.diameter - size.diameter) < 1
+                        BubbleButton(help: "\(size.rawValue.capitalized) size", selected: selected) {
+                            actions.setSize(size)
+                        } label: {
+                            Text(size.label).font(.system(size: 11, weight: .bold, design: .rounded))
+                        }
+                    }
+                }
+                .padding(.top, side * (compact ? 0.12 : 0.14))
+                Spacer()
+                HStack(spacing: compact ? 4 : 6) {
+                    BubbleButton(help: "Shape: \(model.style.shape.rawValue.capitalized)") {
+                        actions.setShape(model.style.shape.next)
+                    } label: {
+                        Image(systemName: model.style.shape.bubbleIcon)
+                    }
+                    BubbleButton(help: model.style.mirrored ? "Mirrored" : "Not mirrored", selected: model.style.mirrored) {
+                        actions.toggleMirror()
+                    } label: {
+                        Image(systemName: "arrow.left.and.right.righttriangle.left.righttriangle.right")
+                    }
+                    BubbleButton(help: "Hide camera") {
+                        actions.hide()
+                    } label: {
+                        Image(systemName: "eye.slash")
+                    }
+                }
+                .padding(.bottom, side * (compact ? 0.12 : 0.14))
+            }
+        }
+    }
+
+    /// Sits on the shape's edge at the bottom-right, so it's always over the camera.
+    private func resizeHandle(side: CGFloat, radius: CGFloat) -> some View {
+        // Distance from the bounding box corner to the shape edge along the diagonal.
+        let inset = radius * (1 - 1 / sqrt(2)) + 2
+        return Image(systemName: "arrow.up.left.and.arrow.down.right")
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 22, height: 22)
+            .background(.black.opacity(0.55), in: Circle())
+            .overlay(Circle().strokeBorder(.white.opacity(0.8), lineWidth: 1))
+            .contentShape(Circle())
+            .offset(x: -inset, y: -inset)
+            .gesture(windowGesture(actions.resize))
+            .help("Drag to resize")
+            .transition(.opacity)
+    }
+
+    /// Reports drags without coordinates; the controller reads the global mouse position,
+    /// which stays stable while the window itself moves.
+    private func windowGesture(_ handler: @escaping (Bool) -> Void) -> some Gesture {
+        DragGesture(minimumDistance: 1, coordinateSpace: .global)
+            .onChanged { _ in handler(false) }
+            .onEnded { _ in handler(true) }
+    }
+}
+
+private struct BubbleButton<Label: View>: View {
+    let help: String
+    var selected = false
+    let action: () -> Void
+    @ViewBuilder let label: Label
+
+    var body: some View {
+        Button(action: action) {
+            label
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(selected ? .black : .white)
+                .frame(width: 24, height: 24)
+                .background(selected ? AnyShapeStyle(.white) : AnyShapeStyle(.black.opacity(0.55)), in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+}
+
+/// `AVCaptureVideoPreviewLayer` hosted in SwiftUI. Mirroring is the bubble's setting,
+/// applied to the preview only (camera.mov is always unmirrored).
+private struct CameraPreview: NSViewRepresentable {
+    let session: AVCaptureSession
+    let mirrored: Bool
+
+    func makeNSView(context: Context) -> PreviewView {
+        PreviewView(session: session)
+    }
+
+    func updateNSView(_ view: PreviewView, context: Context) {
+        view.mirrored = mirrored
+    }
+
+    final class PreviewView: NSView {
+        private let preview: AVCaptureVideoPreviewLayer
+        var mirrored = true {
+            didSet { if mirrored != oldValue { applyMirroring() } }
+        }
+
+        init(session: AVCaptureSession) {
+            preview = AVCaptureVideoPreviewLayer(session: session)
+            super.init(frame: .zero)
+            wantsLayer = true
+            layer?.backgroundColor = NSColor.black.cgColor
+            preview.videoGravity = .resizeAspectFill
+            layer?.addSublayer(preview)
+            // The preview connection only exists once the session has its input.
+            NotificationCenter.default.addObserver(self, selector: #selector(sessionDidStart), name: AVCaptureSession.didStartRunningNotification, object: session)
+            applyMirroring()
+        }
+
+        required init?(coder: NSCoder) { fatalError() }
+
+        @objc private nonisolated func sessionDidStart() {
+            Task { @MainActor in self.applyMirroring() }
+        }
+
+        override func layout() {
+            super.layout()
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            preview.frame = bounds
+            CATransaction.commit()
+        }
+
+        private func applyMirroring() {
+            guard let connection = preview.connection, connection.isVideoMirroringSupported else { return }
+            connection.automaticallyAdjustsVideoMirroring = false
+            connection.isVideoMirrored = mirrored
+        }
+    }
+}
