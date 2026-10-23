@@ -52,12 +52,15 @@ private struct CountdownView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.25)
+            Color.black.opacity(0.18)
             Text("\(model.value)")
-                .font(.system(size: 120, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(width: 220, height: 220)
-                .background(.black.opacity(0.6), in: Circle())
+                .font(.system(size: 104, weight: .semibold))
+                .tracking(-2)
+                .foregroundStyle(UmiTheme.ink)
+                .frame(width: 200, height: 200)
+                .background(Circle().fill(.white.shadow(.inner(color: UmiTheme.innerGlow, radius: 8, x: -3, y: -3))))
+                .overlay(Circle().strokeBorder(LinearGradient(colors: [Color(hex: 0xB0B6C5), Color(hex: 0xD9E0EC)], startPoint: .topTrailing, endPoint: .bottomLeading), lineWidth: 1.5))
+                .shadow(color: .black.opacity(0.25), radius: 24, y: 10)
                 .contentTransition(.numericText(countsDown: true))
                 .animation(.snappy, value: model.value)
         }

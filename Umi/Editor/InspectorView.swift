@@ -22,7 +22,7 @@ struct InspectorView: View {
     private var backgroundSection: some View {
         InspectorSection("Background", systemImage: "paintpalette") {
             LazyVGrid(columns: Array(repeating: GridItem(.fixed(44), spacing: 8), count: 5), spacing: 8) {
-                ForEach(EditSettings.GradientPreset.allCases, id: \.self) { preset in
+                ForEach(EditSettings.GradientPreset.pickable, id: \.self) { preset in
                     let (a, b) = preset.colors
                     Swatch(fill: AnyShapeStyle(LinearGradient(colors: [a.color, b.color], startPoint: .topLeading, endPoint: .bottomTrailing)),
                            selected: model.edit.background == .gradient(preset)) {
@@ -207,7 +207,7 @@ private struct Swatch: View {
             RoundedRectangle(cornerRadius: 7)
                 .fill(fill)
                 .frame(width: 44, height: 30)
-                .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(selected ? Color.accentColor : .primary.opacity(0.15), lineWidth: selected ? 2.5 : 1))
+                .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(selected ? UmiTheme.accent : .primary.opacity(0.15), lineWidth: selected ? 2.5 : 1))
         }
         .buttonStyle(.plain)
     }

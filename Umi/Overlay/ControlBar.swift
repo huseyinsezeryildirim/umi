@@ -35,40 +35,47 @@ struct ControlBarView: View {
     @State private var confirmDiscard = false
 
     var body: some View {
-        VStack(spacing: 14) {
-            ControlButton(systemImage: "stop.fill", help: "Stop and open the editor  ⌥⇧L", tint: .red, prominent: true) {
+        VStack(spacing: 10) {
+            ControlButton(systemImage: "stop.fill", help: "Stop and open the editor  \(HotKeys.Action.startStop.display)", style: .stop) {
                 recorder.stop()
             }
 
             TimelineView(.periodic(from: .now, by: 0.5)) { _ in
                 Text(recorder.elapsed.formattedDuration)
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 12.5, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.white.opacity(recorder.phase == .paused ? 0.55 : 0.95))
                     .contentTransition(.numericText())
             }
+            .padding(.vertical, 2)
+
+            Rectangle().fill(.white.opacity(0.12)).frame(width: 28, height: 1)
 
             if recorder.phase == .paused {
-                ControlButton(systemImage: "play.fill", help: "Resume  ⌥⇧P") { recorder.resume() }
+                ControlButton(systemImage: "play.fill", help: "Resume  \(HotKeys.Action.pauseResume.display)", style: .highlighted) { recorder.resume() }
             } else {
-                ControlButton(systemImage: "pause.fill", help: "Pause  ⌥⇧P") { recorder.pause() }
+                ControlButton(systemImage: "pause.fill", help: "Pause  \(HotKeys.Action.pauseResume.display)") { recorder.pause() }
             }
             ControlButton(systemImage: "arrow.counterclockwise", help: "Restart") { recorder.restart() }
-            ControlButton(systemImage: "trash", help: confirmDiscard ? "Click again to discard" : "Discard recording", tint: confirmDiscard ? .red : nil) {
+            ControlButton(systemImage: "trash", help: confirmDiscard ? "Click again to discard" : "Discard recording",
+                          style: confirmDiscard ? .danger : .normal) {
                 if confirmDiscard { recorder.cancel() } else { confirmDiscard = true }
             }
         }
-        .padding(.vertical, 12)
-        .frame(width: 64, height: 268)
-        .background(Color(white: 0.12).opacity(0.94), in: Capsule())
-        .overlay(Capsule().strokeBorder(.white.opacity(0.12)))
+        .padding(.vertical, 11)
+        .frame(width: 60, height: 268)
+        .umiGlass(in: Capsule(), tint: UmiTheme.night.opacity(0.72), dark: true)
+        .overlay(Capsule().strokeBorder(LinearGradient(colors: [.white.opacity(0.28), .white.opacity(0.06)], startPoint: .top, endPoint: .bottom), lineWidth: 1))
+        .shadow(color: .black.opacity(0.3), radius: 14, y: 6)
+        .environment(\.colorScheme, .dark)
         .overlay(alignment: .top) {
             if recorder.phase == .paused {
                 Text("Paused")
-                    .font(.system(size: 9, weight: .bold))
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(.orange, in: Capsule())
-                    .foregroundStyle(.black)
-                    .offset(y: -8)
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .padding(.horizontal, 7).padding(.vertical, 3)
+                    .background(Capsule().fill(.white))
+                    .foregroundStyle(UmiTheme.ink)
+                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                    .offset(y: -9)
             }
         }
         .task(id: confirmDiscard) {
@@ -80,23 +87,35 @@ struct ControlBarView: View {
 }
 
 private struct ControlButton: View {
+    enum Style { case normal, stop, highlighted, danger }
+
     let systemImage: String
     let help: String
-    var tint: Color?
-    var prominent = false
+    var style = Style.normal
     let action: () -> Void
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: prominent ? 17 : 16, weight: .semibold))
-                .foregroundStyle(prominent ? .white : (tint ?? .white.opacity(0.85)))
-                .frame(width: 42, height: 42)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(prominent ? (tint ?? .red) : .white.opacity(hovering ? 0.16 : 0))
-                )
+            Group {
+                if style == .stop {
+                    // A white disc with a red rounded square, the universal "stop recording".
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(UmiTheme.record)
+                        .frame(width: 14, height: 14)
+                        .frame(width: 40, height: 40)
+                        .background(Circle().fill(.white))
+                        .scaleEffect(hovering ? 1.05 : 1)
+                } else {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(style == .danger ? UmiTheme.record : .white.opacity(hovering || style == .highlighted ? 1 : 0.8))
+                        .frame(width: 40, height: 40)
+                        .background(Circle().fill(.white.opacity(style == .highlighted ? 0.22 : hovering ? 0.14 : 0)))
+                }
+            }
+            .contentShape(Circle())
+            .animation(.easeOut(duration: 0.12), value: hovering)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
