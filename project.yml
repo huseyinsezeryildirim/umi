@@ -1,0 +1,74 @@
+name: Umi
+options:
+  bundleIdPrefix: cam.umi
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+
+configs:
+  Debug: debug
+  Release: release
+  Release-AppStore: release
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  Umi:
+    type: application
+    platform: macOS
+    sources:
+      - path: Umi
+    info:
+      path: Umi/Resources/Info.plist
+      properties:
+        CFBundleName: Umi
+        CFBundleDisplayName: Umi
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.productivity
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        LSUIElement: true
+        NSCameraUsageDescription: Umi uses your camera to show your face in the recording bubble.
+        NSMicrophoneUsageDescription: Umi uses your microphone to record your voice.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cam.umi.app
+        PRODUCT_NAME: Umi
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        COMBINE_HIDPI_IMAGES: YES
+      configs:
+        # Direct distribution (notarized DMG + Sparkle later). Hardened runtime, no sandbox.
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: Umi/Resources/Umi-Direct.entitlements
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Umi/Resources/Umi-Direct.entitlements
+        # Mac App Store build. Sandboxed.
+        Release-AppStore:
+          CODE_SIGN_ENTITLEMENTS: Umi/Resources/Umi-AppStore.entitlements
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: APPSTORE
+
+schemes:
+  Umi:
+    build:
+      targets:
+        Umi: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  Umi-AppStore:
+    build:
+      targets:
+        Umi: all
+    run:
+      config: Release-AppStore
+    archive:
+      config: Release-AppStore
