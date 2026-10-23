@@ -36,6 +36,7 @@ targets:
         LSUIElement: true
         NSCameraUsageDescription: Umi uses your camera to show your face in the recording bubble.
         NSMicrophoneUsageDescription: Umi uses your microphone to record your voice.
+        NSSpeechRecognitionUsageDescription: Umi transcribes your recordings on this Mac to create captions. Audio never leaves your computer.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cam.umi.app
