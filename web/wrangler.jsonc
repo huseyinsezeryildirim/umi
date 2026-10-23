@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "umi-web",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+  "vars": {
+    // Public origin used in share links and OG tags. Empty = use the request origin (fine for local dev).
+    "PUBLIC_BASE_URL": "",
+    // Multipart part size in bytes (R2 minimum is 5 MiB for all parts except the last).
+    "PART_SIZE_BYTES": "10485760",
+    // Hard cap on a single upload.
+    "MAX_UPLOAD_BYTES": "5368709120",
+    // Optional: R2 S3 endpoint for direct-to-R2 presigned URLs, e.g. https://<account_id>.r2.cloudflarestorage.com
+    // When empty (local dev), upload URLs point at this Worker, which streams parts into R2 via the binding.
+    "R2_S3_ENDPOINT": "",
+    "R2_BUCKET_NAME": "umi-videos"
+  },
+  // Secrets (set with `wrangler secret put`, or in .dev.vars locally):
+  //   SIGNING_SECRET        HMAC key for upload URLs and password-unlock cookies (required)
+  //   R2_ACCESS_KEY_ID      only with R2_S3_ENDPOINT
+  //   R2_SECRET_ACCESS_KEY  only with R2_S3_ENDPOINT
+  "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "umi-videos" }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "umi",
+      // Replace with the id printed by `wrangler d1 create umi` before deploying.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Hourly cleanup: purge expired/revoked videos and abandoned uploads.
+  "triggers": { "crons": ["17 * * * *"] }
+}

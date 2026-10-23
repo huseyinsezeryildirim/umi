@@ -1,0 +1,4 @@
+SIGNING_SECRET=dev-only-change-me-0123456789abcdef
+# Only needed when R2_S3_ENDPOINT is set (direct-to-R2 presigned uploads):
+# R2_ACCESS_KEY_ID=
+# R2_SECRET_ACCESS_KEY=

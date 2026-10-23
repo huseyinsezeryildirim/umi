@@ -1,0 +1,5 @@
+node_modules/
+.wrangler/
+.dev.vars
+.e2e/
+.wrangler-dev.log
