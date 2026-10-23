@@ -18,6 +18,9 @@ final class RecordingController {
 
     private let camera = CameraBubbleController()
     private let countdown = CountdownOverlay()
+    private let controlBar = ControlBarController()
+    private let hotKeys = HotKeys()
+    private var launcherOpen = false
     private var startTask: Task<Void, Never>?
     private var session: Session?
 
@@ -34,11 +37,44 @@ final class RecordingController {
 
     var elapsed: TimeInterval { session?.clock.elapsed.seconds ?? 0 }
 
+    init() {
+        hotKeys.register(.startStop) { [weak self] in
+            guard let self else { return }
+            switch phase {
+            case .idle: start()
+            case .recording, .paused: stop()
+            case .countingDown: cancel()
+            case .finishing: break
+            }
+        }
+        hotKeys.register(.pauseResume) { [weak self] in
+            guard let self else { return }
+            if phase == .recording { pause() } else if phase == .paused { resume() }
+        }
+        hotKeys.register(.cancel) { [weak self] in
+            guard let self, phase != .idle, phase != .finishing else { return }
+            cancel()
+        }
+    }
+
+    // MARK: Launcher
+
+    /// The camera bubble is visible while the launcher is open (to frame yourself)
+    /// and during a recording, never otherwise.
+    func launcherDidOpen() {
+        launcherOpen = true
+        if phase == .idle, settings.showCamera { camera.show() }
+    }
+
+    func launcherDidClose() {
+        launcherOpen = false
+        if phase == .idle { camera.hide() }
+    }
+
     // MARK: Sources
 
     func refreshSources() async {
         guard phase == .idle else { return }
-        if settings.showCamera { camera.show() }
         do {
             let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
             displays = content.displays
@@ -61,7 +97,7 @@ final class RecordingController {
     }
 
     func setCameraPreview(_ on: Bool) {
-        if on { camera.show() } else { camera.hide() }
+        if on, launcherOpen || phase != .idle { camera.show() } else if !on { camera.hide() }
     }
 
     // MARK: Control
@@ -146,6 +182,7 @@ final class RecordingController {
         guard await ensurePermissions() else { return }
         await refreshSources()
 
+        if settings.showCamera { camera.show() }
         if settings.countdown {
             phase = .countingDown
             let completed = await countdown.run(seconds: 3)
@@ -158,6 +195,7 @@ final class RecordingController {
             try await session.screen.start()
             session.clock.start()
             session.cursor.start()
+            controlBar.show(recorder: self)
             if session.cameraOn {
                 camera.session.startRecording(to: session.bundle.appendingPathComponent(RecordingProject.cameraFile), clock: session.clock)
             }
@@ -173,7 +211,7 @@ final class RecordingController {
     private func makeSession() async throws -> Session {
         let (filter, captureRect) = try await makeFilter()
         let fps = 60
-        let config = ScreenCapture.makeConfiguration(for: filter, fps: fps, systemAudio: settings.captureSystemAudio, microphone: settings.captureMicrophone)
+        let config = ScreenCapture.makeConfiguration(for: filter, fps: fps, systemAudio: settings.captureSystemAudio, microphone: settings.captureMicrophone, microphoneID: settings.microphoneID)
 
         var audio: [MovieWriter.Audio] = []
         var tracks = ScreenCapture.AudioTracks()
@@ -244,6 +282,7 @@ final class RecordingController {
 
     private func finish() {
         camera.hide()
+        controlBar.hide()
         session = nil
         phase = .idle
         startTask = nil

@@ -11,6 +11,8 @@ struct RecordingSettings {
     var windowID: CGWindowID?
     var showCamera = true
     var captureMicrophone = true
+    /// `AVCaptureDevice.uniqueID`; nil = system default.
+    var microphoneID: String?
     var captureSystemAudio = true
     var countdown = true
 }

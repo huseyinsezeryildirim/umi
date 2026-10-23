@@ -38,7 +38,7 @@ nonisolated final class ScreenCapture: NSObject, @unchecked Sendable {
         try? await stream.stopCapture()
     }
 
-    static func makeConfiguration(for filter: SCContentFilter, fps: Int, systemAudio: Bool, microphone: Bool) -> SCStreamConfiguration {
+    static func makeConfiguration(for filter: SCContentFilter, fps: Int, systemAudio: Bool, microphone: Bool, microphoneID: String? = nil) -> SCStreamConfiguration {
         let config = SCStreamConfiguration()
         let scale = CGFloat(filter.pointPixelScale)
         // H.264 needs even dimensions.
@@ -55,7 +55,7 @@ nonisolated final class ScreenCapture: NSObject, @unchecked Sendable {
         config.channelCount = 2
         config.captureMicrophone = microphone
         if microphone {
-            config.microphoneCaptureDeviceID = AVCaptureDevice.default(for: .audio)?.uniqueID
+            config.microphoneCaptureDeviceID = microphoneID ?? AVCaptureDevice.default(for: .audio)?.uniqueID
         }
         return config
     }
