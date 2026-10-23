@@ -2,42 +2,9 @@ import AVFoundation
 import ScreenCaptureKit
 import SwiftUI
 
-struct MenuBarLabel: View {
-    @Environment(RecordingController.self) private var recorder
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        label
-            #if DEBUG
-            .task {
-                // Dev hook: UMI_OPEN_EDITOR=/path/to/Some.umi opens that project on launch.
-                if let path = ProcessInfo.processInfo.environment["UMI_OPEN_EDITOR"] {
-                    openWindow(id: WindowID.editor, value: URL(fileURLWithPath: path))
-                    NSApp.activate()
-                }
-            }
-            #endif
-    }
-
-    @ViewBuilder
-    private var label: some View {
-        switch recorder.phase {
-        case .recording, .paused:
-            TimelineView(.periodic(from: .now, by: 1)) { _ in
-                Label(recorder.elapsed.formattedDuration, systemImage: recorder.phase == .paused ? "pause.circle.fill" : "record.circle.fill")
-                    .labelStyle(.titleAndIcon)
-            }
-        default:
-            Image(systemName: "record.circle")
-        }
-    }
-}
-
 /// The launcher: pick what to record, check camera and mic, start.
 struct MenuBarView: View {
     @Environment(RecordingController.self) private var recorder
-    @Environment(RecordingsLibrary.self) private var library
-    @Environment(\.openWindow) private var openWindow
     @State private var mic = MicLevelMonitor()
     @State private var microphones: [AVCaptureDevice] = []
     @AppStorage("onboardingStep") private var onboardingStep = 0
@@ -48,6 +15,10 @@ struct MenuBarView: View {
 
             if let step = OnboardingStep(rawValue: onboardingStep), recorder.phase == .idle {
                 OnboardingCard(step: step) { advanceTour() } close: { onboardingStep = OnboardingStep.done }
+            }
+
+            if !recorder.hasScreenPermission, recorder.phase == .idle {
+                PermissionCard(recorder: recorder)
             }
 
             switch recorder.phase {
@@ -82,12 +53,6 @@ struct MenuBarView: View {
         .onDisappear {
             recorder.launcherDidClose()
             mic.stop()
-        }
-        .onChange(of: recorder.lastFinishedURL) { _, url in
-            guard let url else { return }
-            library.reload(selecting: url)
-            openWindow(id: WindowID.editor, value: url)
-            NSApp.activate()
         }
     }
 
@@ -312,13 +277,40 @@ struct MenuBarView: View {
     }
 
     private func openLibrary() {
-        openWindow(id: WindowID.library)
-        NSApp.activate()
+        AppModel.shared.closeLauncher()
+        AppModel.shared.openLibrary()
     }
 
-    /// Closes the menu bar panel so it isn't in the way when recording starts.
+    /// Closes the launcher so it isn't in the way when recording starts.
     private func closeLauncher() {
-        NSApp.windows.first { $0.isVisible && String(describing: type(of: $0)).contains("MenuBarExtra") }?.orderOut(nil)
+        AppModel.shared.closeLauncher()
+    }
+}
+
+/// Shown until Screen Recording is allowed. macOS's own prompt appears only once;
+/// this card covers the rest, including the relaunch macOS needs after granting.
+private struct PermissionCard: View {
+    let recorder: RecordingController
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Allow screen recording", systemImage: "lock.shield")
+                .font(.system(size: 15, weight: .bold))
+            Text("Turn on Umi in System Settings › Privacy & Security › Screen & System Audio Recording. Then relaunch Umi so macOS applies it.")
+                .font(.system(size: 13))
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("Open System Settings") { recorder.requestScreenPermission() }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.umiAccent)
+                Button("Relaunch Umi") { recorder.relaunch() }
+            }
+            .controlSize(.small)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.orange.opacity(0.4)))
     }
 }
 

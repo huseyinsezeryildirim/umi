@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import Observation
 import ScreenCaptureKit
@@ -15,6 +16,11 @@ final class RecordingController {
     private(set) var windows: [SCWindow] = []
     private(set) var lastError: String?
     private(set) var lastFinishedURL: URL?
+    /// False until macOS grants Screen Recording. The launcher shows a permission card
+    /// instead of letting every capture call trigger the system prompt again.
+    private(set) var hasScreenPermission = CGPreflightScreenCaptureAccess()
+    /// macOS only shows its own prompt once per launch; after that we point to Settings.
+    private var askedForScreenPermission = false
 
     private let camera = CameraBubbleController()
     private let countdown = CountdownOverlay()
@@ -80,6 +86,10 @@ final class RecordingController {
 
     func refreshSources() async {
         guard phase == .idle else { return }
+        // Any ScreenCaptureKit call without permission pops the system prompt, so don't
+        // touch it until access is granted.
+        hasScreenPermission = CGPreflightScreenCaptureAccess()
+        guard hasScreenPermission else { return }
         do {
             let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
             displays = content.displays
@@ -97,7 +107,32 @@ final class RecordingController {
             }
             if lastError == RecorderError.screenPermissionDenied.errorDescription { lastError = nil }
         } catch {
-            lastError = RecorderError.screenPermissionDenied.errorDescription
+            lastError = error.localizedDescription
+        }
+    }
+
+    /// Shows macOS's prompt the first time; afterwards opens the Settings pane directly.
+    func requestScreenPermission() {
+        if !askedForScreenPermission {
+            askedForScreenPermission = true
+            if CGRequestScreenCaptureAccess() { hasScreenPermission = true; return }
+        }
+        openScreenRecordingSettings()
+    }
+
+    func openScreenRecordingSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// A newly granted Screen Recording permission only applies after a relaunch.
+    func relaunch() {
+        let url = Bundle.main.bundleURL
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: url, configuration: config) { _, _ in
+            Task { @MainActor in NSApp.terminate(nil) }
         }
     }
 
@@ -260,9 +295,9 @@ final class RecordingController {
     }
 
     private func ensurePermissions() async -> Bool {
-        if !CGPreflightScreenCaptureAccess() {
-            CGRequestScreenCaptureAccess()
-            lastError = RecorderError.screenPermissionDenied.errorDescription
+        hasScreenPermission = CGPreflightScreenCaptureAccess()
+        if !hasScreenPermission {
+            requestScreenPermission()
             return false
         }
         if settings.captureMicrophone, await !AVCaptureDevice.requestAccess(for: .audio) {
