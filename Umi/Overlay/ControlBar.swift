@@ -19,7 +19,7 @@ final class ControlBarController {
         panel.isMovableByWindowBackground = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false
-        panel.contentView = NSHostingView(rootView: ControlBarView(recorder: recorder))
+        panel.contentView = FirstMouseHostingView(rootView: ControlBarView(recorder: recorder))
         panel.orderFrontRegardless()
         self.panel = panel
     }

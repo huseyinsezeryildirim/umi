@@ -77,6 +77,7 @@ struct MenuBarView: View {
                 Text("Start / Stop  \(HotKeys.Action.startStop.display)")
                 Text("Pause / Resume  \(HotKeys.Action.pauseResume.display)")
                 Text("Cancel  \(HotKeys.Action.cancel.display)")
+                Text("Open Umi  \(HotKeys.Action.launcher.display)")
                 Divider()
                 Button("Quit Umi") { NSApp.terminate(nil) }
             } label: {

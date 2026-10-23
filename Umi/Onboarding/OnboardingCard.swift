@@ -77,7 +77,7 @@ struct TourCard: View {
                 HStack(spacing: 5) {
                     ForEach(OnboardingStep.allCases, id: \.self) { s in
                         Capsule()
-                            .fill(s.rawValue <= step.rawValue ? UmiTheme.accent : UmiTheme.track)
+                            .fill(s.rawValue <= step.rawValue ? UmiTheme.accent : Color.black.opacity(0.1))
                             .frame(width: s == step ? 22 : 14, height: 5)
                     }
                 }

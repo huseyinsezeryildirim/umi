@@ -99,7 +99,9 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
             return popover.contentViewController?.view.window?.frame
         }
 
-        popover.behavior = .transient
+        // Closed by us (see `startDismissMonitors`), not by AppKit: the camera bubble and
+        // tour callouts are separate windows, and clicks on them must not close the launcher.
+        popover.behavior = .applicationDefined
         popover.appearance = NSAppearance(named: .aqua)
         popover.animates = true
         popover.delegate = self
@@ -115,8 +117,16 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         }
         model.closeLauncher = { [weak self] in self?.popover.performClose(nil) }
         model.startTour = { [weak self] in self?.tour.restart() }
+        model.recorder.onOpenLauncher = { [weak self] in self?.togglePopover() }
         updateButton()
         observePhase()
+        #if DEBUG
+        // UI-test hook: `cam.umi.debug.toggleLauncher` opens/closes the launcher, since the
+        // status item can be hidden when the menu bar is full.
+        DistributedNotificationCenter.default().addObserver(forName: .init("cam.umi.debug.toggleLauncher"), object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.togglePopover() }
+        }
+        #endif
     }
 
     @objc private func clicked(_ sender: NSStatusBarButton) {
@@ -128,13 +138,36 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         }
     }
 
+    /// A tiny invisible window under the menu bar's right end, used to anchor the
+    /// launcher when macOS has hidden the status item because the menu bar is full.
+    private lazy var fallbackAnchor: NSWindow = {
+        let window = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false)
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.ignoresMouseEvents = true
+        window.level = .statusBar
+        window.collectionBehavior = [.canJoinAllSpaces, .transient]
+        window.contentView = NSView()
+        return window
+    }()
+
     private func togglePopover() {
         guard let button = item.button else { return }
         if popover.isShown {
             popover.performClose(nil)
         } else {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            let visible = button.window.map { w in NSScreen.screens.contains { $0.frame.contains(CGPoint(x: w.frame.midX, y: w.frame.midY)) } } ?? false
+            if visible {
+                popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            } else {
+                let screen = NSScreen.main ?? NSScreen.screens[0]
+                let anchor = CGRect(x: screen.visibleFrame.maxX - 200, y: screen.visibleFrame.maxY - 2, width: 24, height: 2)
+                fallbackAnchor.setFrame(anchor, display: false)
+                fallbackAnchor.orderFrontRegardless()
+                popover.show(relativeTo: fallbackAnchor.contentView!.bounds, of: fallbackAnchor.contentView!, preferredEdge: .minY)
+            }
             popover.contentViewController?.view.window?.makeKey()
+            startDismissMonitors()
             NSApp.activate()
             // Let the popover finish laying out before placing callouts next to it.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
@@ -228,31 +261,53 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     // MARK: NSPopoverDelegate
 
     func popoverDidClose(_ notification: Notification) {
-        // Clicking the camera bubble (to drag, resize or use its controls) counts as a
-        // click outside the popover. Keep the bubble up and bring the launcher back once
-        // the mouse is released, instead of hiding both.
-        let mouse = NSEvent.mouseLocation
-        if model.recorder.phase == .idle, model.recorder.cameraBubbleContains(mouse) || tour.contains(mouse) {
-            reopenOnMouseUp()
-            return
-        }
+        stopDismissMonitors()
+        fallbackAnchor.orderOut(nil)
         tour.suspend()
         model.recorder.launcherDidClose()
     }
 
-    private var mouseUpMonitor: Any?
+    // MARK: Dismissal
 
-    private func reopenOnMouseUp() {
-        guard mouseUpMonitor == nil else { return }
-        mouseUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { [weak self] event in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                if let monitor = self.mouseUpMonitor { NSEvent.removeMonitor(monitor) }
-                self.mouseUpMonitor = nil
-                guard self.model.recorder.phase == .idle, !self.popover.isShown else { return }
-                self.togglePopover()
+    private var dismissMonitors: [Any] = []
+
+    /// Closes the launcher on a click outside Umi, a click in Umi outside the launcher
+    /// and its companions (bubble, tour), or Escape.
+    private func startDismissMonitors() {
+        stopDismissMonitors()
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] _ in
+            self?.closePopover()
+        }) { dismissMonitors.append(global) }
+
+        if let local = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown], handler: { [weak self] event in
+            guard let self else { return event }
+            if event.type == .keyDown {
+                if event.keyCode == 53 { closePopover(); return nil } // Escape
+                return event
             }
+            if !isCompanionClick(event) { closePopover() }
             return event
-        }
+        }) { dismissMonitors.append(local) }
+    }
+
+    private func stopDismissMonitors() {
+        dismissMonitors.forEach(NSEvent.removeMonitor)
+        dismissMonitors = []
+    }
+
+    private func isCompanionClick(_ event: NSEvent) -> Bool {
+        let point = NSEvent.mouseLocation
+        if popover.contentViewController?.view.window?.frame.contains(point) == true { return true }
+        if item.button?.window?.frame.contains(point) == true { return true } // the status item toggles itself
+        if model.recorder.cameraBubbleContains(point) { return true }
+        if tour.contains(point) { return true }
+        // Menus opened from the launcher (source, mic) are their own windows.
+        if let window = event.window, window.level.rawValue >= NSWindow.Level.popUpMenu.rawValue { return true }
+        return false
+    }
+
+    private func closePopover() {
+        if popover.isShown { popover.performClose(nil) }
     }
 }
+

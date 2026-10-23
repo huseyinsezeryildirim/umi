@@ -27,6 +27,8 @@ final class RecordingController {
     private let controlBar = ControlBarController()
     private let hotKeys = HotKeys()
     private var launcherOpen = false
+    /// Set by the status bar; opens or closes the launcher (⌥⇧U).
+    var onOpenLauncher: () -> Void = {}
     private var startTask: Task<Void, Never>?
     private var session: Session?
 
@@ -61,6 +63,9 @@ final class RecordingController {
         hotKeys.register(.pauseResume) { [weak self] in
             guard let self else { return }
             if phase == .recording { pause() } else if phase == .paused { resume() }
+        }
+        hotKeys.register(.launcher) { [weak self] in
+            self?.onOpenLauncher()
         }
         hotKeys.register(.cancel) { [weak self] in
             guard let self, phase != .idle, phase != .finishing else { return }
