@@ -19,6 +19,7 @@ nonisolated struct RecordingProject: Codable, Hashable {
     var screen: Screen
     var camera: Camera?
     var audio: Audio
+    var edit: EditSettings?
 
     struct Screen: Codable, Hashable {
         var pixelWidth: Int

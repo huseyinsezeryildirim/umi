@@ -55,11 +55,31 @@ targets:
           CODE_SIGN_ENTITLEMENTS: Umi/Resources/Umi-AppStore.entitlements
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: APPSTORE
 
+  UmiTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: UmiTests
+    dependencies:
+      - target: Umi
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cam.umi.tests
+        SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Umi.app/Contents/MacOS/Umi
+        BUNDLE_LOADER: $(TEST_HOST)
+
 schemes:
   Umi:
     build:
       targets:
         Umi: all
+    test:
+      config: Debug
+      targets:
+        - UmiTests
     run:
       config: Debug
     archive:
