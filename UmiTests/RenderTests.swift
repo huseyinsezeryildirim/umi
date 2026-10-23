@@ -51,6 +51,70 @@ final class RenderTests: XCTestCase {
         XCTAssertEqual(CompositionBuilder.keptClips([], total: 6), [.init(start: 0, end: 6)])
     }
 
+    func testLayoutWithSpeedAndCrossfade() {
+        let placements = CompositionBuilder.layout([.init(start: 0, end: 3, speed: 2), .init(start: 3, end: 6)], crossfade: 0.5)
+        XCTAssertEqual(placements[0].outputDuration, 1.5, accuracy: 0.001)
+        XCTAssertEqual(placements[1].outputStart, 1.0, accuracy: 0.001)
+        XCTAssertEqual(placements[1].outputEnd, 4.0, accuracy: 0.001)
+    }
+
+    func testOldProjectJSONStillDecodes() throws {
+        let json = #"{"padding":0.1,"clips":[{"start":0,"end":2}],"background":{"gradient":{"_0":"dusk"}}}"#
+        let edit = try JSONDecoder().decode(EditSettings.self, from: Data(json.utf8))
+        XCTAssertEqual(edit.padding, 0.1)
+        XCTAssertEqual(edit.clips.first?.speed, 1)
+        XCTAssertTrue(edit.masks.isEmpty)
+    }
+
+    /// Every studio feature at once; frames are saved for a visual check.
+    @MainActor
+    func testAllStudioFeaturesExport() async throws {
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: fixture.path), "Run scripts/make-fixture.sh first")
+        var project = try ProjectStore.read(RecordingProject.self, from: fixture.appendingPathComponent(RecordingProject.fileName))
+        var edit = EditSettings()
+        edit.frame = .macOS
+        edit.background = .gradient(.navy)
+        edit.backgroundAngle = 60
+        edit.backgroundNoise = 0.5
+        edit.masks = [.init(start: 0, end: 6, rect: CGRect(x: 0.05, y: 0.05, width: 0.3, height: 0.25), style: .blur, amount: 0.8),
+                      .init(start: 0, end: 6, rect: CGRect(x: 0.6, y: 0.05, width: 0.3, height: 0.25), style: .pixelate, amount: 0.6)]
+        edit.scenes = [.init(start: 3.4, end: 6, layout: .splitScreen)]
+        edit.grade = .init(preset: .cinematic, vignette: 0.6, grain: 0.3)
+        edit.texts = [.init(start: 0, end: 2.5, style: .lowerThird, text: "Sezer Yıldırım", detail: "Founder, Umi", position: CGPoint(x: 0.25, y: 0.82)),
+                      .init(start: 0, end: 2.5, style: .bigStat, text: "42%", detail: "faster onboarding", position: CGPoint(x: 0.7, y: 0.4))]
+        edit.moves = [.init(start: 4.5, end: 6, kind: .glide)]
+        edit.captions = .init(enabled: true, words: [.init(start: 0.2, end: 0.6, text: "Here"), .init(start: 0.6, end: 0.9, text: "is"),
+                                                     .init(start: 0.9, end: 1.2, text: "the"), .init(start: 1.2, end: 1.6, text: "new"),
+                                                     .init(start: 1.6, end: 2.4, text: "dashboard")])
+        edit.clips = [.init(start: 0, end: 3, speed: 2), .init(start: 3, end: 6)]
+        edit.crossfade = 0.5
+        edit.music = .init(file: "music-test.m4a")
+        edit.zoom.auto = false
+        project.edit = edit
+        let cursor = try ProjectStore.read(CursorData.self, from: fixture.appendingPathComponent(RecordingProject.cursorFile))
+        let renderer = FrameRenderer(project: project, cursorData: cursor, cursorImage: .arrow, bundle: fixture)
+
+        let output = root.appendingPathComponent("export-all.mp4")
+        try await Exporter.export(bundle: fixture, renderer: renderer, resolution: .p1080, fps: 30, to: output)
+        let asset = AVURLAsset(url: output)
+        let duration = try await asset.load(.duration).seconds
+        let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+        XCTAssertEqual(duration, 4.0, accuracy: 0.15)
+        XCTAssertEqual(audioTracks.count, 1)
+
+        let frames = root.appendingPathComponent("frames")
+        try FileManager.default.createDirectory(at: frames, withIntermediateDirectories: true)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        // 0.5 s = source 1.0 (text, captions, masks); 1.25 = mid dissolve; 2.2 = source 4.2 split screen; 3.5 = source 5.5 glide.
+        for t in [0.5, 1.25, 2.2, 3.5] {
+            let (image, _) = try await generator.image(at: CMTime(seconds: t, preferredTimescale: 600))
+            try CIContext().writePNGRepresentation(of: CIImage(cgImage: image), to: frames.appendingPathComponent("all-\(t).png"),
+                                                   format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+        }
+    }
+
     func testClockRemovesPauses() {
         let clock = RecordingClock()
         clock.start()

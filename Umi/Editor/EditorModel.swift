@@ -1,5 +1,17 @@
 import AVFoundation
 import Observation
+import UniformTypeIdentifiers
+
+/// What's selected in the editor; drives the timeline highlight, the inspector and the
+/// preview overlay handles.
+enum EditorSelection: Hashable {
+    case clip(Int)
+    case zoom(UUID)
+    case mask(UUID)
+    case scene(UUID)
+    case text(UUID)
+    case move(UUID)
+}
 
 /// State of one open editor window: the project, its edits, the preview player and export.
 @Observable
@@ -12,15 +24,22 @@ final class EditorModel {
     let player = AVPlayer()
     private(set) var currentTime: Double = 0
     private(set) var isPlaying = false
-    /// Output timeline (after cuts).
-    private(set) var clips: [(source: TimeRangeValue, outputStart: Double)] = []
+    /// Clips laid out on the output timeline (after cuts, speed and crossfades).
+    private(set) var placements: [CompositionBuilder.Placement] = []
     private(set) var zoomSegments: [EditSettings.ZoomSegment] = []
-    var outputDuration: Double { clips.last.map { $0.outputStart + $0.source.duration } ?? 0 }
+    var outputDuration: Double { placements.last?.outputEnd ?? 0 }
+    var selection: EditorSelection? {
+        didSet { if editingOnPreview != (oldValue.map(Self.needsFlatPreview) ?? false) { rebuild(keepTime: true) } }
+    }
 
     private(set) var exportProgress: Double?
     private(set) var lastExportURL: URL?
+    private(set) var captionProgress: String?
 
     var undoManager: UndoManager?
+    /// The renderer behind the current preview, for mapping overlay handles.
+    private(set) var renderer: FrameRenderer?
+    let previewSize: CGSize
 
     private var cursorData = CursorData()
     private let cursorImage = FrameRenderer.CursorImage.arrow
@@ -35,6 +54,7 @@ final class EditorModel {
             ?? RecordingProject(createdAt: .now, duration: 0, screen: .init(pixelWidth: 1920, pixelHeight: 1080, captureRect: .zero, fps: 60), audio: .init())
         self.project = project
         edit = project.edit ?? Self.defaults(for: project)
+        previewSize = CompositionBuilder.renderSize(for: project, maxHeight: 1080)
         cursorData = (try? ProjectStore.read(CursorData.self, from: bundle.appendingPathComponent(RecordingProject.cursorFile))) ?? CursorData()
 
         let interval = CMTime(value: 1, timescale: 30)
@@ -94,65 +114,88 @@ final class EditorModel {
         scheduleSave()
     }
 
-    // MARK: Timeline operations (output time)
+    // MARK: Clips
+
+    private var keptClips: [EditSettings.Clip] { placements.map(\.clip) }
 
     func split(at outputTime: Double) {
-        guard let index = clipIndex(at: outputTime) else { return }
-        let clip = clips[index]
-        let cut = clip.source.start + (outputTime - clip.outputStart)
-        guard cut - clip.source.start > 0.1, clip.source.end - cut > 0.1 else { return }
+        guard let index = clipIndex(at: outputTime), let cut = sourceTime(for: outputTime) else { return }
+        let clip = keptClips[index]
+        guard cut - clip.start > 0.1, clip.end - cut > 0.1 else { return }
         update { edit in
-            var kept = clips.map(\.source)
+            var kept = keptClips
             kept.replaceSubrange(index...index, with: [
-                TimeRangeValue(start: clip.source.start, end: cut),
-                TimeRangeValue(start: cut, end: clip.source.end),
+                EditSettings.Clip(start: clip.start, end: cut, speed: clip.speed),
+                EditSettings.Clip(start: cut, end: clip.end, speed: clip.speed),
             ])
             edit.clips = kept
         }
     }
 
     func deleteClip(at index: Int) {
-        guard clips.count > 1, clips.indices.contains(index) else { return }
+        guard keptClips.count > 1, keptClips.indices.contains(index) else { return }
         update { edit in
-            var kept = clips.map(\.source)
+            var kept = keptClips
             kept.remove(at: index)
             edit.clips = kept
         }
+        selection = nil
     }
 
     /// Moves one edge of a clip, in source time.
     func trimClip(at index: Int, start: Double? = nil, end: Double? = nil) {
-        guard clips.indices.contains(index) else { return }
+        guard keptClips.indices.contains(index) else { return }
         update { edit in
-            var kept = clips.map(\.source)
-            let lower = index > 0 ? kept[index - 1].end : 0
-            let upper = index + 1 < kept.count ? kept[index + 1].start : project.duration
-            if let start { kept[index].start = min(max(start, lower), kept[index].end - 0.2) }
-            if let end { kept[index].end = max(min(end, upper), kept[index].start + 0.2) }
+            var kept = keptClips
+            if let start { kept[index].start = min(max(start, 0), kept[index].end - 0.2) }
+            if let end { kept[index].end = max(min(end, project.duration), kept[index].start + 0.2) }
             edit.clips = kept
         }
     }
 
-    func addZoom(at outputTime: Double) {
-        guard let source = sourceTime(for: outputTime) else { return }
+    func setSpeed(_ speed: Double, forClip index: Int) {
+        guard keptClips.indices.contains(index) else { return }
         update { edit in
-            materializeAutoZoom(&edit)
-            edit.zoom.segments.append(.init(start: source, end: min(source + 3, project.duration), scale: edit.zoom.scale))
+            var kept = keptClips
+            kept[index].speed = speed
+            edit.clips = kept
         }
     }
 
-    func updateZoom(_ id: EditSettings.ZoomSegment.ID, _ change: (inout EditSettings.ZoomSegment) -> Void) {
+    func moveClip(from: Int, to: Int) {
+        guard keptClips.indices.contains(from), keptClips.indices.contains(to), from != to else { return }
+        update { edit in
+            var kept = keptClips
+            kept.insert(kept.remove(at: from), at: to)
+            edit.clips = kept
+        }
+        selection = .clip(to)
+    }
+
+    // MARK: Zoom
+
+    func addZoom(at outputTime: Double) {
+        guard let source = sourceTime(for: outputTime) else { return }
+        let segment = EditSettings.ZoomSegment(start: source, end: min(source + 3, project.duration), scale: edit.zoom.scale)
+        update { edit in
+            materializeAutoZoom(&edit)
+            edit.zoom.segments.append(segment)
+        }
+        selection = .zoom(segment.id)
+    }
+
+    func updateZoom(_ id: UUID, _ change: (inout EditSettings.ZoomSegment) -> Void) {
         update { edit in
             materializeAutoZoom(&edit)
             guard let i = edit.zoom.segments.firstIndex(where: { $0.id == id }) else { return }
-            change(&edit.zoom.segments[i])
-            let s = edit.zoom.segments[i]
-            edit.zoom.segments[i].start = max(0, min(s.start, s.end - 0.3))
-            edit.zoom.segments[i].end = min(project.duration, max(s.end, edit.zoom.segments[i].start + 0.3))
+            var segment = edit.zoom.segments[i]
+            change(&segment)
+            (segment.start, segment.end) = clamped(segment.start, segment.end)
+            edit.zoom.segments[i] = segment
         }
     }
 
-    func deleteZoom(_ id: EditSettings.ZoomSegment.ID) {
+    func deleteZoom(_ id: UUID) {
         update { edit in
             materializeAutoZoom(&edit)
             edit.zoom.segments.removeAll { $0.id == id }
@@ -167,20 +210,181 @@ final class EditorModel {
         edit.zoom.auto = false
     }
 
+    // MARK: Masks, scenes, text, 3D moves
+
+    func addMask(at outputTime: Double) {
+        guard let source = sourceTime(for: outputTime) else { return }
+        let mask = EditSettings.PrivacyMask(start: source, end: min(source + 3, project.duration), rect: CGRect(x: 0.35, y: 0.35, width: 0.3, height: 0.2))
+        update { $0.masks.append(mask) }
+        selection = .mask(mask.id)
+    }
+
+    func addScene(_ layout: EditSettings.SceneLayout, at outputTime: Double) {
+        guard let source = sourceTime(for: outputTime) else { return }
+        let scene = EditSettings.SceneSegment(start: source, end: min(source + 4, project.duration), layout: layout)
+        update { $0.scenes.append(scene) }
+        selection = .scene(scene.id)
+    }
+
+    func addText(_ style: EditSettings.TextStyle, at outputTime: Double) {
+        guard let source = sourceTime(for: outputTime) else { return }
+        let (text, detail, position): (String, String, CGPoint) = switch style {
+        case .title: ("Your title", "", CGPoint(x: 0.5, y: 0.45))
+        case .lowerThird: ("Your Name", "Your role", CGPoint(x: 0.24, y: 0.82))
+        case .kicker: ("New", "", CGPoint(x: 0.5, y: 0.14))
+        case .bigStat: ("42%", "faster onboarding", CGPoint(x: 0.5, y: 0.45))
+        case .quote: ("Simple things should be simple", "Alan Kay", CGPoint(x: 0.5, y: 0.45))
+        case .typewriter: ("Type something…", "", CGPoint(x: 0.5, y: 0.2))
+        }
+        let overlay = EditSettings.TextOverlay(start: source, end: min(source + 4, project.duration), style: style, text: text, detail: detail,
+                                               position: position, animation: style == .typewriter ? .typewriter : .slide)
+        update { $0.texts.append(overlay) }
+        selection = .text(overlay.id)
+    }
+
+    func addMove(_ kind: EditSettings.MoveKind, at outputTime: Double) {
+        guard let source = sourceTime(for: outputTime) else { return }
+        let move = EditSettings.CameraMove(start: source, end: min(source + 4, project.duration), kind: kind)
+        update { $0.moves.append(move) }
+        selection = .move(move.id)
+    }
+
+    func updateMask(_ id: UUID, _ change: (inout EditSettings.PrivacyMask) -> Void) { updateItem(\.masks, id, change) }
+    func updateScene(_ id: UUID, _ change: (inout EditSettings.SceneSegment) -> Void) { updateItem(\.scenes, id, change) }
+    func updateText(_ id: UUID, _ change: (inout EditSettings.TextOverlay) -> Void) { updateItem(\.texts, id, change) }
+    func updateMove(_ id: UUID, _ change: (inout EditSettings.CameraMove) -> Void) { updateItem(\.moves, id, change) }
+
+    /// Moves or resizes any timed item (source time), whatever its kind.
+    func retime(_ selection: EditorSelection, start: Double, end: Double) {
+        switch selection {
+        case .zoom(let id): updateZoom(id) { $0.start = start; $0.end = end }
+        case .mask(let id): updateMask(id) { $0.start = start; $0.end = end }
+        case .scene(let id): updateScene(id) { $0.start = start; $0.end = end }
+        case .text(let id): updateText(id) { $0.start = start; $0.end = end }
+        case .move(let id): updateMove(id) { $0.start = start; $0.end = end }
+        case .clip: break
+        }
+    }
+
+    func deleteSelection() {
+        switch selection {
+        case .clip(let i): deleteClip(at: i)
+        case .zoom(let id): deleteZoom(id)
+        case .mask(let id): update { $0.masks.removeAll { $0.id == id } }
+        case .scene(let id): update { $0.scenes.removeAll { $0.id == id } }
+        case .text(let id): update { $0.texts.removeAll { $0.id == id } }
+        case .move(let id): update { $0.moves.removeAll { $0.id == id } }
+        case nil: break
+        }
+        selection = nil
+    }
+
+    private func updateItem<T: Identifiable & TimedItem>(_ keyPath: WritableKeyPath<EditSettings, [T]>, _ id: UUID, _ change: (inout T) -> Void) where T.ID == UUID {
+        update { edit in
+            guard let i = edit[keyPath: keyPath].firstIndex(where: { $0.id == id }) else { return }
+            var item = edit[keyPath: keyPath][i]
+            change(&item)
+            (item.start, item.end) = clamped(item.start, item.end)
+            edit[keyPath: keyPath][i] = item
+        }
+    }
+
+    private func clamped(_ start: Double, _ end: Double) -> (Double, Double) {
+        let s = max(0, min(start, end - 0.3))
+        return (s, min(project.duration, max(end, s + 0.3)))
+    }
+
+    // MARK: Files
+
+    /// Uses an image as the background. System wallpapers are referenced in place;
+    /// other files are copied into the project so it stays self-contained.
+    func setBackgroundImage(_ url: URL) {
+        if url.path.hasPrefix("/System/Library/Desktop Pictures") {
+            update { $0.background = .image(url.path) }
+        } else if let name = copyIntoBundle(url, as: "background") {
+            update { $0.background = .image(name) }
+        }
+    }
+
+    func setMusic(_ url: URL) {
+        guard let name = copyIntoBundle(url, as: "music") else { return }
+        update { $0.music = EditSettings.Music(file: name) }
+    }
+
+    private func copyIntoBundle(_ url: URL, as base: String) -> String? {
+        let name = "\(base)-\(UUID().uuidString.prefix(6)).\(url.pathExtension.lowercased())"
+        do {
+            try FileManager.default.copyItem(at: url, to: bundle.appendingPathComponent(name))
+            return name
+        } catch {
+            loadError = "Couldn't add \(url.lastPathComponent): \(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    // MARK: Captions
+
+    func generateCaptions(locale: Locale) {
+        guard captionProgress == nil else { return }
+        captionProgress = "Preparing audio…"
+        let bundle = bundle, project = project
+        Task {
+            do {
+                let words = try await CaptionGenerator.transcribe(bundle: bundle, project: project, locale: locale) { status in
+                    Task { @MainActor in self.captionProgress = status }
+                }
+                update {
+                    $0.captions.words = words
+                    $0.captions.language = locale.identifier
+                    $0.captions.enabled = true
+                }
+                if words.isEmpty { loadError = "No speech was found in this recording." }
+            } catch {
+                loadError = "Captions failed: \(error.localizedDescription)"
+            }
+            captionProgress = nil
+        }
+    }
+
+    /// Replaces the words of one caption line, spreading its timing over the new words.
+    func editCaptionLine(_ line: [EditSettings.CaptionWord], text: String) {
+        guard let first = line.first, let last = line.last else { return }
+        let parts = text.split(separator: " ").map(String.init)
+        let step = (last.end - first.start) / Double(max(parts.count, 1))
+        let replacement = parts.enumerated().map { i, word in
+            EditSettings.CaptionWord(start: first.start + Double(i) * step, end: first.start + Double(i + 1) * step, text: word)
+        }
+        let ids = Set(line.map(\.id))
+        update { edit in
+            edit.captions.words.removeAll { ids.contains($0.id) }
+            edit.captions.words.append(contentsOf: replacement)
+            edit.captions.words.sort { $0.start < $1.start }
+        }
+    }
+
+    func exportSubtitles(_ format: SubtitleFormat, to url: URL) {
+        do {
+            try SubtitleWriter.write(edit.captions.words, format: format, mapTime: { self.outputTime(for: $0) }, to: url)
+        } catch {
+            loadError = "Couldn't save subtitles: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: Time mapping
 
     func clipIndex(at outputTime: Double) -> Int? {
-        clips.lastIndex { outputTime >= $0.outputStart - 0.0001 }
+        placements.lastIndex { outputTime >= $0.outputStart - 0.0001 }
     }
 
     func sourceTime(for outputTime: Double) -> Double? {
         guard let i = clipIndex(at: outputTime) else { return nil }
-        return min(clips[i].source.start + (outputTime - clips[i].outputStart), clips[i].source.end)
+        let p = placements[i]
+        return min(p.clip.start + (outputTime - p.outputStart) * p.clip.speed, p.clip.end)
     }
 
     func outputTime(for sourceTime: Double) -> Double? {
-        clips.first { sourceTime >= $0.source.start && sourceTime <= $0.source.end }
-            .map { $0.outputStart + (sourceTime - $0.source.start) }
+        placements.first { sourceTime >= $0.clip.start && sourceTime <= $0.clip.end }
+            .map { $0.outputStart + (sourceTime - $0.clip.start) / $0.clip.speed }
     }
 
     // MARK: Playback
@@ -209,7 +413,7 @@ final class EditorModel {
         lastExportURL = nil
         var project = project
         project.edit = edit
-        let renderer = FrameRenderer(project: project, cursorData: cursorData, cursorImage: cursorImage)
+        let renderer = FrameRenderer(project: project, cursorData: cursorData, cursorImage: cursorImage, bundle: bundle)
         let bundle = bundle
         Task {
             do {
@@ -230,12 +434,24 @@ final class EditorModel {
 
     // MARK: Private
 
+    /// Masks and fixed zoom focus are placed on the preview, so it's shown flat (no zoom
+    /// or 3D move) while one is selected.
+    var editingOnPreview: Bool { selection.map(Self.needsFlatPreview) ?? false }
+
+    private static func needsFlatPreview(_ selection: EditorSelection) -> Bool {
+        switch selection {
+        case .mask, .zoom: true
+        default: false
+        }
+    }
+
     private func rebuild(keepTime: Bool) {
         rebuildTask?.cancel()
         var project = project
         project.edit = edit
-        let renderer = FrameRenderer(project: project, cursorData: cursorData, cursorImage: cursorImage)
-        let size = CompositionBuilder.renderSize(for: project, maxHeight: 1080)
+        let renderer = FrameRenderer(project: project, cursorData: cursorData, cursorImage: cursorImage, bundle: bundle,
+                                     applyZoomAndMoves: !editingOnPreview)
+        let size = previewSize
         let bundle = bundle
         let resumeAt = keepTime ? currentTime : 0
         let wasPlaying = player.rate != 0
@@ -244,10 +460,13 @@ final class EditorModel {
             do {
                 let built = try await CompositionBuilder.build(bundle: bundle, renderer: renderer, renderSize: size)
                 guard !Task.isCancelled else { return }
-                clips = built.clips
+                placements = built.placements
                 zoomSegments = renderer.zoomSegments
+                self.renderer = renderer
                 let item = AVPlayerItem(asset: built.composition)
                 item.videoComposition = built.videoComposition
+                item.audioMix = built.audioMix
+                item.audioTimePitchAlgorithm = .timeDomain
                 player.replaceCurrentItem(with: item)
                 seek(to: min(resumeAt, built.duration))
                 if wasPlaying { player.play() }
@@ -268,3 +487,15 @@ final class EditorModel {
         }
     }
 }
+
+/// Anything with a start and end on the source timeline.
+protocol TimedItem {
+    var start: Double { get set }
+    var end: Double { get set }
+}
+
+extension EditSettings.ZoomSegment: TimedItem {}
+extension EditSettings.PrivacyMask: TimedItem {}
+extension EditSettings.SceneSegment: TimedItem {}
+extension EditSettings.TextOverlay: TimedItem {}
+extension EditSettings.CameraMove: TimedItem {}

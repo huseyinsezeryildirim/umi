@@ -30,5 +30,7 @@
 	<string>Umi uses your camera to show your face in the recording bubble.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Umi uses your microphone to record your voice.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Umi transcribes your recordings on this Mac to create captions. Audio never leaves your computer.</string>
 </dict>
 </plist>

@@ -19,7 +19,7 @@ nonisolated enum Exporter {
             throw CocoaError(.featureUnsupported)
         }
         session.videoComposition = videoComposition
-        session.audioMix = mixAll(built.composition)
+        session.audioMix = built.audioMix
         session.shouldOptimizeForNetworkUse = true
         try? FileManager.default.removeItem(at: destination)
 
@@ -32,16 +32,5 @@ nonisolated enum Exporter {
         defer { monitor.cancel() }
         try await session.export(to: destination, as: .mp4)
         progress?(1)
-    }
-
-    /// All audio tracks at full volume; the export session mixes them into one track.
-    private static func mixAll(_ composition: AVComposition) -> AVAudioMix {
-        let mix = AVMutableAudioMix()
-        mix.inputParameters = composition.tracks.filter { $0.mediaType == .audio }.map { track in
-            let params = AVMutableAudioMixInputParameters(track: track)
-            params.setVolume(1, at: .zero)
-            return params
-        }
-        return mix
     }
 }
