@@ -119,7 +119,7 @@ final class TourController {
         panel.level = .floating
         panel.ignoresMouseEvents = true
         let view = ControlBarView(recorder: recorder)
-            .shadow(color: .umiAccent.opacity(0.9), radius: 14)
+            .shadow(color: UmiTheme.accent.opacity(0.55), radius: 16)
             .frame(width: size.width, height: size.height)
         panel.contentView = NSHostingView(rootView: view)
         panel.orderFrontRegardless()
@@ -158,9 +158,12 @@ struct TourCallout: View {
     }
 
     private var arrow: some View {
-        ScribbleArrow()
-            .stroke(.white, style: StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round))
-            .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
+        // Ink line with a white halo, readable on light and dark backgrounds.
+        ZStack {
+            ScribbleArrow().stroke(.white, style: StrokeStyle(lineWidth: 6.5, lineCap: .round, lineJoin: .round))
+            ScribbleArrow().stroke(UmiTheme.ink, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+        }
+        .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
             .frame(width: 92, height: 74)
             .padding(.top, 2)
     }

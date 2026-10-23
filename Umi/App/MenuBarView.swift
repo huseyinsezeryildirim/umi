@@ -10,7 +10,7 @@ struct MenuBarView: View {
     @AppStorage("onboardingStep") private var onboardingStep = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             header
 
             if !recorder.hasScreenPermission, recorder.phase == .idle {
@@ -31,13 +31,16 @@ struct MenuBarView: View {
 
             if let error = recorder.lastError {
                 Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                    .font(.system(size: 12))
+                    .foregroundStyle(UmiTheme.record)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(18)
-        .frame(width: 340)
+        .padding(20)
+        .frame(width: 344)
+        .background(UmiTheme.iceWash)
+        .foregroundStyle(UmiTheme.body)
+        .environment(\.colorScheme, .light)
         .task {
             await recorder.refreshSources()
             microphones = CaptureDevices.microphones
@@ -55,13 +58,18 @@ struct MenuBarView: View {
     // MARK: Sections
 
     private var header: some View {
-        HStack(spacing: 10) {
-            UmiMark(size: 30)
-            Text("Umi").font(.system(size: 20, weight: .bold, design: .rounded))
+        HStack(spacing: 8) {
+            UmiMark(size: 28)
+            Text("Umi")
+                .font(.system(size: 19, weight: .bold))
+                .tracking(-0.4)
+                .foregroundStyle(UmiTheme.ink)
             Spacer()
-            Button { AppModel.shared.startTour() } label: { Image(systemName: "questionmark.circle") }
+            Button { AppModel.shared.startTour() } label: { Image(systemName: "questionmark") }
+                .buttonStyle(GlassIconButtonStyle())
                 .help("Show the tour")
             Button { openLibrary() } label: { Image(systemName: "film.stack") }
+                .buttonStyle(GlassIconButtonStyle())
                 .help("Library")
             Menu {
                 Toggle("3-second countdown", isOn: Binding(get: { recorder.settings.countdown }, set: { recorder.settings.countdown = $0 }))
@@ -72,15 +80,18 @@ struct MenuBarView: View {
                 Divider()
                 Button("Quit Umi") { NSApp.terminate(nil) }
             } label: {
-                Image(systemName: "ellipsis.circle")
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(UmiTheme.secondary)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(.white.shadow(.inner(color: UmiTheme.innerGlow, radius: 3, x: -1, y: -1))))
+                    .overlay(Circle().strokeBorder(Color(hex: 0xD0D5DF)))
             }
-            .menuStyle(.borderlessButton)
+            .menuStyle(.button)
+            .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
         }
-        .font(.system(size: 17))
-        .buttonStyle(.borderless)
-        .foregroundStyle(.primary)
     }
 
     @ViewBuilder
@@ -94,8 +105,10 @@ struct MenuBarView: View {
         }
         .overlay {
             if highlight {
-                RoundedRectangle(cornerRadius: 16).strokeBorder(Color.umiAccent.opacity(0.8), lineWidth: 2).padding(-5)
-                    .shadow(color: .umiAccent.opacity(0.5), radius: 8)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(UmiTheme.ringLit, lineWidth: 2)
+                    .padding(-6)
+                    .shadow(color: UmiTheme.accent.opacity(0.25), radius: 10)
             }
         }
 
@@ -103,24 +116,23 @@ struct MenuBarView: View {
             closeLauncher()
             recorder.start()
         } label: {
-            Text("Start recording")
-                .font(.system(size: 16, weight: .semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 13)
-                .background(Color.umiAccent, in: RoundedRectangle(cornerRadius: 14))
-                .foregroundStyle(.white)
-                .shadow(color: onboardingStep == OnboardingStep.ready.rawValue ? .umiAccent.opacity(0.7) : .clear, radius: 10)
+            HStack(spacing: 9) {
+                Circle().fill(UmiTheme.record).frame(width: 9, height: 9)
+                Text("Start recording")
+            }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(InkButtonStyle())
+        .shadow(color: onboardingStep == OnboardingStep.ready.rawValue ? UmiTheme.accent.opacity(0.45) : .clear, radius: 14)
         .keyboardShortcut(.defaultAction)
 
         HStack {
             Text("No time limit · Free forever")
             Spacer()
-            Text(HotKeys.Action.startStop.display)
+            Text("\(HotKeys.Action.startStop.display) to start")
         }
-        .font(.caption)
-        .foregroundStyle(.secondary)
+        .font(.system(size: 12))
+        .foregroundStyle(UmiTheme.tertiary)
+        .frame(maxWidth: .infinity)
     }
 
     private var sourceRow: some View {
@@ -158,11 +170,10 @@ struct MenuBarView: View {
                     AVCaptureDevice.showSystemUserInterface(.videoEffects)
                 } label: {
                     Image(systemName: "wand.and.stars")
-                        .font(.system(size: 16, weight: .medium))
-                        .frame(width: 54, height: 54)
-                        .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(UmiTheme.secondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(GlassButtonStyle(height: 54, cornerRadius: 16))
                 .help("Video effects (Portrait, Studio Light, Center Stage…)")
             }
         }
@@ -284,29 +295,37 @@ private struct PermissionCard: View {
     let recorder: RecordingController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Allow screen recording", systemImage: "lock.shield")
-                .font(.system(size: 15, weight: .bold))
-            Text("Turn on Umi in System Settings › Privacy & Security › Screen & System Audio Recording. Then relaunch Umi so macOS applies it.")
-                .font(.system(size: 13))
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Button("Open System Settings") { recorder.requestScreenPermission() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.umiAccent)
-                Button("Relaunch Umi") { recorder.relaunch() }
+        UmiCard(.small, padding: 16, highlighted: true) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(UmiTheme.accent)
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(Color(hex: 0xE8EFFC)))
+                    Text("Allow screen recording")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(UmiTheme.ink)
+                }
+                Text("Turn on Umi in System Settings › Privacy & Security › Screen & System Audio Recording, then relaunch Umi.")
+                    .font(.system(size: 13))
+                    .lineSpacing(2)
+                    .foregroundStyle(UmiTheme.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 14) {
+                    Button("Open Settings") { recorder.requestScreenPermission() }
+                        .buttonStyle(GlassButtonStyle(height: 36, cornerRadius: 12))
+                    Button("Relaunch Umi") { recorder.relaunch() }
+                        .buttonStyle(LinkButtonStyle())
+                }
             }
-            .controlSize(.small)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.orange.opacity(0.4)))
     }
 }
 
-/// One rounded setting row in the launcher (Loom style), with an optional On/Off pill
-/// and an optional input level bar along the bottom.
+/// One setting row in the launcher: a white card with an icon, a title, a switch and
+/// an optional input-level line along the bottom.
 private struct LauncherRow: View {
     let systemImage: String
     let title: String
@@ -316,61 +335,48 @@ private struct LauncherRow: View {
     @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 14) {
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        HStack(spacing: 12) {
             Image(systemName: systemImage)
-                .font(.system(size: compact ? 15 : 18, weight: .medium))
-                .frame(width: 26)
+                .font(.system(size: compact ? 14 : 16, weight: .medium))
+                .foregroundStyle(isOn == false ? UmiTheme.tertiary : UmiTheme.ink)
+                .frame(width: 24)
             Text(title)
-                .font(.system(size: compact ? 13 : 15, weight: .semibold))
+                .font(.system(size: compact ? 13.5 : 15, weight: .medium))
+                .foregroundStyle(isOn == false ? UmiTheme.tertiary : UmiTheme.body)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 8)
             if let isOn {
-                Text(isOn ? "On" : "Off")
-                    .font(.system(size: 12, weight: .semibold))
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(isOn ? Color.green.opacity(0.22) : Color.secondary.opacity(0.18), in: RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(isOn ? Color.green.opacity(0.5) : .clear))
-                    .foregroundStyle(isOn ? Color.green : .secondary)
+                GlassSwitch(isOn: isOn)
+            } else {
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(UmiTheme.tertiary)
             }
         }
         .padding(.horizontal, 16)
-        .frame(height: compact ? 40 : 54)
+        .frame(height: compact ? 44 : 54)
         .frame(maxWidth: .infinity)
-        .background(alignment: .bottomLeading) {
+        .background(shape.fill(.white).shadow(color: .black.opacity(hovering ? 0.08 : 0.04), radius: hovering ? 6 : 2, y: 1))
+        .overlay(alignment: .bottom) {
             if let level {
                 GeometryReader { geo in
-                    Rectangle()
-                        .fill(Color.umiAccent.opacity(0.35))
-                        .frame(width: geo.size.width * level, height: 6)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
+                    Capsule()
+                        .fill(LinearGradient(colors: [UmiTheme.accentLight, UmiTheme.accent], startPoint: .leading, endPoint: .trailing))
+                        .frame(width: max(geo.size.width * level, 3), height: 3)
                         .animation(.linear(duration: 0.08), value: level)
                 }
+                .frame(height: 3)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
             }
         }
-        .background(Color.primary.opacity(hovering ? 0.11 : 0.07))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(shape.strokeBorder(hovering ? UmiTheme.ringLit : UmiTheme.cardBorder))
+        .contentShape(shape)
         .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
     }
-}
-
-/// Umi's app mark: a rounded square in the Umay gradient with a record dot.
-struct UmiMark: View {
-    var size: CGFloat = 28
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: size * 0.26)
-            .fill(LinearGradient(colors: [Color(red: 1, green: 0.45, blue: 0.62), Color(red: 0.45, green: 0.62, blue: 1)],
-                                 startPoint: .topLeading, endPoint: .bottomTrailing))
-            .frame(width: size, height: size)
-            .overlay(Circle().fill(.white).frame(width: size * 0.38, height: size * 0.38))
-    }
-}
-
-extension Color {
-    /// Umi's accent: a warm coral pink.
-    static let umiAccent = Color(red: 0.98, green: 0.36, blue: 0.47)
 }
 
 extension SCDisplay {

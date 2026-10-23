@@ -100,6 +100,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         }
 
         popover.behavior = .transient
+        popover.appearance = NSAppearance(named: .aqua)
         popover.animates = true
         popover.delegate = self
         popover.contentViewController = NSHostingController(rootView: MenuBarView()

@@ -44,64 +44,59 @@ enum OnboardingStep: Int, CaseIterable {
     }
 }
 
-/// A Loom-style tour callout: a soft, rounded card with an emoji title, progress
-/// dashes and a Next button. Always drawn light so it reads the same on any wallpaper.
+/// A tour callout: white card washed with icy blue at the bottom, ink title, grey
+/// body, progress dashes and the white glass Next button. Always light.
 struct TourCard: View {
     let step: OnboardingStep
     let next: () -> Void
     let close: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
-                Text("\(step.emoji) \(step.title)")
-                    .font(.system(size: 21, weight: .bold))
+                Text("\(step.emoji)  \(step.title)")
+                    .font(.system(size: 19, weight: .semibold))
+                    .tracking(-0.3)
+                    .foregroundStyle(UmiTheme.ink)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 Button(action: close) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 17, weight: .medium))
-                        .frame(width: 26, height: 26)
+                        .font(.system(size: 12, weight: .semibold))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(GlassIconButtonStyle(size: 26))
                 .help("Skip the tour")
             }
             Text(step.message)
-                .font(.system(size: 15.5))
-                .lineSpacing(3)
+                .font(.system(size: 14))
+                .lineSpacing(3.3)
+                .foregroundStyle(UmiTheme.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(alignment: .bottom) {
-                HStack(spacing: 6) {
+            HStack(alignment: .center) {
+                HStack(spacing: 5) {
                     ForEach(OnboardingStep.allCases, id: \.self) { s in
                         Capsule()
-                            .fill(s.rawValue <= step.rawValue ? Color.umiAccent : Color.black.opacity(0.15))
-                            .frame(width: 22, height: 5)
+                            .fill(s.rawValue <= step.rawValue ? UmiTheme.accent : UmiTheme.track)
+                            .frame(width: s == step ? 22 : 14, height: 5)
                     }
                 }
-                .padding(.bottom, 6)
+                .animation(.smooth(duration: 0.3), value: step)
                 Spacer()
-                Button(action: next) {
-                    Text(step == .ready ? "Close" : "Next")
-                        .font(.system(size: 16, weight: .semibold))
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 11)
-                        .background(Color.umiAccent, in: RoundedRectangle(cornerRadius: 10))
-                        .foregroundStyle(.white)
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.defaultAction)
+                Button(step == .ready ? "Done" : "Next", action: next)
+                    .buttonStyle(GlassButtonStyle(height: 40, cornerRadius: 13))
+                    .keyboardShortcut(.defaultAction)
             }
+            .padding(.top, 4)
         }
-        .foregroundStyle(Color(white: 0.12))
-        .padding(.horizontal, 24)
-        .padding(.vertical, 22)
-        .frame(width: 380)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 20)
+        .frame(width: 360)
         .background(
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .fill(Color(red: 1, green: 0.95, blue: 0.96))
-                .shadow(color: .black.opacity(0.22), radius: 18, y: 8)
+            shape.fill(LinearGradient(colors: [.white, .white, UmiTheme.iceTop, UmiTheme.iceBottom], startPoint: .top, endPoint: .bottom))
+                .shadow(color: .black.opacity(0.14), radius: 22, y: 10)
         )
-        .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous).strokeBorder(Color.umiAccent.opacity(0.25)))
+        .overlay(shape.strokeBorder(UmiTheme.hairline, lineWidth: 0.5))
         .environment(\.colorScheme, .light)
     }
 }

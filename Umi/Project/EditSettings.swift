@@ -4,7 +4,7 @@ import Foundation
 /// Every non-destructive edit of a recording. Stored in project.json; the source
 /// tracks are never modified. All sizes are fractions so they're resolution-independent.
 nonisolated struct EditSettings: Codable, Hashable, Sendable {
-    var background = Background.gradient(.dusk)
+    var background = Background.gradient(.sky)
     /// Space around the screen, as a fraction of the canvas' shorter side.
     var padding = 0.08
     /// Screen corner radius, as a fraction of the screen's shorter side.
@@ -23,10 +23,20 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
     }
 
     enum GradientPreset: String, Codable, CaseIterable, Sendable {
-        case dusk, ocean, mint, peach, grape, night, sand, umay
+        case sky, ice, navy, graphite, mist, mint, sand, dusk
+        // Earlier presets, still decodable for existing projects.
+        case ocean, peach, grape, night, umay
+
+        /// Presets offered in the editor.
+        static let pickable: [GradientPreset] = [.sky, .ice, .navy, .graphite, .mist, .mint, .sand, .dusk]
 
         var colors: (RGBA, RGBA) {
             switch self {
+            case .sky: (RGBA(0.62, 0.80, 0.98), RGBA(0.18, 0.37, 0.72))
+            case .ice: (RGBA(0.95, 0.97, 0.99), RGBA(0.80, 0.88, 0.97))
+            case .navy: (RGBA(0.18, 0.33, 0.53), RGBA(0.06, 0.09, 0.17))
+            case .graphite: (RGBA(0.25, 0.27, 0.32), RGBA(0.06, 0.07, 0.10))
+            case .mist: (RGBA(0.93, 0.94, 0.96), RGBA(0.72, 0.75, 0.81))
             case .dusk: (RGBA(0.98, 0.45, 0.42), RGBA(0.42, 0.29, 0.86))
             case .ocean: (RGBA(0.13, 0.60, 0.95), RGBA(0.08, 0.20, 0.55))
             case .mint: (RGBA(0.55, 0.93, 0.76), RGBA(0.11, 0.55, 0.55))

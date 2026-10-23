@@ -87,8 +87,8 @@ struct EditorTimeline: View {
             ForEach(Array(model.clips.enumerated()), id: \.offset) { index, clip in
                 let selected = selection == .clip(index)
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.accentColor.opacity(selected ? 0.55 : 0.32))
-                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2))
+                    .fill(UmiTheme.ink.opacity(selected ? 0.55 : 0.32))
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(selected ? UmiTheme.ink : .clear, lineWidth: 2))
                     .overlay(alignment: .leading) { Label("Clip", systemImage: "film").font(.caption2).padding(.leading, 12).labelStyle(.iconOnly) }
                     .overlay(alignment: .leading) { trimHandle { delta in trim(index, scale: scale, startDelta: delta) } }
                     .overlay(alignment: .trailing) { trimHandle { delta in trim(index, scale: scale, endDelta: delta) } }
@@ -202,10 +202,10 @@ private struct ZoomChip: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: 6)
-            .fill(Color.purple.opacity(generated ? 0.25 : 0.45))
+            .fill(UmiTheme.accent.opacity(generated ? 0.25 : 0.45))
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(selected ? Color.purple : Color.purple.opacity(0.5), style: StrokeStyle(lineWidth: selected ? 2 : 1, dash: generated ? [4, 3] : []))
+                    .strokeBorder(selected ? UmiTheme.accent : UmiTheme.accent.opacity(0.5), style: StrokeStyle(lineWidth: selected ? 2 : 1, dash: generated ? [4, 3] : []))
             )
             .overlay(alignment: .leading) {
                 Label(String(format: "%.1f×", segment.scale), systemImage: "plus.magnifyingglass")
