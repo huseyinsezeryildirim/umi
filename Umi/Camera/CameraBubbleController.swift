@@ -9,7 +9,9 @@ final class CameraBubbleController {
     private var panel: NSPanel?
     let session = CameraSession()
     private let model = CameraBubbleModel(style: .load())
-    /// Called when the user hides the camera from the bubble.
+    /// Called when the user closes the bubble with its × button. The owner should turn its
+    /// "show camera" setting off and call `hide()` (or `hidePanel()` mid-recording). When
+    /// unset, the bubble simply hides itself and stops the camera.
     var onHide: (() -> Void)?
 
     private var dragStart: (mouse: CGPoint, origin: CGPoint)?
@@ -210,7 +212,10 @@ final class CameraBubbleController {
             setSize: { [weak self] in self?.setSize($0) },
             setShape: { [weak self] in self?.setShape($0) },
             toggleMirror: { [weak self] in self?.toggleMirror() },
-            hide: { [weak self] in self?.onHide?() },
+            hide: { [weak self] in
+                guard let self else { return }
+                if let onHide { onHide() } else { hide() }
+            },
             drag: { [weak self] in self?.drag(ended: $0) },
             resize: { [weak self] in self?.resize(ended: $0) }
         )

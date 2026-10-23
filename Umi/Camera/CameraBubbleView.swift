@@ -20,11 +20,12 @@ nonisolated struct CameraBubbleStyle: Codable, Hashable, Sendable {
             }
         }
 
-        var label: String {
+        /// Dot drawn for this preset in the bubble's controls.
+        var dot: CGFloat {
             switch self {
-            case .small: "S"
-            case .medium: "M"
-            case .large: "L"
+            case .small: 6
+            case .medium: 9
+            case .large: 12
             }
         }
     }
@@ -125,43 +126,40 @@ struct CameraBubbleView: View {
         }
     }
 
+    /// Loom-style: a dark pill near the bottom with close | size dots, and a smaller pill
+    /// near the top for shape and mirror.
     private func controls(side: CGFloat) -> some View {
-        let compact = side < 170
-        return ZStack {
-            LinearGradient(colors: [.black.opacity(0.45), .clear, .clear, .black.opacity(0.45)], startPoint: .top, endPoint: .bottom)
-                .allowsHitTesting(false)
-            VStack {
-                HStack(spacing: 4) {
-                    ForEach(CameraBubbleStyle.Size.allCases, id: \.self) { size in
-                        let selected = abs(model.style.diameter - size.diameter) < 1
-                        BubbleButton(help: "\(size.rawValue.capitalized) size", selected: selected) {
-                            actions.setSize(size)
-                        } label: {
-                            Text(size.label).font(.system(size: 11, weight: .bold, design: .rounded))
-                        }
-                    }
+        VStack {
+            ControlPill {
+                PillButton(help: "Shape: \(model.style.shape.rawValue.capitalized)") {
+                    actions.setShape(model.style.shape.next)
+                } label: {
+                    Image(systemName: model.style.shape.bubbleIcon).font(.system(size: 11, weight: .semibold))
                 }
-                .padding(.top, side * (compact ? 0.12 : 0.14))
-                Spacer()
-                HStack(spacing: compact ? 4 : 6) {
-                    BubbleButton(help: "Shape: \(model.style.shape.rawValue.capitalized)") {
-                        actions.setShape(model.style.shape.next)
-                    } label: {
-                        Image(systemName: model.style.shape.bubbleIcon)
-                    }
-                    BubbleButton(help: model.style.mirrored ? "Mirrored" : "Not mirrored", selected: model.style.mirrored) {
-                        actions.toggleMirror()
-                    } label: {
-                        Image(systemName: "arrow.left.and.right.righttriangle.left.righttriangle.right")
-                    }
-                    BubbleButton(help: "Hide camera") {
-                        actions.hide()
-                    } label: {
-                        Image(systemName: "eye.slash")
-                    }
+                PillButton(help: model.style.mirrored ? "Mirrored" : "Not mirrored", selected: model.style.mirrored) {
+                    actions.toggleMirror()
+                } label: {
+                    Image(systemName: "arrow.left.and.right").font(.system(size: 11, weight: .semibold))
                 }
-                .padding(.bottom, side * (compact ? 0.12 : 0.14))
             }
+            .padding(.top, side * 0.1)
+            Spacer()
+            ControlPill {
+                PillButton(help: "Close camera") {
+                    actions.hide()
+                } label: {
+                    Image(systemName: "xmark").font(.system(size: 11, weight: .bold))
+                }
+                Rectangle().fill(.white.opacity(0.25)).frame(width: 1, height: 16)
+                ForEach(CameraBubbleStyle.Size.allCases, id: \.self) { size in
+                    PillButton(help: "\(size.rawValue.capitalized) size", selected: abs(model.style.diameter - size.diameter) < 1) {
+                        actions.setSize(size)
+                    } label: {
+                        Circle().fill(.white).frame(width: size.dot, height: size.dot)
+                    }
+                }
+            }
+            .padding(.bottom, side * 0.1)
         }
     }
 
@@ -191,7 +189,19 @@ struct CameraBubbleView: View {
     }
 }
 
-private struct BubbleButton<Label: View>: View {
+private struct ControlPill<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(spacing: 2) { content }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 3)
+            .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.3), lineWidth: 1))
+    }
+}
+
+private struct PillButton<Label: View>: View {
     let help: String
     var selected = false
     let action: () -> Void
@@ -200,11 +210,10 @@ private struct BubbleButton<Label: View>: View {
     var body: some View {
         Button(action: action) {
             label
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(selected ? .black : .white)
+                .foregroundStyle(.white)
                 .frame(width: 24, height: 24)
-                .background(selected ? AnyShapeStyle(.white) : AnyShapeStyle(.black.opacity(0.55)), in: Circle())
-                .contentShape(Circle())
+                .background(selected ? AnyShapeStyle(.white.opacity(0.18)) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(help)

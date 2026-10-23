@@ -34,13 +34,6 @@ final class RecordingController {
 
     var elapsed: TimeInterval { session?.clock.elapsed.seconds ?? 0 }
 
-    init() {
-        camera.onHide = { [weak self] in
-            self?.settings.showCamera = false
-            self?.setCameraPreview(false)
-        }
-    }
-
     // MARK: Sources
 
     func refreshSources() async {
@@ -68,14 +61,7 @@ final class RecordingController {
     }
 
     func setCameraPreview(_ on: Bool) {
-        if session?.cameraOn == true {
-            // Mid-recording: only the bubble goes away, camera.mov keeps running.
-            if on { camera.showPanel() } else { camera.hidePanel() }
-        } else if on {
-            camera.show()
-        } else {
-            camera.hide()
-        }
+        if on { camera.show() } else { camera.hide() }
     }
 
     // MARK: Control
@@ -102,7 +88,6 @@ final class RecordingController {
         guard phase == .recording || phase == .paused, let session else { return }
         phase = .finishing
         let end = session.clock.stop()
-        let bubble = camera.editCamera(in: session.project.screen.captureRect)
         Task {
             let cursorData = session.cursor.stop()
             await session.screen.stop()
@@ -112,7 +97,7 @@ final class RecordingController {
             do {
                 var project = session.project
                 project.duration = end.seconds
-                if hasCamera { project.camera?.bubble = bubble } else { project.camera = nil }
+                if !hasCamera { project.camera = nil }
                 try ProjectStore.write(cursorData, to: session.bundle.appendingPathComponent(RecordingProject.cursorFile))
                 try ProjectStore.write(project, to: session.bundle.appendingPathComponent(RecordingProject.fileName))
                 lastFinishedURL = session.bundle
@@ -245,11 +230,10 @@ final class RecordingController {
                 throw RecorderError.noSource
             }
             // Leave out all of Umi's own windows: menu, countdown and the camera bubble
-            // (the camera has its own track and is composited by the editor). Excluding the
-            // app rather than its current windows also covers a bubble shown mid-recording.
+            // (the camera has its own track and is composited by the editor).
             let pid = ProcessInfo.processInfo.processIdentifier
-            let own = content.applications.filter { $0.processID == pid }
-            return (SCContentFilter(display: display, excludingApplications: own, exceptingWindows: []), CGDisplayBounds(display.displayID))
+            let own = content.windows.filter { $0.owningApplication?.processID == pid }
+            return (SCContentFilter(display: display, excludingWindows: own), CGDisplayBounds(display.displayID))
         case .window:
             guard let window = content.windows.first(where: { $0.windowID == settings.windowID }) else {
                 throw RecorderError.noSource
