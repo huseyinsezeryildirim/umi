@@ -41,8 +41,11 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: cam.umi.app
         PRODUCT_NAME: Umi
         ENABLE_HARDENED_RUNTIME: YES
-        CODE_SIGN_STYLE: Automatic
-        CODE_SIGN_IDENTITY: "-"
+        # A stable signing identity keeps macOS privacy permissions (screen recording,
+        # camera, mic) across rebuilds; ad-hoc signatures change every build.
+        DEVELOPMENT_TEAM: 78RWS43DL8
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: Apple Development
         COMBINE_HIDPI_IMAGES: YES
       configs:
         # Direct distribution (notarized DMG + Sparkle later). Hardened runtime, no sandbox.
@@ -67,7 +70,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: cam.umi.tests
         SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
         GENERATE_INFOPLIST_FILE: YES
-        CODE_SIGN_IDENTITY: "-"
+        DEVELOPMENT_TEAM: 78RWS43DL8
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: Apple Development
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/Umi.app/Contents/MacOS/Umi
         BUNDLE_LOADER: $(TEST_HOST)
 

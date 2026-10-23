@@ -26,7 +26,7 @@ Build outside `~/Desktop` (Xcode's default DerivedData is fine); an app binary i
 
 Tests: `scripts/make-fixture.sh` creates a synthetic project in `/tmp/umi-fixtures`, then run the `Umi` scheme's tests. In Debug, `UMI_OPEN_EDITOR=/path/to/X.umi` opens that project's editor on launch.
 
-Local builds are ad-hoc signed, so macOS may ask for Screen Recording permission again after a rebuild. Set a development team in Xcode to avoid this.
+Builds are signed with the team's Apple Development identity (`project.yml`) so macOS keeps Screen Recording / Camera / Mic permissions across rebuilds. Don't run several differently-signed copies of `cam.umi.app` side by side (e.g. from worktrees): macOS will keep re-asking for permission.
 
 ## Layout
 
