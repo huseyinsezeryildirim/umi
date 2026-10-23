@@ -231,3 +231,9 @@ extension View {
         }
     }
 }
+
+/// Hosting view for Umi's floating, never-key panels (control bar, tour callouts):
+/// the first click goes straight to the button instead of only focusing the panel.
+final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}

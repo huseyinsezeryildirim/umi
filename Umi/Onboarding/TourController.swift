@@ -93,7 +93,7 @@ final class TourController {
     private func place(_ step: OnboardingStep, pointing: Pointing, toward target: CGPoint, screen: CGRect) {
         let content = TourCallout(step: step, pointsRight: pointing == .right, next: { [weak self] in self?.advance() },
                                   close: { [weak self] in self?.finish() })
-        let host = NSHostingView(rootView: content)
+        let host = FirstMouseHostingView(rootView: content)
         let size = host.fittingSize
         var origin = CGPoint(
             x: pointing == .right ? target.x - size.width - 6 : target.x + 6,

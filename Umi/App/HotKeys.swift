@@ -4,13 +4,14 @@ import Carbon.HIToolbox
 /// Defaults match Loom's so switching users keep their muscle memory.
 final class HotKeys {
     enum Action: UInt32, CaseIterable {
-        case startStop = 1, pauseResume, cancel
+        case startStop = 1, pauseResume, cancel, launcher
 
         var keyCode: Int {
             switch self {
             case .startStop: kVK_ANSI_L
             case .pauseResume: kVK_ANSI_P
             case .cancel: kVK_ANSI_C
+            case .launcher: kVK_ANSI_U
             }
         }
 
@@ -19,6 +20,7 @@ final class HotKeys {
             case .startStop: "⌥⇧L"
             case .pauseResume: "⌥⇧P"
             case .cancel: "⌥⇧C"
+            case .launcher: "⌥⇧U"
             }
         }
     }
