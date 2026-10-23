@@ -33,6 +33,9 @@ nonisolated struct RecordingProject: Codable, Hashable {
         /// Where the bubble sat during recording, as the bubble's center normalized to the
         /// captured area. The editor uses it as the default camera position.
         var bubbleCenter: CGPoint?
+        /// Shape, size, mirror and position of the bubble when recording stopped, so the
+        /// editor starts with what the user saw.
+        var bubble: EditSettings.Camera?
     }
 
     struct Audio: Codable, Hashable {
