@@ -77,7 +77,8 @@ private struct OpenWindowBridge: View {
                 #if DEBUG
                 // Dev hook: UMI_OPEN_EDITOR=/path/to/Some.umi opens that project on launch.
                 if let path = ProcessInfo.processInfo.environment["UMI_OPEN_EDITOR"] {
-                    AppModel.shared.openEditor(URL(fileURLWithPath: path))
+                    // Give SwiftUI's scenes a moment to come up before opening a window.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) { AppModel.shared.openEditor(URL(fileURLWithPath: path)) }
                 }
                 #endif
             }

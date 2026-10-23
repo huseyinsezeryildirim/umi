@@ -86,12 +86,12 @@ enum CaptionGenerator {
     }
 }
 
-enum SubtitleFormat: String, CaseIterable {
+nonisolated enum SubtitleFormat: String, CaseIterable {
     case srt, vtt
 }
 
 /// Writes captions as SRT or WebVTT, timed on the edited (output) timeline.
-enum SubtitleWriter {
+nonisolated enum SubtitleWriter {
     static func write(_ words: [EditSettings.CaptionWord], format: SubtitleFormat, mapTime: (Double) -> Double?, to url: URL) throws {
         var cues: [(Double, Double, String)] = []
         for line in TextRenderer.lines(words) {

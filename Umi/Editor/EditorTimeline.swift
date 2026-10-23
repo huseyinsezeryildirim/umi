@@ -5,7 +5,7 @@ import SwiftUI
 struct EditorTimeline: View {
     let model: EditorModel
 
-    static let labelWidth: CGFloat = 84
+    static let labelWidth: CGFloat = 96
     static let trackHeight: CGFloat = 30
 
     var body: some View {
