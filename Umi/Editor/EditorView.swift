@@ -15,11 +15,12 @@ struct EditorView: View {
             VStack(spacing: 0) {
                 PlayerSurface(player: model.player)
                     .background(Color.black.opacity(0.9))
+                    .overlay { PreviewOverlay(model: model) }
                     .frame(minWidth: 560, minHeight: 320)
                 TransportBar(model: model)
                 Divider()
                 EditorTimeline(model: model)
-                    .frame(height: 132)
+                    .frame(minHeight: 150, idealHeight: 250)
             }
             InspectorView(model: model)
                 .frame(minWidth: 280, idealWidth: 300, maxWidth: 360)

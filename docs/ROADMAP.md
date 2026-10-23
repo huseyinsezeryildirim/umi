@@ -21,6 +21,18 @@ Hedef: **Loom'un hızı + Cap Studio'nun cilası**, native ve ücretsiz. Ayrınt
 - [x] Trim, split, segment silme, undo/redo (yıkıcı olmayan proje dosyası)
 - [x] MP4 dışa aktarma: 720p/1080p/4K, 30/60 fps, kalite presetleri
 
+## M2.5 — Cap Studio özellikleri
+- [x] Gizlilik maskeleri: blur, pixelate, highlight (önizlemede sürükle/boyutlandır)
+- [x] Zoom: 1x–4.5x, imleci takip et veya sabit odak (önizlemede tıkla)
+- [x] Canvas: gradyan (açı), renk, macOS duvar kağıtları, kendi görselin, gren; cihaz çerçeveleri (macOS, Windows, tarayıcı, MacBook)
+- [x] Sahneler: camera only, hide camera, split screen, floating; animasyonlu geçişler
+- [x] Renk: Cinematic, Noir, Vintage, Frost, Golden, Midnight, Vivid, Dreamy + exposure/contrast/saturation/vignette/grain
+- [x] Hareketli yazı: title, lower third, kicker, big stat, quote, typewriter; fade/slide/pop/typewriter
+- [x] 3D kamera hareketleri: glide, unfold, pull back (odak bulanıklığı)
+- [x] Altyazı: cihazda transkripsiyon (Apple Speech), satır düzenleme, aktif kelime vurgusu, SRT/VTT
+- [x] Klipler: hız (0.25–8x), sıralama, crossfade; müzik (döngü + fade out)
+- [ ] Hazır müzik kütüphanesi (telifsiz parçalar gerekiyor)
+
 ## M3 — Paylaşım ve izleyici sayfası (ücretli bulut)
 - [ ] Durdur → yükle → link panoda; yeniden denenebilir/devam ettirilebilir yükleme
 - [ ] İzleyici sayfası: hesapsız izleme, hız, tam ekran, `t=` zaman linki, OG önizleme
