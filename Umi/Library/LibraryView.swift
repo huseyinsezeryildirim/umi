@@ -66,8 +66,8 @@ private struct RecordingRow: View {
     }
 
     private func load() async {
-        let asset = AVURLAsset(url: recording.url)
-        if let time = try? await asset.load(.duration) { duration = time.seconds }
+        duration = recording.project.duration
+        let asset = AVURLAsset(url: recording.screenURL)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
         generator.maximumSize = CGSize(width: 320, height: 200)
@@ -98,7 +98,7 @@ private struct RecordingDetail: View {
             .padding(12)
         }
         .onChange(of: recording.url, initial: true) { _, url in
-            player.replaceCurrentItem(with: AVPlayerItem(url: url))
+            player.replaceCurrentItem(with: AVPlayerItem(url: recording.screenURL))
         }
         .onDisappear { player.pause() }
     }

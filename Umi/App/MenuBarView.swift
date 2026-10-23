@@ -131,9 +131,12 @@ struct MenuBarView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(.red)
             }
-            Button("Discard recording", role: .destructive) { recorder.cancel() }
-                .buttonStyle(.borderless)
-                .font(.caption)
+            HStack {
+                Button("Restart") { recorder.restart() }
+                Button("Discard", role: .destructive) { recorder.cancel() }
+            }
+            .buttonStyle(.borderless)
+            .font(.caption)
         }
     }
 

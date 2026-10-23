@@ -1,14 +1,22 @@
 import AppKit
 import AVFoundation
 
-/// A round, draggable, always-on-top camera preview. It's a real window on screen,
-/// so the screen recording picks it up the same way Loom's bubble does.
+/// A round, draggable, always-on-top camera preview. The camera is recorded to its own
+/// track, so the bubble is left out of the screen capture and composited by the editor.
 final class CameraBubbleController {
     private var panel: NSPanel?
-    private let session = CameraSession()
+    let session = CameraSession()
     private let diameter: CGFloat = 200
 
     var windowNumber: Int? { panel?.isVisible == true ? panel?.windowNumber : nil }
+
+    /// The bubble's center normalized to `rect` (global points, top-left origin).
+    func normalizedCenter(in rect: CGRect) -> CGPoint? {
+        guard let frame = panel?.frame, panel?.isVisible == true else { return nil }
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        let center = CGPoint(x: frame.midX, y: primaryHeight - frame.midY)
+        return CGPoint(x: (center.x - rect.minX) / max(rect.width, 1), y: (center.y - rect.minY) / max(rect.height, 1))
+    }
 
     func show() {
         Task {
@@ -54,37 +62,5 @@ final class CameraBubbleController {
 
         panel.contentView = view
         return panel
-    }
-}
-
-/// Owns the `AVCaptureSession` and runs its blocking start/stop calls off the main thread.
-nonisolated final class CameraSession: @unchecked Sendable {
-    let captureSession = AVCaptureSession()
-    private let queue = DispatchQueue(label: "cam.umi.camera")
-    private var configured = false
-
-    func start() {
-        queue.async { [self] in
-            if !configured { configure() }
-            if !captureSession.isRunning { captureSession.startRunning() }
-        }
-    }
-
-    func stop() {
-        queue.async { [self] in
-            if captureSession.isRunning { captureSession.stopRunning() }
-        }
-    }
-
-    private func configure() {
-        captureSession.beginConfiguration()
-        captureSession.sessionPreset = .high
-        if let device = AVCaptureDevice.default(for: .video),
-           let input = try? AVCaptureDeviceInput(device: device),
-           captureSession.canAddInput(input) {
-            captureSession.addInput(input)
-        }
-        captureSession.commitConfiguration()
-        configured = true
     }
 }

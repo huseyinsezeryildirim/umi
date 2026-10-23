@@ -1,0 +1,76 @@
+import Foundation
+
+/// A recording on disk: a `.umi` folder holding each track separately plus metadata.
+///
+///     Umi 2026-10-23 at 20.41.07.umi/
+///       project.json   this struct
+///       screen.mov     screen video (no cursor, no camera) + system audio + mic tracks
+///       camera.mov     camera video, if the camera was on
+///       cursor.json    `CursorData`
+nonisolated struct RecordingProject: Codable, Hashable {
+    static let fileName = "project.json"
+    static let screenFile = "screen.mov"
+    static let cameraFile = "camera.mov"
+    static let cursorFile = "cursor.json"
+
+    var version = 1
+    var createdAt: Date
+    var duration: Double
+    var screen: Screen
+    var camera: Camera?
+    var audio: Audio
+
+    struct Screen: Codable, Hashable {
+        var pixelWidth: Int
+        var pixelHeight: Int
+        /// Captured area in global screen points (top-left origin).
+        var captureRect: CGRect
+        var fps: Int
+    }
+
+    struct Camera: Codable, Hashable {
+        /// Where the bubble sat during recording, as the bubble's center normalized to the
+        /// captured area. The editor uses it as the default camera position.
+        var bubbleCenter: CGPoint?
+    }
+
+    struct Audio: Codable, Hashable {
+        /// Index of each audio track inside screen.mov.
+        var systemTrack: Int?
+        var microphoneTrack: Int?
+    }
+}
+
+nonisolated struct CursorData: Codable, Hashable {
+    var moves: [Move] = []
+    var clicks: [Click] = []
+
+    struct Move: Codable, Hashable {
+        var t: Double
+        var x: Double
+        var y: Double
+    }
+
+    struct Click: Codable, Hashable {
+        enum Button: String, Codable { case left, right, other }
+        var t: Double
+        var x: Double
+        var y: Double
+        var button: Button
+    }
+}
+
+nonisolated enum ProjectStore {
+    static func write<T: Encodable>(_ value: T, to url: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(value).write(to: url, options: .atomic)
+    }
+
+    static func read<T: Decodable>(_ type: T.Type, from url: URL) throws -> T {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(type, from: Data(contentsOf: url))
+    }
+}
