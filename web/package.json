@@ -1,0 +1,27 @@
+{
+  "name": "umi-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "db:migrate:local": "wrangler d1 migrations apply umi --local",
+    "db:seed:local": "wrangler d1 execute umi --local --file=seed/dev.sql",
+    "setup:local": "npm run db:migrate:local && npm run db:seed:local",
+    "typecheck": "tsc --noEmit",
+    "types": "wrangler types",
+    "e2e": "node scripts/e2e.mjs",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "wrangler": "^4.152.0"
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "sharp@0.35.5": true,
+    "workerd@1.20261019.1": true
+  }
+}
