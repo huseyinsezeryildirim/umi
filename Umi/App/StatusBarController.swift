@@ -12,6 +12,7 @@ final class AppModel {
     /// SwiftUI's openWindow, captured from a view so AppKit code can open scenes.
     var openWindow: OpenWindowAction?
     var closeLauncher: () -> Void = {}
+    var startTour: () -> Void = {}
 
     func openLibrary() {
         openWindow?(id: WindowID.library)
@@ -87,10 +88,16 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let popover = NSPopover()
     private var titleTimer: Timer?
+    private let tour: TourController
 
     init(model: AppModel) {
         self.model = model
+        tour = TourController(recorder: model.recorder)
         super.init()
+        tour.launcherFrame = { [weak self] in
+            guard let self, popover.isShown else { return nil }
+            return popover.contentViewController?.view.window?.frame
+        }
 
         popover.behavior = .transient
         popover.animates = true
@@ -106,6 +113,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
             button.imagePosition = .imageLeading
         }
         model.closeLauncher = { [weak self] in self?.popover.performClose(nil) }
+        model.startTour = { [weak self] in self?.tour.restart() }
         updateButton()
         observePhase()
     }
@@ -127,6 +135,11 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
             NSApp.activate()
+            // Let the popover finish laying out before placing callouts next to it.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                guard let self, popover.isShown, model.recorder.phase == .idle else { return }
+                tour.showIfNeeded()
+            }
         }
     }
 
@@ -214,6 +227,31 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     // MARK: NSPopoverDelegate
 
     func popoverDidClose(_ notification: Notification) {
+        // Clicking the camera bubble (to drag, resize or use its controls) counts as a
+        // click outside the popover. Keep the bubble up and bring the launcher back once
+        // the mouse is released, instead of hiding both.
+        let mouse = NSEvent.mouseLocation
+        if model.recorder.phase == .idle, model.recorder.cameraBubbleContains(mouse) || tour.contains(mouse) {
+            reopenOnMouseUp()
+            return
+        }
+        tour.suspend()
         model.recorder.launcherDidClose()
+    }
+
+    private var mouseUpMonitor: Any?
+
+    private func reopenOnMouseUp() {
+        guard mouseUpMonitor == nil else { return }
+        mouseUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { [weak self] event in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let monitor = self.mouseUpMonitor { NSEvent.removeMonitor(monitor) }
+                self.mouseUpMonitor = nil
+                guard self.model.recorder.phase == .idle, !self.popover.isShown else { return }
+                self.togglePopover()
+            }
+            return event
+        }
     }
 }

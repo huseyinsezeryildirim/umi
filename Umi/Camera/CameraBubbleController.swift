@@ -21,6 +21,8 @@ final class CameraBubbleController {
 
     var windowNumber: Int? { panel?.isVisible == true ? panel?.windowNumber : nil }
     var isVisible: Bool { panel?.isVisible == true }
+    /// On-screen frame (AppKit global coordinates), if visible.
+    var visibleFrame: CGRect? { isVisible ? panel?.frame : nil }
 
     /// The bubble's center normalized to `rect` (global points, top-left origin).
     func normalizedCenter(in rect: CGRect) -> CGPoint? {

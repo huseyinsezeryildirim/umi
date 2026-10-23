@@ -26,6 +26,12 @@ final class LauncherSnapshotTests: XCTestCase {
         bar.scale = 2
         let barData = NSBitmapImageRep(data: bar.nsImage!.tiffRepresentation!)!.representation(using: .png, properties: [:])!
         try barData.write(to: dir.appendingPathComponent("controlbar.png"))
+        for (name, step, right) in [("welcome", OnboardingStep.welcome, true), ("bubble", OnboardingStep.bubble, false)] {
+            let r = ImageRenderer(content: TourCallout(step: step, pointsRight: right, next: {}, close: {}).background(Color(white: 0.45)))
+            r.scale = 2
+            let d = NSBitmapImageRep(data: r.nsImage!.tiffRepresentation!)!.representation(using: .png, properties: [:])!
+            try d.write(to: dir.appendingPathComponent("tour-\(name).png"))
+        }
         UserDefaults.standard.removeObject(forKey: "onboardingStep")
     }
 }

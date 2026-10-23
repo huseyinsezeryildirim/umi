@@ -77,6 +77,13 @@ final class RecordingController {
         if phase == .idle, settings.showCamera { camera.show() }
     }
 
+    var cameraBubbleFrame: CGRect? { camera.visibleFrame }
+
+    /// Whether a screen point (AppKit global coordinates) is on the camera bubble.
+    func cameraBubbleContains(_ point: CGPoint) -> Bool {
+        camera.visibleFrame?.contains(point) ?? false
+    }
+
     func launcherDidClose() {
         launcherOpen = false
         if phase == .idle { camera.hide() }

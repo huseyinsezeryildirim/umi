@@ -13,10 +13,6 @@ struct MenuBarView: View {
         VStack(alignment: .leading, spacing: 14) {
             header
 
-            if let step = OnboardingStep(rawValue: onboardingStep), recorder.phase == .idle {
-                OnboardingCard(step: step) { advanceTour() } close: { onboardingStep = OnboardingStep.done }
-            }
-
             if !recorder.hasScreenPermission, recorder.phase == .idle {
                 PermissionCard(recorder: recorder)
             }
@@ -63,7 +59,7 @@ struct MenuBarView: View {
             UmiMark(size: 30)
             Text("Umi").font(.system(size: 20, weight: .bold, design: .rounded))
             Spacer()
-            Button { onboardingStep = 1 } label: { Image(systemName: "questionmark.circle") }
+            Button { AppModel.shared.startTour() } label: { Image(systemName: "questionmark.circle") }
                 .help("Show the tour")
             Button { openLibrary() } label: { Image(systemName: "film.stack") }
                 .help("Library")
@@ -269,11 +265,6 @@ struct MenuBarView: View {
     private var micName: String {
         microphones.first { $0.uniqueID == recorder.settings.microphoneID }?.localizedName
             ?? AVCaptureDevice.default(for: .audio)?.localizedName ?? "Microphone"
-    }
-
-    private func advanceTour() {
-        let next = onboardingStep + 1
-        onboardingStep = OnboardingStep(rawValue: next) == nil ? OnboardingStep.done : next
     }
 
     private func openLibrary() {

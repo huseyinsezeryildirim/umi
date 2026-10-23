@@ -167,9 +167,9 @@ struct CameraBubbleView: View {
     private func resizeHandle(side: CGFloat, radius: CGFloat) -> some View {
         // Distance from the bounding box corner to the shape edge along the diagonal.
         let inset = radius * (1 - 1 / sqrt(2)) + 2
-        return Image(systemName: "arrow.up.left.and.arrow.down.right")
-            .font(.system(size: 9, weight: .bold))
-            .foregroundStyle(.white)
+        return ResizeGrip()
+            .stroke(.white, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            .frame(width: 10, height: 10)
             .frame(width: 22, height: 22)
             .background(.black.opacity(0.55), in: Circle())
             .overlay(Circle().strokeBorder(.white.opacity(0.8), lineWidth: 1))
@@ -186,6 +186,18 @@ struct CameraBubbleView: View {
         DragGesture(minimumDistance: 1, coordinateSpace: .global)
             .onChanged { _ in handler(false) }
             .onEnded { _ in handler(true) }
+    }
+}
+
+/// Two diagonal strokes in the bottom-right corner: the usual "drag to resize" grip.
+private struct ResizeGrip: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path { p in
+            p.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+            p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            p.move(to: CGPoint(x: rect.maxX, y: rect.midY))
+            p.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+        }
     }
 }
 
