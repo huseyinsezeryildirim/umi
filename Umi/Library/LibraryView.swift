@@ -3,6 +3,7 @@ import SwiftUI
 
 struct LibraryView: View {
     @Environment(RecordingsLibrary.self) private var library
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         @Bindable var library = library
@@ -11,10 +12,14 @@ struct LibraryView: View {
             List(library.recordings, selection: $library.selection) { recording in
                 RecordingRow(recording: recording)
                     .contextMenu {
+                        Button("Edit") { openWindow(id: WindowID.editor, value: recording.url) }
                         Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([recording.url]) }
                         Divider()
                         Button("Move to Trash", role: .destructive) { library.moveToTrash(recording) }
                     }
+            }
+            .contextMenu(forSelectionType: Recording.ID.self) { _ in } primaryAction: { ids in
+                ids.forEach { openWindow(id: WindowID.editor, value: $0) }
             }
             .navigationSplitViewColumnWidth(min: 240, ideal: 280)
             .overlay {
@@ -79,27 +84,44 @@ private struct RecordingRow: View {
 
 private struct RecordingDetail: View {
     let recording: Recording
-    @State private var player = AVPlayer()
+    @Environment(\.openWindow) private var openWindow
+    @State private var thumbnail: NSImage?
 
     var body: some View {
-        VStack(spacing: 0) {
-            VideoPlayer(player: player)
-                .background(.black)
+        VStack(spacing: 16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12).fill(.quaternary)
+                if let thumbnail {
+                    Image(nsImage: thumbnail).resizable().aspectRatio(contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onTapGesture(count: 2) { edit() }
+
             HStack {
-                Text(recording.title).font(.headline).lineLimit(1)
+                VStack(alignment: .leading) {
+                    Text(recording.title).font(.headline).lineLimit(1)
+                    Text(recording.project.duration.formattedDuration).foregroundStyle(.secondary)
+                }
                 Spacer()
                 Button("Show in Finder", systemImage: "folder") {
                     NSWorkspace.shared.activateFileViewerSelecting([recording.url])
                 }
-                ShareLink(item: recording.url) {
-                    Label("Share File", systemImage: "square.and.arrow.up")
-                }
+                Button("Edit", systemImage: "slider.horizontal.3") { edit() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
             }
-            .padding(12)
         }
-        .onChange(of: recording.url, initial: true) { _, url in
-            player.replaceCurrentItem(with: AVPlayerItem(url: recording.screenURL))
+        .padding(16)
+        .task(id: recording.url) {
+            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: recording.screenURL))
+            generator.maximumSize = CGSize(width: 1600, height: 1000)
+            thumbnail = (try? await generator.image(at: CMTime(seconds: 0.5, preferredTimescale: 600))).map { NSImage(cgImage: $0.image, size: .zero) }
         }
-        .onDisappear { player.pause() }
+    }
+
+    private func edit() {
+        openWindow(id: WindowID.editor, value: recording.url)
     }
 }

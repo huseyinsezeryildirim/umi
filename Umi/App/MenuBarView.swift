@@ -3,8 +3,23 @@ import SwiftUI
 
 struct MenuBarLabel: View {
     @Environment(RecordingController.self) private var recorder
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
+        label
+            #if DEBUG
+            .task {
+                // Dev hook: UMI_OPEN_EDITOR=/path/to/Some.umi opens that project on launch.
+                if let path = ProcessInfo.processInfo.environment["UMI_OPEN_EDITOR"] {
+                    openWindow(id: WindowID.editor, value: URL(fileURLWithPath: path))
+                    NSApp.activate()
+                }
+            }
+            #endif
+    }
+
+    @ViewBuilder
+    private var label: some View {
         switch recorder.phase {
         case .recording, .paused:
             TimelineView(.periodic(from: .now, by: 1)) { _ in
@@ -67,7 +82,8 @@ struct MenuBarView: View {
         .onChange(of: recorder.lastFinishedURL) { _, url in
             guard let url else { return }
             library.reload(selecting: url)
-            openLibrary()
+            openWindow(id: WindowID.editor, value: url)
+            NSApp.activate()
         }
     }
 

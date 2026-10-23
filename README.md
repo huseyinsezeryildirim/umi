@@ -22,6 +22,10 @@ Schemes:
 | `Umi` | Debug / Release | Direct distribution (notarized DMG). Hardened runtime, no sandbox. |
 | `Umi-AppStore` | Release-AppStore | Mac App Store. Sandboxed, `APPSTORE` compile flag. |
 
+Build outside `~/Desktop` (Xcode's default DerivedData is fine); an app binary inside Desktop triggers a Desktop-folder privacy prompt.
+
+Tests: `scripts/make-fixture.sh` creates a synthetic project in `/tmp/umi-fixtures`, then run the `Umi` scheme's tests. In Debug, `UMI_OPEN_EDITOR=/path/to/X.umi` opens that project's editor on launch.
+
 Local builds are ad-hoc signed, so macOS may ask for Screen Recording permission again after a rebuild. Set a development team in Xcode to avoid this.
 
 ## Layout
@@ -29,8 +33,11 @@ Local builds are ad-hoc signed, so macOS may ask for Screen Recording permission
 ```
 Umi/
   App/        app entry, menu bar UI
-  Recording/  ScreenCaptureKit recorder, segments (pause/resume), merge
-  Camera/     floating camera bubble
+  Recording/  ScreenCaptureKit capture, writers, shared clock, cursor log
+  Project/    .umi project format and edit settings
+  Render/     Core Image compositor, cursor/zoom tracks, composition, export
+  Editor/     editor window: preview, timeline, inspector
+  Camera/     camera session + floating bubble
   Overlay/    countdown
   Library/    recordings list + player
 docs/         product strategy and research
