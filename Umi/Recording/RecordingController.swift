@@ -84,6 +84,34 @@ final class RecordingController {
 
     var cameraBubbleFrame: CGRect? { camera.visibleFrame }
 
+    // MARK: Camera settings
+
+    var cameraBubble: CameraBubbleModel { camera.model }
+    func setCameraSize(_ size: CameraBubbleStyle.Size) { camera.setSize(size) }
+    func setCameraShape(_ shape: EditSettings.Camera.Shape) { camera.setShape(shape) }
+    func toggleCameraMirror() { camera.toggleMirror() }
+
+    func selectCamera(_ id: String?) {
+        settings.cameraID = id
+        camera.session.selectDevice(id)
+    }
+
+    var selectedCamera: AVCaptureDevice? {
+        settings.cameraID.flatMap(AVCaptureDevice.init(uniqueID:)) ?? AVCaptureDevice.default(for: .video)
+    }
+
+    /// Center Stage keeps you framed as you move. Apps may switch it in "cooperative" mode.
+    var supportsCenterStage: Bool { selectedCamera?.activeFormat.isCenterStageSupported ?? false }
+    var centerStageEnabled: Bool {
+        get { access(keyPath: \.centerStageEnabled); return AVCaptureDevice.isCenterStageEnabled }
+        set {
+            withMutation(keyPath: \.centerStageEnabled) {
+                AVCaptureDevice.centerStageControlMode = .cooperative
+                AVCaptureDevice.isCenterStageEnabled = newValue
+            }
+        }
+    }
+
     /// Whether a screen point (AppKit global coordinates) is on the camera bubble.
     func cameraBubbleContains(_ point: CGPoint) -> Bool {
         camera.visibleFrame?.contains(point) ?? false

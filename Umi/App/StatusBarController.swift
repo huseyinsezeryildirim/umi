@@ -13,6 +13,8 @@ final class AppModel {
     var openWindow: OpenWindowAction?
     var closeLauncher: () -> Void = {}
     var startTour: () -> Void = {}
+    /// Closes the launcher but leaves the camera and bubble on (for macOS video effects).
+    var closeLauncherKeepingCamera: () -> Void = {}
 
     func openLibrary() {
         openWindow?(id: WindowID.library)
@@ -117,6 +119,10 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         }
         model.closeLauncher = { [weak self] in self?.popover.performClose(nil) }
         model.startTour = { [weak self] in self?.tour.restart() }
+        model.closeLauncherKeepingCamera = { [weak self] in
+            self?.keepCameraOnClose = true
+            self?.popover.performClose(nil)
+        }
         model.recorder.onOpenLauncher = { [weak self] in self?.togglePopover() }
         updateButton()
         observePhase()
@@ -260,11 +266,17 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
 
     // MARK: NSPopoverDelegate
 
+    private var keepCameraOnClose = false
+
     func popoverDidClose(_ notification: Notification) {
         stopDismissMonitors()
         fallbackAnchor.orderOut(nil)
         tour.suspend()
-        model.recorder.launcherDidClose()
+        if keepCameraOnClose {
+            keepCameraOnClose = false
+        } else {
+            model.recorder.launcherDidClose()
+        }
     }
 
     // MARK: Dismissal

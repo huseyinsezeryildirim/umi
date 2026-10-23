@@ -48,14 +48,32 @@ nonisolated final class CameraSession: NSObject, @unchecked Sendable {
         }
     }
 
+    /// `AVCaptureDevice.uniqueID` of the camera to use; nil = system default.
+    private var deviceID: String?
+
+    /// Switches cameras (also while the bubble is showing).
+    func selectDevice(_ id: String?) {
+        queue.async { [self] in
+            deviceID = id
+            guard configured else { return }
+            captureSession.beginConfiguration()
+            captureSession.inputs.forEach(captureSession.removeInput)
+            addInput()
+            captureSession.commitConfiguration()
+        }
+    }
+
+    private func addInput() {
+        let device = deviceID.flatMap(AVCaptureDevice.init(uniqueID:)) ?? AVCaptureDevice.default(for: .video)
+        if let device, let input = try? AVCaptureDeviceInput(device: device), captureSession.canAddInput(input) {
+            captureSession.addInput(input)
+        }
+    }
+
     private func configure() {
         captureSession.beginConfiguration()
         captureSession.sessionPreset = .high
-        if let device = AVCaptureDevice.default(for: .video),
-           let input = try? AVCaptureDeviceInput(device: device),
-           captureSession.canAddInput(input) {
-            captureSession.addInput(input)
-        }
+        addInput()
         output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
         output.alwaysDiscardsLateVideoFrames = true
         output.setSampleBufferDelegate(self, queue: queue)

@@ -115,9 +115,6 @@ struct CameraBubbleView: View {
             .frame(width: side, height: side)
             .clipShape(shape)
             .overlay(shape.strokeBorder(.white.opacity(0.9), lineWidth: 3))
-            .overlay(alignment: .bottomTrailing) {
-                if model.isHovering { resizeHandle(side: side, radius: radius) }
-            }
             .contentShape(shape)
             .gesture(windowGesture(actions.drag))
             .animation(.spring(duration: 0.3), value: model.style.shape)
