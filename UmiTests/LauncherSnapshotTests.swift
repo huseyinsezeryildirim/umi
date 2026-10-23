@@ -9,7 +9,7 @@ final class LauncherSnapshotTests: XCTestCase {
         let dir = URL(fileURLWithPath: "/tmp/umi-fixtures")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         UserDefaults.standard.set(2, forKey: "onboardingStep")
-        let recorder = RecordingController()
+        let recorder = AppModel.shared.recorder
         for scheme in [ColorScheme.light, .dark] {
             let view = MenuBarView()
                 .environment(recorder)
