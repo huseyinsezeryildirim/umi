@@ -10,6 +10,8 @@ struct RecordingSettings {
     var displayID: CGDirectDisplayID?
     var windowID: CGWindowID?
     var showCamera = true
+    /// `AVCaptureDevice.uniqueID`; nil = system default.
+    var cameraID: String?
     var captureMicrophone = true
     /// `AVCaptureDevice.uniqueID`; nil = system default.
     var microphoneID: String?

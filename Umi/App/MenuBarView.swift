@@ -8,6 +8,7 @@ struct MenuBarView: View {
     @State private var mic = MicLevelMonitor()
     @State private var microphones: [AVCaptureDevice] = []
     @AppStorage("onboardingStep") private var onboardingStep = 0
+    @State private var showCameraSettings = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -18,6 +19,9 @@ struct MenuBarView: View {
             }
 
             switch recorder.phase {
+            case .idle where showCameraSettings:
+                CameraSettingsView(recorder: recorder) { withAnimation(.smooth(duration: 0.25)) { showCameraSettings = false } }
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
             case .idle:
                 setup
             case .countingDown:
@@ -167,15 +171,14 @@ struct MenuBarView: View {
             cameraToggle
             if recorder.settings.showCamera {
                 Button {
-                    // macOS's own Video Effects panel: Center Stage, Portrait, Studio Light, backgrounds…
-                    AVCaptureDevice.showSystemUserInterface(.videoEffects)
+                    withAnimation(.smooth(duration: 0.25)) { showCameraSettings = true }
                 } label: {
-                    Image(systemName: "wand.and.stars")
+                    Image(systemName: "slider.horizontal.3")
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(UmiTheme.secondary)
                 }
                 .buttonStyle(GlassButtonStyle(height: 54, cornerRadius: 16))
-                .help("Video effects (Portrait, Studio Light, Center Stage…)")
+                .help("Camera settings")
             }
         }
     }
@@ -186,7 +189,7 @@ struct MenuBarView: View {
             recorder.setCameraPreview(recorder.settings.showCamera)
         } label: {
             LauncherRow(systemImage: recorder.settings.showCamera ? "video" : "video.slash",
-                        title: recorder.settings.showCamera ? (AVCaptureDevice.default(for: .video)?.localizedName ?? "Camera") : "No camera",
+                        title: recorder.settings.showCamera ? (recorder.selectedCamera?.localizedName ?? "Camera") : "No camera",
                         isOn: recorder.settings.showCamera)
         }
         .buttonStyle(.plain)
@@ -287,6 +290,165 @@ struct MenuBarView: View {
     /// Closes the launcher so it isn't in the way when recording starts.
     private func closeLauncher() {
         AppModel.shared.closeLauncher()
+    }
+}
+
+/// Camera settings, shown inside the launcher: device, bubble shape/size/mirror,
+/// Center Stage, and a way into macOS's own video effects.
+private struct CameraSettingsView: View {
+    let recorder: RecordingController
+    let back: () -> Void
+    @State private var cameras: [AVCaptureDevice] = []
+
+    var body: some View {
+        let style = recorder.cameraBubble.style
+        VStack(alignment: .leading, spacing: 14) {
+            Button(action: back) {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.left").font(.system(size: 12, weight: .semibold))
+                    Text("Camera").font(.system(size: 15, weight: .semibold))
+                }
+                .foregroundStyle(UmiTheme.ink)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            UmiCard(.small, padding: 14) {
+                VStack(alignment: .leading, spacing: 14) {
+                    SettingLabel("Camera")
+                    Menu {
+                        ForEach(cameras, id: \.uniqueID) { device in
+                            Button(device.localizedName) { recorder.selectCamera(device.uniqueID) }
+                        }
+                    } label: {
+                        HStack {
+                            Text(recorder.selectedCamera?.localizedName ?? "Camera")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(UmiTheme.body)
+                                .lineLimit(1)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down").font(.system(size: 11, weight: .semibold)).foregroundStyle(UmiTheme.tertiary)
+                        }
+                        .padding(.horizontal, 12)
+                        .frame(height: 36)
+                        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(UmiTheme.track.opacity(0.6)))
+                        .contentShape(Rectangle())
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(.plain)
+                    .menuIndicator(.hidden)
+
+                    SettingLabel("Shape")
+                    Segmented(options: EditSettings.Camera.Shape.allCases, selection: style.shape, label: { $0.rawValue.capitalized }) {
+                        recorder.setCameraShape($0)
+                    }
+
+                    SettingLabel("Size")
+                    Segmented(options: CameraBubbleStyle.Size.allCases, selection: CameraBubbleStyle.Size.allCases.min { abs($0.diameter - style.diameter) < abs($1.diameter - style.diameter) } ?? .medium,
+                              label: { $0.rawValue.capitalized }) {
+                        recorder.setCameraSize($0)
+                    }
+
+                    ToggleRow(title: "Mirror", isOn: style.mirrored) { recorder.toggleCameraMirror() }
+                    if recorder.supportsCenterStage {
+                        ToggleRow(title: "Center Stage", subtitle: "Keeps you in frame as you move", isOn: recorder.centerStageEnabled) {
+                            recorder.centerStageEnabled.toggle()
+                        }
+                    }
+                }
+            }
+
+            Button {
+                // macOS's own panel (Portrait, Studio Light, backgrounds) opens under the menu
+                // bar; close the launcher first so it isn't hidden behind it. The camera stays
+                // on: macOS only offers effects for a camera in use, and the bubble shows them.
+                AppModel.shared.closeLauncherKeepingCamera()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    AVCaptureDevice.showSystemUserInterface(.videoEffects)
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "sparkles")
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("More video effects").font(.system(size: 14, weight: .medium))
+                        Text("Portrait, Studio Light, backgrounds (macOS)").font(.system(size: 11.5)).foregroundStyle(UmiTheme.tertiary)
+                    }
+                    Spacer()
+                    Image(systemName: "arrow.up.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(UmiTheme.tertiary)
+                }
+                .foregroundStyle(UmiTheme.body)
+                .padding(.horizontal, 14)
+                .frame(height: 52)
+                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(.white).shadow(color: .black.opacity(0.04), radius: 2, y: 1))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(UmiTheme.cardBorder))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .onAppear { cameras = CaptureDevices.cameras }
+    }
+}
+
+private struct SettingLabel: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(text).font(.system(size: 12, weight: .medium)).foregroundStyle(UmiTheme.tertiary)
+    }
+}
+
+/// A light segmented control: a track with a white raised pill on the selection.
+private struct Segmented<Option: Hashable>: View {
+    let options: [Option]
+    let selection: Option
+    let label: (Option) -> String
+    let select: (Option) -> Void
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(options, id: \.self) { option in
+                Button { select(option) } label: {
+                    Text(label(option))
+                        .font(.system(size: 13, weight: option == selection ? .semibold : .regular))
+                        .foregroundStyle(option == selection ? UmiTheme.ink : UmiTheme.secondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 30)
+                        .background {
+                            if option == selection {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous).fill(.white)
+                                    .shadow(color: .black.opacity(0.1), radius: 1.5, y: 1)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(UmiTheme.track))
+        .animation(.snappy(duration: 0.2), value: selection)
+    }
+}
+
+private struct ToggleRow: View {
+    let title: String
+    var subtitle: String?
+    let isOn: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(.system(size: 14, weight: .medium)).foregroundStyle(UmiTheme.body)
+                    if let subtitle { Text(subtitle).font(.system(size: 11.5)).foregroundStyle(UmiTheme.tertiary) }
+                }
+                Spacer()
+                GlassSwitch(isOn: isOn)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

@@ -8,7 +8,8 @@ import SwiftUI
 final class CameraBubbleController {
     private var panel: NSPanel?
     let session = CameraSession()
-    private let model = CameraBubbleModel(style: .load())
+    /// Observable bubble style, also shown in the launcher's camera settings.
+    let model = CameraBubbleModel(style: .load())
     /// Called when the user closes the bubble with its × button. The owner should turn its
     /// "show camera" setting off and call `hide()` (or `hidePanel()` mid-recording). When
     /// unset, the bubble simply hides itself and stops the camera.
@@ -73,21 +74,21 @@ final class CameraBubbleController {
 
     // MARK: Controls
 
-    private func setSize(_ size: CameraBubbleStyle.Size) {
-        guard let panel else { return }
+    func setSize(_ size: CameraBubbleStyle.Size) {
+        guard let panel else { model.style.diameter = size.diameter; save(); return }
         let d = size.diameter
         let frame = CGRect(x: panel.frame.midX - d / 2, y: panel.frame.midY - d / 2, width: d, height: d)
         model.style.diameter = d
         move(to: snapped(frame), animate: true)
     }
 
-    private func setShape(_ shape: EditSettings.Camera.Shape) {
+    func setShape(_ shape: EditSettings.Camera.Shape) {
         model.style.shape = shape
         save()
         refreshShadow(after: 0.35)
     }
 
-    private func toggleMirror() {
+    func toggleMirror() {
         model.style.mirrored.toggle()
         save()
     }
