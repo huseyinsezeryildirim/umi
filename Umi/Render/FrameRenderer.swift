@@ -49,7 +49,8 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
         cursor = CursorTrack(data: cursorData, duration: project.duration, spring: settings.cursor.smoothing.spring)
         zoom = ZoomTrack(settings: settings.zoom, cursor: cursorData, duration: project.duration)
         scenes = SceneLayoutEngine(settings: settings,
-                                   screenAspect: Double(project.screen.pixelWidth) / Double(max(project.screen.pixelHeight, 1)),
+                                   screenAspect: Double(project.screen.pixelWidth) * (settings.crop?.width ?? 1)
+                                       / (Double(max(project.screen.pixelHeight, 1)) * (settings.crop?.height ?? 1)),
                                    hasCamera: project.camera != nil)
         ringImage = Self.makeRing()
         backgroundImage = Self.loadBackgroundImage(settings.background, bundle: bundle)
@@ -97,7 +98,7 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
 
         // Screen card, built on a transparent layer so a 3D move can tilt it as a whole.
         if let screen, scene.screenAlpha > 0.001 {
-            var card = screenCard(Effects.applyMasks(settings.masks, to: screen, at: time), outer: scene.screenRect, canvas: canvas, time: time)
+            var card = screenCard(cropped(Effects.applyMasks(settings.masks, to: screen, at: time)), outer: scene.screenRect, canvas: canvas, time: time)
             if let move {
                 card = Effects.perspective(card, rect: scene.screenRect, yaw: move.yaw, pitch: move.pitch, scale: move.scale, shift: move.shift)
             }
@@ -106,7 +107,8 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
         }
 
         // Zoom the composed screen (not the camera), keeping the view inside the canvas.
-        let (rawScale, focus) = applyZoomAndMoves ? zoom.state(at: time) : (1, CGPoint(x: 0.5, y: 0.5))
+        let (rawScale, rawFocus) = applyZoomAndMoves ? zoom.state(at: time) : (1, CGPoint(x: 0.5, y: 0.5))
+        let focus = toContent(rawFocus)
         let scale = 1 + (rawScale - 1) * scene.zoomAllowance * (1 - fillAmount)
         if scale > 1.001 {
             let content = DeviceFrameGeometry.contentRect(settings.frame, outer: scene.screenRect)
@@ -179,6 +181,15 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
             .transformed(by: CGAffineTransform(translationX: content.minX - screen.extent.minX * content.width / screen.extent.width,
                                                y: content.minY - screen.extent.minY * content.height / screen.extent.height))
         card = Effects.blend(placed, over: card, mask: Effects.roundedRect(content, radius: radius, alpha: 1))
+        if settings.border > 0, settings.frame == .none {
+            let width = max(1, settings.border * min(content.width, content.height))
+            let stroke = CIFilter(name: "CIRoundedRectangleStrokeGenerator", parameters: [
+                "inputExtent": CIVector(cgRect: content.insetBy(dx: -width / 2, dy: -width / 2)),
+                "inputRadius": radius + width / 2, "inputWidth": width,
+                "inputColor": CIColor(red: 1, green: 1, blue: 1, alpha: 0.9),
+            ])?.outputImage
+            if let stroke { card = stroke.composited(over: card) }
+        }
         return drawCursor(over: card, screenRect: content, at: time).cropped(to: canvas.insetBy(dx: -short, dy: -short))
     }
 
@@ -216,11 +227,12 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
     }
 
     private func drawCursor(over frame: CIImage, screenRect: CGRect, at time: Double) -> CIImage {
-        guard settings.cursor.visible, let p = cursor.position(at: time),
-              (-0.02...1.02).contains(p.x), (-0.02...1.02).contains(p.y) else { return frame }
+        guard settings.cursor.visible, let raw = cursor.position(at: time) else { return frame }
+        let p = toContent(raw)
+        guard (-0.02...1.02).contains(p.x), (-0.02...1.02).contains(p.y) else { return frame }
 
-        // Points → canvas pixels: the screen rect spans captureRect.width points.
-        let pointScale = screenRect.width / max(project.screen.captureRect.width, 1)
+        // Points → canvas pixels: the screen rect spans the (cropped) captured width in points.
+        let pointScale = screenRect.width / max(project.screen.captureRect.width * (settings.crop?.width ?? 1), 1)
         let anchor = CGPoint(x: screenRect.minX + p.x * screenRect.width, y: screenRect.maxY - p.y * screenRect.height)
         var result = frame
 
@@ -228,7 +240,8 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
             for click in cursor.clicks where time >= click.t && time - click.t < 0.45 {
                 let progress = (time - click.t) / 0.45
                 let diameter = (24 + 36 * progress) * pointScale * max(settings.cursor.size, 1)
-                let ringAnchor = CGPoint(x: screenRect.minX + click.x * screenRect.width, y: screenRect.maxY - click.y * screenRect.height)
+                let c = toContent(CGPoint(x: click.x, y: click.y))
+                let ringAnchor = CGPoint(x: screenRect.minX + c.x * screenRect.width, y: screenRect.maxY - c.y * screenRect.height)
                 let ring = ringImage
                     .transformed(by: CGAffineTransform(scaleX: diameter / ringImage.extent.width, y: diameter / ringImage.extent.height))
                     .transformed(by: CGAffineTransform(translationX: ringAnchor.x - diameter / 2, y: ringAnchor.y - diameter / 2))
@@ -277,6 +290,22 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
             .applyingGaussianBlur(sigma: size * 0.04)
             .transformed(by: CGAffineTransform(translationX: 0, y: -size * 0.02))
         return Effects.blend(image, over: shadow.composited(over: frame), mask: Effects.roundedRect(rect, radius: radius, alpha: alpha))
+    }
+
+    // MARK: Crop
+
+    /// The screen image cut to `settings.crop`, moved back to the origin.
+    private func cropped(_ screen: CIImage) -> CIImage {
+        guard let c = settings.crop else { return screen }
+        let e = screen.extent
+        let r = CGRect(x: e.minX + c.minX * e.width, y: e.minY + (1 - c.maxY) * e.height, width: c.width * e.width, height: c.height * e.height)
+        return screen.cropped(to: r).transformed(by: CGAffineTransform(translationX: -r.minX, y: -r.minY))
+    }
+
+    /// A point normalized to the full recording, normalized to the cropped content instead.
+    private func toContent(_ p: CGPoint) -> CGPoint {
+        guard let c = settings.crop else { return p }
+        return CGPoint(x: (p.x - c.minX) / max(c.width, 0.001), y: (p.y - c.minY) / max(c.height, 0.001))
     }
 
     // MARK: Media track

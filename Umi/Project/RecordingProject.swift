@@ -86,6 +86,7 @@ nonisolated extension RecordingProject {
     /// look, with the camera where and how the bubble was while recording.
     var defaultEdit: EditSettings {
         var edit = EditSettings()
+        StylePresets.defaultPreset?.apply(to: &edit)
         if let bubble = camera?.bubble {
             edit.camera = bubble
         } else if let center = camera?.bubbleCenter {

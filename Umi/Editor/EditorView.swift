@@ -4,6 +4,7 @@ import SwiftUI
 struct EditorView: View {
     @State private var model: EditorModel
     @State private var showExport = false
+    @State private var showCrop = false
     @Environment(\.undoManager) private var undoManager
 
     init(bundle: URL) {
@@ -15,33 +16,45 @@ struct EditorView: View {
             // Drag the divider to trade preview size for timeline space.
             VSplitView {
                 VStack(spacing: 0) {
+                    PreviewToolbar(model: model, showCrop: $showCrop)
                     PlayerSurface(player: model.player)
                         .background(Color.black.opacity(0.9))
                         .overlay { PreviewOverlay(model: model) }
-                        .frame(minWidth: 560, minHeight: 280)
+                        .frame(minWidth: 560, minHeight: 260)
                     TransportBar(model: model)
                 }
                 EditorTimeline(model: model)
-                    .frame(minHeight: 180, idealHeight: 290, maxHeight: 520)
+                    .frame(minHeight: 180, idealHeight: 290, maxHeight: 560)
             }
             .background(EditorKeys(model: model))
             InspectorView(model: model)
-                .frame(minWidth: 280, idealWidth: 300, maxWidth: 360)
+                .frame(minWidth: 280, idealWidth: 310, maxWidth: 380)
         }
         .navigationTitle(model.bundle.deletingPathExtension().lastPathComponent)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .navigation) {
+                PresetsMenu(model: model)
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button { undoManager?.undo() } label: { Image(systemName: "arrow.uturn.backward") }
+                    .help("Undo (⌘Z)")
+                    .disabled(!(undoManager?.canUndo ?? false))
+                Button { undoManager?.redo() } label: { Image(systemName: "arrow.uturn.forward") }
+                    .help("Redo (⇧⌘Z)")
+                    .disabled(!(undoManager?.canRedo ?? false))
                 Button {
                     showExport = true
                 } label: {
                     Label("Export", systemImage: "square.and.arrow.up")
+                        .labelStyle(.titleAndIcon)
                 }
-                .help("Export as MP4")
+                .buttonStyle(.borderedProminent)
+                .tint(UmiTheme.accent)
+                .help("Export the video")
             }
         }
-        .sheet(isPresented: $showExport) {
-            ExportSheet(model: model)
-        }
+        .sheet(isPresented: $showExport) { ExportSheet(model: model) }
+        .sheet(isPresented: $showCrop) { CropSheet(model: model) }
         .overlay(alignment: .top) {
             if let error = model.loadError {
                 Text(error)
@@ -74,42 +87,171 @@ private struct PlayerSurface: NSViewRepresentable {
     }
 }
 
+/// Above the preview: aspect ratio, crop, device frame and preview quality.
+private struct PreviewToolbar: View {
+    let model: EditorModel
+    @Binding var showCrop: Bool
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Menu {
+                ForEach(EditSettings.AspectRatio.allCases, id: \.self) { aspect in
+                    Button {
+                        model.update { $0.aspect = aspect }
+                    } label: {
+                        if model.edit.aspect == aspect { Label(aspect.label, systemImage: "checkmark") } else { Text(aspect.label) }
+                    }
+                }
+            } label: {
+                Label(model.edit.aspect == .auto ? "Auto" : model.edit.aspect.label.components(separatedBy: " ").first ?? "", systemImage: "aspectratio")
+            }
+            .fixedSize()
+            .help("Aspect ratio")
+
+            Button { showCrop = true } label: {
+                Label(model.edit.crop == nil ? "Crop" : "Cropped", systemImage: "crop")
+            }
+            .help("Crop the recording")
+
+            Menu {
+                ForEach(EditSettings.DeviceFrame.allCases, id: \.self) { frame in
+                    Button {
+                        model.update { $0.frame = frame }
+                    } label: {
+                        if model.edit.frame == frame { Label(frame.label, systemImage: "checkmark") } else { Text(frame.label) }
+                    }
+                }
+            } label: {
+                Label(model.edit.frame == .none ? "Frame" : model.edit.frame.label, systemImage: "macwindow")
+            }
+            .fixedSize()
+            .help("Device frame")
+
+            Spacer()
+
+            Text("Preview quality").font(.caption).foregroundStyle(.secondary)
+            Picker("", selection: Binding(get: { model.previewQuality }, set: { model.previewQuality = $0 })) {
+                Text("Full").tag(1.0)
+                Text("Half").tag(0.5)
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .fixedSize()
+        }
+        .menuStyle(.borderlessButton)
+        .buttonStyle(.borderless)
+        .font(.system(size: 12.5, weight: .medium))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+    }
+}
+
+/// Time on the left, play controls in the middle, split and timeline zoom on the right.
 private struct TransportBar: View {
     let model: EditorModel
 
     var body: some View {
-        HStack(spacing: 14) {
-            Button {
-                model.togglePlay()
-            } label: {
-                Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
-                    .frame(width: 18)
+        ZStack {
+            HStack(spacing: 14) {
+                Text("\(model.currentTime.formattedPrecise) / \(model.outputDuration.formattedPrecise)")
+                    .font(.system(size: 13, weight: .medium).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button { model.split(at: model.currentTime) } label: { Image(systemName: "scissors") }
+                    .help("Split at the playhead (S). Drag on the ruler to select a part to cut.")
+                Divider().frame(height: 18)
+                Button { model.timelineZoom = max(1, model.timelineZoom / 1.5) } label: { Image(systemName: "minus.magnifyingglass") }
+                    .help("Zoom the timeline out")
+                Slider(value: Binding(get: { model.timelineZoom }, set: { model.timelineZoom = $0 }), in: 1...12)
+                    .frame(width: 110)
+                    .controlSize(.small)
+                Button { model.timelineZoom = min(12, model.timelineZoom * 1.5) } label: { Image(systemName: "plus.magnifyingglass") }
+                    .help("Zoom the timeline in")
             }
-            .help("Play / Pause (Space)")
-
-            Text("\(model.currentTime.formattedPrecise) / \(model.outputDuration.formattedPrecise)")
-                .font(.system(.body, design: .monospaced))
-                .foregroundStyle(.secondary)
-
-            Spacer()
-
-            Button {
-                model.split(at: model.currentTime)
-            } label: {
-                Label("Split", systemImage: "scissors")
+            HStack(spacing: 18) {
+                Button { model.seek(to: model.previousEdge()) } label: { Image(systemName: "backward.end.fill") }
+                    .help("Previous cut or start")
+                Button { model.togglePlay() } label: {
+                    Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(width: 38, height: 38)
+                        .background(Circle().fill(Color.primary.opacity(0.08)))
+                        .overlay(Circle().strokeBorder(Color.primary.opacity(0.15)))
+                }
+                .help("Play / Pause (Space)")
+                Button { model.seek(to: model.nextEdge()) } label: { Image(systemName: "forward.end.fill") }
+                    .help("Next cut or end")
             }
-            .help("Split at playhead (S)")
-
-            Button {
-                model.addZoom(at: model.currentTime)
-            } label: {
-                Label("Add Zoom", systemImage: "plus.magnifyingglass")
-            }
-            .help("Add a zoom at the playhead (Z)")
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
+    }
+}
+
+/// Save the current look as a preset, apply one, or pick the default for new recordings.
+private struct PresetsMenu: View {
+    let model: EditorModel
+    @State private var presets = StylePresets.all
+    @State private var defaultID = StylePresets.defaultID
+
+    var body: some View {
+        Menu {
+            if presets.isEmpty {
+                Text("No presets yet")
+            }
+            ForEach(presets) { preset in
+                Button {
+                    model.update { preset.apply(to: &$0) }
+                } label: {
+                    Text(preset.name + (preset.id == defaultID ? "  (default)" : ""))
+                }
+            }
+            Divider()
+            Button("Save Current Look as Preset…") { save() }
+            if !presets.isEmpty {
+                Menu("Default for New Recordings") {
+                    Button {
+                        StylePresets.defaultID = nil
+                        defaultID = nil
+                    } label: { if defaultID == nil { Label("Umi Default", systemImage: "checkmark") } else { Text("Umi Default") } }
+                    ForEach(presets) { preset in
+                        Button {
+                            StylePresets.defaultID = preset.id
+                            defaultID = preset.id
+                        } label: { if preset.id == defaultID { Label(preset.name, systemImage: "checkmark") } else { Text(preset.name) } }
+                    }
+                }
+                Menu("Delete") {
+                    ForEach(presets) { preset in
+                        Button(preset.name, role: .destructive) {
+                            presets.removeAll { $0.id == preset.id }
+                            StylePresets.all = presets
+                            if defaultID == preset.id { StylePresets.defaultID = nil; defaultID = nil }
+                        }
+                    }
+                }
+            }
+        } label: {
+            Label("Presets", systemImage: "wand.and.stars")
+        }
+        .help("Style presets")
+    }
+
+    private func save() {
+        let alert = NSAlert()
+        alert.messageText = "Save this look as a preset"
+        alert.informativeText = "Background, frame, padding, corners, shadow, cursor, camera style and color grade."
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        field.placeholderString = "Preset name"
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let name = field.stringValue.trimmingCharacters(in: .whitespaces)
+        presets.append(StylePreset(name: name.isEmpty ? "Preset \(presets.count + 1)" : name, from: model.edit))
+        StylePresets.all = presets
     }
 }
 

@@ -186,12 +186,16 @@ nonisolated enum CompositionBuilder {
         }
     }
 
-    /// Output size for a target height, matching the screen's aspect ratio (even dimensions).
+    /// Output size for a target resolution: the chosen aspect ratio, or the (cropped)
+    /// recording's own shape. `maxHeight` is the short side for vertical/portrait videos.
     static func renderSize(for project: RecordingProject, maxHeight: Int) -> CGSize {
-        let w = Double(project.screen.pixelWidth), h = Double(project.screen.pixelHeight)
-        let height = min(Double(maxHeight), h)
-        let width = height * w / max(h, 1)
-        return CGSize(width: Int(width) & ~1, height: Int(height) & ~1)
+        let edit = project.edit ?? EditSettings()
+        let crop = edit.crop ?? CGRect(x: 0, y: 0, width: 1, height: 1)
+        let w = Double(project.screen.pixelWidth) * crop.width, h = Double(project.screen.pixelHeight) * crop.height
+        let ratio = edit.aspect.ratio ?? w / max(h, 1)
+        let short = min(Double(maxHeight), max(min(w, h), 360))
+        let size = ratio >= 1 ? CGSize(width: short * ratio, height: short) : CGSize(width: short, height: short / ratio)
+        return CGSize(width: Int(size.width) & ~1, height: Int(size.height) & ~1)
     }
 }
 

@@ -1,46 +1,81 @@
 import AVFoundation
 import SwiftUI
 
-/// The editor timeline: a ruler, the clip track (trim, split, speed, reorder) and one
-/// track per kind of timed edit (zoom, scenes, masks, text, 3D moves).
+/// Kinds of tracks that can be shown under the video.
+enum TrackKind: String, CaseIterable, Hashable {
+    case media, zoom, scenes, masks, text, moves, music
+
+    var title: String {
+        switch self {
+        case .media: "Media"
+        case .zoom: "Zoom"
+        case .scenes: "Scenes"
+        case .masks: "Masks"
+        case .text: "Text"
+        case .moves: "3D"
+        case .music: "Music"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .media: "photo.on.rectangle"
+        case .zoom: "plus.magnifyingglass"
+        case .scenes: "rectangle.split.2x1"
+        case .masks: "eye.slash"
+        case .text: "textformat"
+        case .moves: "cube"
+        case .music: "music.note"
+        }
+    }
+}
+
+/// The editor timeline: a fixed column of track names, and to its right the ruler, the
+/// video clip track and the tracks in use, scrollable and zoomable horizontally.
 struct EditorTimeline: View {
     let model: EditorModel
 
-    static let labelWidth: CGFloat = 96
+    static let labelWidth: CGFloat = 104
     static let trackHeight: CGFloat = 32
-    static let clipHeight: CGFloat = 46
+    static let clipHeight: CGFloat = 50
+    static let rulerHeight: CGFloat = 22
+    static let spacing: CGFloat = 5
 
     var body: some View {
         GeometryReader { geo in
-            let width = max(geo.size.width - Self.labelWidth - 16, 1)
+            let visible = max(geo.size.width - Self.labelWidth - 12, 1)
+            let width = visible * model.timelineZoom
             let scale = width / max(model.outputDuration, 0.1)
+            let tracks = TrackKind.allCases.filter(isVisible)
 
             ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: 5) {
-                    row(title: "", icon: nil) { RulerView(model: model, scale: scale, width: width) }
-                    row(title: "Clips", icon: "film") { ClipTrack(model: model, scale: scale) }
-                    mediaRow(scale: scale)
-                    track("Zoom", icon: "plus.magnifyingglass", add: { model.addZoom(at: model.currentTime) }, items: zoomItems, scale: scale)
-                    track("Scenes", icon: "rectangle.split.2x1", menu: sceneMenu, items: sceneItems, scale: scale)
-                    track("Masks", icon: "eye.slash", add: { model.addMask(at: model.currentTime) }, items: maskItems, scale: scale)
-                    track("Text", icon: "textformat", menu: textMenu, items: textItems, scale: scale)
-                    track("3D", icon: "cube", menu: moveMenu, items: moveItems, scale: scale)
-                    HStack(spacing: 8) {
-                        HStack(spacing: 4) {
-                            label("Music", icon: "music.note")
-                            Spacer(minLength: 0)
-                            addButton(title: "Music", add: { model.chooseMusic() }, menu: [])
+                HStack(alignment: .top, spacing: 0) {
+                    VStack(alignment: .leading, spacing: Self.spacing) {
+                        addTrackMenu.frame(height: Self.rulerHeight)
+                        header("Video", icon: "film", height: Self.clipHeight)
+                        ForEach(tracks, id: \.self) { kind in
+                            header(kind.title, icon: kind.icon, height: Self.trackHeight, add: { add(kind) }, menu: menu(for: kind))
                         }
-                        .foregroundStyle(.secondary)
-                        .frame(width: Self.labelWidth - 8, alignment: .leading)
-                        .padding(.leading, 8)
-                        MusicTrack(model: model, scale: scale)
                     }
+                    .frame(width: Self.labelWidth)
+                    .padding(.vertical, 6)
+
+                    ScrollView(.horizontal) {
+                        VStack(alignment: .leading, spacing: Self.spacing) {
+                            RulerView(model: model, scale: scale, width: width)
+                            ClipTrack(model: model, scale: scale)
+                            ForEach(tracks, id: \.self) { kind in
+                                content(kind, scale: scale)
+                            }
+                        }
+                        .frame(width: width + 6, alignment: .leading)
+                        .padding(.vertical, 6)
+                        .overlay(alignment: .topLeading) { rangeHighlight(scale: scale) }
+                        .overlay(alignment: .topLeading) { playhead(scale: scale) }
+                        .coordinateSpace(.named("timeline"))
+                    }
+                    .scrollIndicators(model.timelineZoom > 1 ? .visible : .hidden)
                 }
-                .padding(.vertical, 6)
-                .overlay(alignment: .topLeading) { rangeHighlight(scale: scale) }
-                .overlay(alignment: .topLeading) { playhead(scale: scale) }
-                .coordinateSpace(.named("timeline"))
             }
         }
         .background(Color(nsColor: .underPageBackgroundColor))
@@ -49,11 +84,121 @@ struct EditorTimeline: View {
         .focusEffectDisabled()
     }
 
+    // MARK: Tracks
+
+    /// A track shows when it has something on it, or after it was added from the menu.
+    private func isVisible(_ kind: TrackKind) -> Bool {
+        if model.shownTracks.contains(kind) { return true }
+        switch kind {
+        case .media: return !model.edit.overlays.isEmpty
+        case .zoom: return !model.zoomSegments.isEmpty
+        case .scenes: return !model.edit.scenes.isEmpty
+        case .masks: return !model.edit.masks.isEmpty
+        case .text: return !model.edit.texts.isEmpty
+        case .moves: return !model.edit.moves.isEmpty
+        case .music: return model.edit.music != nil
+        }
+    }
+
+    private var addTrackMenu: some View {
+        Menu {
+            ForEach(TrackKind.allCases.filter { !isVisible($0) }, id: \.self) { kind in
+                Button { model.shownTracks.insert(kind) } label: { Label(kind.title, systemImage: kind.icon) }
+            }
+        } label: {
+            Label("Add track", systemImage: "plus")
+                .font(.system(size: 11, weight: .semibold))
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(Capsule().fill(UmiTheme.accent))
+                .foregroundStyle(.white)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .padding(.leading, 8)
+        .disabled(TrackKind.allCases.allSatisfy(isVisible))
+        .help("Show another track")
+    }
+
+    private func add(_ kind: TrackKind) {
+        switch kind {
+        case .media: model.chooseOverlay()
+        case .zoom: model.addZoom(at: model.currentTime)
+        case .masks: model.addMask(at: model.currentTime)
+        case .music: model.chooseMusic()
+        case .scenes, .text, .moves: break
+        }
+    }
+
+    private func menu(for kind: TrackKind) -> [MenuEntry] {
+        switch kind {
+        case .scenes: sceneMenu
+        case .text: textMenu
+        case .moves: moveMenu
+        default: []
+        }
+    }
+
+    @ViewBuilder
+    private func content(_ kind: TrackKind, scale: CGFloat) -> some View {
+        switch kind {
+        case .media:
+            SegmentTrack(model: model, items: mediaItems, scale: scale,
+                         emptyHint: model.edit.overlays.isEmpty ? "Drop a video or image here, or click +" : nil)
+                .onDrop(of: [.fileURL], isTargeted: nil) { providers, location in
+                    for provider in providers {
+                        _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                            guard let url else { return }
+                            Task { @MainActor in model.addOverlay(url, at: Double(location.x / scale)) }
+                        }
+                    }
+                    return true
+                }
+        case .zoom: SegmentTrack(model: model, items: zoomItems, scale: scale, emptyHint: hint(kind))
+        case .scenes: SegmentTrack(model: model, items: sceneItems, scale: scale, emptyHint: hint(kind))
+        case .masks: SegmentTrack(model: model, items: maskItems, scale: scale, emptyHint: hint(kind))
+        case .text: SegmentTrack(model: model, items: textItems, scale: scale, emptyHint: hint(kind))
+        case .moves: SegmentTrack(model: model, items: moveItems, scale: scale, emptyHint: hint(kind))
+        case .music: MusicTrack(model: model, scale: scale)
+        }
+    }
+
+    private func hint(_ kind: TrackKind) -> String? {
+        isEmpty(kind) ? "Click + to add at the playhead" : nil
+    }
+
+    private func isEmpty(_ kind: TrackKind) -> Bool {
+        switch kind {
+        case .zoom: model.zoomSegments.isEmpty
+        case .scenes: model.edit.scenes.isEmpty
+        case .masks: model.edit.masks.isEmpty
+        case .text: model.edit.texts.isEmpty
+        case .moves: model.edit.moves.isEmpty
+        default: false
+        }
+    }
+
+    /// A track name tile on the left, with its + button.
+    private func header(_ title: String, icon: String, height: CGFloat, add: (() -> Void)? = nil, menu: [MenuEntry] = []) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon).font(.system(size: 10.5, weight: .semibold))
+            Text(title).font(.system(size: 11.5, weight: .semibold))
+            Spacer(minLength: 0)
+            if add != nil || !menu.isEmpty { addButton(title: title, add: menu.isEmpty ? add : nil, menu: menu) }
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 9)
+        .frame(height: height)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.06)))
+        .padding(.horizontal, 6)
+    }
+
     /// The span selected on the ruler: a yellow band over every track with a Cut button.
     @ViewBuilder
     private func rangeHighlight(scale: CGFloat) -> some View {
         if let range = model.rangeSelection {
-            let x = Self.labelWidth + 8 + range.lowerBound * scale
+            let x = range.lowerBound * scale
             let width = max((range.upperBound - range.lowerBound) * scale, 2)
             ZStack(alignment: .top) {
                 Rectangle().fill(UmiTheme.trim.opacity(0.16))
@@ -71,7 +216,7 @@ struct EditorTimeline: View {
                         .fixedSize()
                 }
                 .buttonStyle(.plain)
-                .offset(y: 22)
+                .offset(y: 24)
                 .help("Remove this part (⌫)")
             }
             .frame(width: width)
@@ -91,72 +236,12 @@ struct EditorTimeline: View {
         }
         .frame(width: 14)
         .contentShape(Rectangle())
-        .offset(x: Self.labelWidth + 8 + model.currentTime * scale - 7)
+        .offset(x: model.currentTime * scale - 7)
         .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("timeline")).onChanged { value in
-            model.seek(to: (value.location.x - Self.labelWidth - 8) / scale)
+            model.seek(to: value.location.x / scale)
         })
         .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
         .help("Drag to scrub")
-    }
-
-    // MARK: Rows
-
-    /// The Media track: extra videos and images, timed on the output timeline. Files can
-    /// be dropped here from Finder.
-    private func mediaRow(scale: CGFloat) -> some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 4) {
-                label("Media", icon: "photo.on.rectangle")
-                Spacer(minLength: 0)
-                addButton(title: "Media", add: { model.chooseOverlay() }, menu: [])
-            }
-            .foregroundStyle(.secondary)
-            .frame(width: Self.labelWidth - 8, alignment: .leading)
-            .padding(.leading, 8)
-            SegmentTrack(model: model, items: mediaItems, scale: scale,
-                         emptyHint: model.edit.overlays.isEmpty ? "Drop a video or image here, or click +" : nil)
-                .onDrop(of: [.fileURL], isTargeted: nil) { providers, location in
-                    for provider in providers {
-                        _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                            guard let url else { return }
-                            Task { @MainActor in model.addOverlay(url, at: Double(location.x / scale)) }
-                        }
-                    }
-                    return true
-                }
-        }
-    }
-
-    private func label(_ title: String, icon: String?) -> some View {
-        HStack(spacing: 5) {
-            if let icon { Image(systemName: icon).font(.system(size: 10, weight: .semibold)) }
-            Text(title).font(.system(size: 11, weight: .medium))
-        }
-    }
-
-    private func row<Content: View>(title: String, icon: String?, @ViewBuilder content: () -> Content) -> some View {
-        HStack(spacing: 8) {
-            HStack { label(title, icon: icon); Spacer(minLength: 0) }
-                .foregroundStyle(.secondary)
-                .frame(width: Self.labelWidth - 8, alignment: .leading)
-                .padding(.leading, 8)
-            content()
-        }
-    }
-
-    private func track(_ title: String, icon: String, add: (() -> Void)? = nil, menu: [MenuEntry] = [],
-                       items: [SegmentTrack.Item], scale: CGFloat) -> some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 4) {
-                label(title, icon: icon)
-                Spacer(minLength: 0)
-                addButton(title: title, add: add, menu: menu)
-            }
-            .foregroundStyle(.secondary)
-            .frame(width: Self.labelWidth - 8, alignment: .leading)
-            .padding(.leading, 8)
-            SegmentTrack(model: model, items: items, scale: scale)
-        }
     }
 
     @ViewBuilder
@@ -323,6 +408,7 @@ private struct ClipTrack: View {
             .fill(UmiTheme.ink)
             .overlay { Filmstrip(screenURL: screen, clip: placement.clip).clipShape(shape) }
             .overlay(shape.fill(UmiTheme.ink.opacity(selected ? 0.25 : 0.45)))
+            .overlay(alignment: .bottom) { ClipWaveform(peaks: model.waveform, clip: placement.clip).frame(height: 16).padding(.bottom, 3).clipShape(shape) }
             .overlay(shape.strokeBorder(border, lineWidth: selected ? 2.5 : 1))
             .overlay(alignment: .leading) { title(index, placement).padding(.leading, 4) }
             .overlay(alignment: .leading) {
@@ -603,5 +689,28 @@ private struct TrimHandle: View {
                 onDrag(nil)
             })
         .help("Drag to trim")
+    }
+}
+
+/// The voice track's loudness under a clip, drawn as thin bars.
+private struct ClipWaveform: View {
+    let peaks: [Float]
+    let clip: EditSettings.Clip
+
+    var body: some View {
+        Canvas { context, size in
+            guard !peaks.isEmpty else { return }
+            let first = Int(clip.start * Waveform.samplesPerSecond), last = min(Int(clip.end * Waveform.samplesPerSecond), peaks.count)
+            guard last > first else { return }
+            let bars = max(Int(size.width / 3), 1)
+            for bar in 0..<bars {
+                let a = first + (last - first) * bar / bars, b = max(first + (last - first) * (bar + 1) / bars, a + 1)
+                let peak = peaks[a..<min(b, peaks.count)].max() ?? 0
+                let h = max(1.5, CGFloat(peak) * size.height)
+                context.fill(Path(roundedRect: CGRect(x: CGFloat(bar) * 3, y: size.height - h, width: 2, height: h), cornerRadius: 1),
+                             with: .color(.white.opacity(0.55)))
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
