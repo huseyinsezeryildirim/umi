@@ -5,7 +5,8 @@ import SwiftUI
 /// Instant mode: when a recording stops, export it with the default look and put the
 /// video on the clipboard, with a small card to share it, find it or open the editor.
 ///
-/// Link sharing (upload + copy link) plugs in here once Umi Cloud is live.
+/// With Umi Cloud connected, the video is uploaded too and the link replaces the file on
+/// the clipboard as soon as it exists.
 @Observable
 final class InstantShareController {
     enum State: Equatable {
@@ -31,6 +32,7 @@ final class InstantShareController {
                 }
                 copyToClipboard(url)
                 state = .ready(url)
+                if CloudConfig.isConfigured { ShareService.for(bundle).share(copyLink: true, exported: url) }
                 scheduleDismiss()
             } catch {
                 state = .failed(error.localizedDescription)
@@ -106,6 +108,14 @@ final class InstantShareController {
 private struct InstantShareCard: View {
     let controller: InstantShareController
 
+    /// The cloud upload for this recording, when Umi Cloud is connected.
+    private var share: ShareService? {
+        guard CloudConfig.isConfigured, let bundle = controller.bundle else { return nil }
+        return ShareService.for(bundle)
+    }
+
+    private var linkReady: Bool { share?.video != nil }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
@@ -122,9 +132,17 @@ private struct InstantShareCard: View {
             case .preparing(let progress):
                 ProgressView(value: progress).tint(UmiTheme.accent)
             case .ready(let url):
+                if let share, case .uploading(let p) = share.phase {
+                    ProgressView(value: p).tint(UmiTheme.accent)
+                }
                 HStack(spacing: 8) {
-                    ShareLink(item: url) { Label("Share…", systemImage: "square.and.arrow.up") }
-                        .buttonStyle(InkCompactButtonStyle())
+                    if let share, linkReady {
+                        Button { share.copyLink() } label: { Label("Copy Link", systemImage: "link") }
+                            .buttonStyle(InkCompactButtonStyle())
+                    } else {
+                        ShareLink(item: url) { Label("Share…", systemImage: "square.and.arrow.up") }
+                            .buttonStyle(InkCompactButtonStyle())
+                    }
                     Button { NSWorkspace.shared.activateFileViewerSelecting([url]) } label: { Label("Finder", systemImage: "folder") }
                         .buttonStyle(GlassButtonStyle(height: 32, cornerRadius: 10))
                     Button { controller.openEditor() } label: { Label("Edit", systemImage: "slider.horizontal.3") }
@@ -148,7 +166,7 @@ private struct InstantShareCard: View {
     private var title: String {
         switch controller.state {
         case .preparing: "Polishing your video…"
-        case .ready: "Copied to clipboard"
+        case .ready: linkReady ? "Link copied" : "Copied to clipboard"
         case .failed: "Couldn't prepare the video"
         }
     }
@@ -156,7 +174,12 @@ private struct InstantShareCard: View {
     private var subtitle: String {
         switch controller.state {
         case .preparing(let p): "Background, auto zoom and camera applied · \(Int(p * 100))%"
-        case .ready: "Paste it into Slack, Mail or Messages, or share it."
+        case .ready:
+            switch share?.phase {
+            case .uploading(let p)?: "Anyone with the link can watch · uploading \(Int(p * 100))%"
+            case .failed(let message)?: "Link failed: \(message) The video file is on the clipboard."
+            default: linkReady ? "Anyone with the link can watch it, no account needed." : "Paste it into Slack, Mail or Messages, or share it."
+            }
         case .failed(let message): message
         }
     }

@@ -4,6 +4,7 @@ import SwiftUI
 struct EditorView: View {
     @State private var model: EditorModel
     @State private var showExport = false
+    @State private var showShare = false
     @State private var showCrop = false
     @Environment(\.undoManager) private var undoManager
 
@@ -43,6 +44,14 @@ struct EditorView: View {
                     .help("Redo (⇧⌘Z)")
                     .disabled(!(undoManager?.canRedo ?? false))
                 Button {
+                    model.saveNow()
+                    showShare = true
+                } label: {
+                    Label("Share", systemImage: "link")
+                        .labelStyle(.titleAndIcon)
+                }
+                .help("Get a link to this video")
+                Button {
                     showExport = true
                 } label: {
                     Label("Export", systemImage: "square.and.arrow.up")
@@ -54,6 +63,7 @@ struct EditorView: View {
             }
         }
         .sheet(isPresented: $showExport) { ExportSheet(model: model) }
+        .sheet(isPresented: $showShare) { ShareSheet(service: ShareService.for(model.bundle), currentTime: model.currentTime) }
         .sheet(isPresented: $showCrop) { CropSheet(model: model) }
         .sheet(isPresented: Binding(get: { model.showsMusicLibrary }, set: { model.showsMusicLibrary = $0 })) { MusicLibrarySheet(model: model) }
         .overlay(alignment: .top) {
