@@ -1,0 +1,22 @@
+[package]
+name = "umi-engine"
+description = "Timeline playback and export: decodes sources, renders frames, mixes audio."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+umi-project.workspace = true
+umi-render = { path = "../umi-render" }
+umi-media = { path = "../umi-media" }
+thiserror.workspace = true
+uuid.workspace = true
+parking_lot = "0.12"
+crossbeam-channel = "0.5"
+tracing.workspace = true
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[lints]
+workspace = true

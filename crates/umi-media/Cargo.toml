@@ -1,0 +1,21 @@
+[package]
+name = "umi-media"
+description = "Media I/O on FFmpeg: hardware video decode, audio decode/resample, H.264/HEVC encode, MP4/MOV mux, GIF, waveforms and thumbnails."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ffmpeg-next = { version = "9", default-features = false, features = ["codec", "format", "software-resampling", "software-scaling", "filter"] }
+ffmpeg-sys-next = "9"
+thiserror.workspace = true
+gif = "0.14"
+color_quant = "1"
+tracing.workspace = true
+
+[lints.rust]
+# FFmpeg's hardware decoding needs a few raw FFI calls (documented at each use).
+unsafe_code = "allow"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
