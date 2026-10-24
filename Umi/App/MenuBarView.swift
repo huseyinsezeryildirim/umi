@@ -77,6 +77,13 @@ struct MenuBarView: View {
                 .help("Library")
             Menu {
                 Toggle("3-second countdown", isOn: Binding(get: { recorder.settings.countdown }, set: { recorder.settings.countdown = $0 }))
+                Picker("Resolution", selection: Binding(get: { recorder.settings.quality.resolution }, set: { recorder.settings.quality.resolution = $0 })) {
+                    ForEach(RecordingQuality.Resolution.allCases, id: \.self) { Text($0.label).tag($0) }
+                }
+                Picker("Frame rate", selection: Binding(get: { recorder.settings.quality.fps }, set: { recorder.settings.quality.fps = $0 })) {
+                    Text("60 fps").tag(60)
+                    Text("30 fps").tag(30)
+                }
                 Divider()
                 Text("Start / Stop  \(HotKeys.Action.startStop.display)")
                 Text("Pause / Resume  \(HotKeys.Action.pauseResume.display)")
@@ -152,6 +159,14 @@ struct MenuBarView: View {
                     }
                 }
             }
+            Section("Other") {
+                Button("Select Area…") { AppModel.shared.pickArea() }
+                Button("Camera Only") {
+                    recorder.settings.mode = .cameraOnly
+                    recorder.settings.showCamera = true
+                    recorder.setCameraPreview(true)
+                }
+            }
             Section("Window") {
                 ForEach(recorder.windows, id: \.windowID) { window in
                     Button(window.menuTitle) {
@@ -161,7 +176,7 @@ struct MenuBarView: View {
                 }
             }
         } label: {
-            LauncherRow(systemImage: recorder.settings.mode == .display ? "display" : "macwindow", title: sourceTitle)
+            LauncherRow(systemImage: sourceIcon, title: sourceTitle)
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
@@ -276,6 +291,20 @@ struct MenuBarView: View {
             return recorder.displays.first { $0.displayID == recorder.settings.displayID }?.menuTitle ?? "Full Screen"
         case .window:
             return recorder.windows.first { $0.windowID == recorder.settings.windowID }?.menuTitle ?? "Window"
+        case .area:
+            guard let r = recorder.settings.areaRect else { return "Select Area…" }
+            return "Area \(Int(r.width)) × \(Int(r.height))"
+        case .cameraOnly:
+            return "Camera only"
+        }
+    }
+
+    private var sourceIcon: String {
+        switch recorder.settings.mode {
+        case .display: "display"
+        case .window: "macwindow"
+        case .area: "rectangle.dashed"
+        case .cameraOnly: "person.crop.square"
         }
     }
 

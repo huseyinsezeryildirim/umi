@@ -297,9 +297,14 @@ final class RecordingController {
     }
 
     private func makeSession() async throws -> Session {
-        let (filter, captureRect) = try await makeFilter()
-        let fps = 60
-        let config = ScreenCapture.makeConfiguration(for: filter, fps: fps, systemAudio: settings.captureSystemAudio, microphone: settings.captureMicrophone, microphoneID: settings.microphoneID)
+        let (filter, captureRect, sourceRect) = try await makeFilter()
+        // Camera only keeps a tiny, hidden screen track (it carries the audio).
+        let cameraOnly = settings.mode == .cameraOnly
+        let fps = cameraOnly ? 15 : settings.quality.fps
+        let config = ScreenCapture.makeConfiguration(for: filter, sourceRect: sourceRect,
+                                                     maxHeight: cameraOnly ? 360 : settings.quality.resolution.maxHeight, fps: fps,
+                                                     systemAudio: settings.captureSystemAudio, microphone: settings.captureMicrophone,
+                                                     microphoneID: settings.microphoneID)
 
         var audio: [MovieWriter.Audio] = []
         var tracks = ScreenCapture.AudioTracks()
@@ -325,7 +330,8 @@ final class RecordingController {
             duration: 0,
             screen: .init(pixelWidth: config.width, pixelHeight: config.height, captureRect: captureRect, fps: fps),
             camera: cameraOn ? .init(bubbleCenter: camera.normalizedCenter(in: captureRect)) : nil,
-            audio: .init(systemTrack: tracks.system, microphoneTrack: tracks.microphone)
+            audio: .init(systemTrack: tracks.system, microphoneTrack: tracks.microphone),
+            cameraOnly: cameraOnly ? true : nil
         )
         return Session(
             bundle: bundle, clock: clock, screen: screen, screenWriter: writer,
@@ -347,10 +353,23 @@ final class RecordingController {
         return true
     }
 
-    /// The content filter plus the captured area in global screen points.
-    private func makeFilter() async throws -> (SCContentFilter, CGRect) {
+    /// The content filter, the captured area in global screen points, and for an area
+    /// recording the part of the display to capture (display points).
+    private func makeFilter() async throws -> (SCContentFilter, CGRect, CGRect?) {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let own = content.applications.filter { $0.processID == pid }
         switch settings.mode {
+        case .area:
+            guard let area = settings.areaRect,
+                  let display = content.displays.first(where: { CGDisplayBounds($0.displayID).intersects(area) }) else { throw RecorderError.noSource }
+            let bounds = CGDisplayBounds(display.displayID)
+            let clipped = area.intersection(bounds)
+            let local = CGRect(x: clipped.minX - bounds.minX, y: clipped.minY - bounds.minY, width: clipped.width, height: clipped.height)
+            return (SCContentFilter(display: display, excludingApplications: own, exceptingWindows: []), clipped, local)
+        case .cameraOnly:
+            guard let display = content.displays.first(where: { $0.displayID == CGMainDisplayID() }) ?? content.displays.first else { throw RecorderError.noSource }
+            return (SCContentFilter(display: display, excludingApplications: own, exceptingWindows: []), CGDisplayBounds(display.displayID), nil)
         case .display:
             guard let display = content.displays.first(where: { $0.displayID == settings.displayID }) else {
                 throw RecorderError.noSource
@@ -359,14 +378,12 @@ final class RecordingController {
             // (the camera has its own track and is composited by the editor). Excluding the
             // app rather than its current windows also covers windows shown mid-recording,
             // like the control bar or a re-opened bubble.
-            let pid = ProcessInfo.processInfo.processIdentifier
-            let own = content.applications.filter { $0.processID == pid }
-            return (SCContentFilter(display: display, excludingApplications: own, exceptingWindows: []), CGDisplayBounds(display.displayID))
+            return (SCContentFilter(display: display, excludingApplications: own, exceptingWindows: []), CGDisplayBounds(display.displayID), nil)
         case .window:
             guard let window = content.windows.first(where: { $0.windowID == settings.windowID }) else {
                 throw RecorderError.noSource
             }
-            return (SCContentFilter(desktopIndependentWindow: window), window.frame)
+            return (SCContentFilter(desktopIndependentWindow: window), window.frame, nil)
         }
     }
 

@@ -38,12 +38,19 @@ nonisolated final class ScreenCapture: NSObject, @unchecked Sendable {
         try? await stream.stopCapture()
     }
 
-    static func makeConfiguration(for filter: SCContentFilter, fps: Int, systemAudio: Bool, microphone: Bool, microphoneID: String? = nil) -> SCStreamConfiguration {
+    /// - Parameters:
+    ///   - sourceRect: part of the display to capture (points, display top-left origin).
+    ///   - maxHeight: downscale so the video is at most this tall.
+    static func makeConfiguration(for filter: SCContentFilter, sourceRect: CGRect? = nil, maxHeight: Int? = nil, fps: Int,
+                                  systemAudio: Bool, microphone: Bool, microphoneID: String? = nil) -> SCStreamConfiguration {
         let config = SCStreamConfiguration()
-        let scale = CGFloat(filter.pointPixelScale)
+        var scale = CGFloat(filter.pointPixelScale)
+        let size = sourceRect?.size ?? filter.contentRect.size
+        if let sourceRect { config.sourceRect = sourceRect }
+        if let maxHeight, size.height * scale > CGFloat(maxHeight) { scale = CGFloat(maxHeight) / size.height }
         // H.264 needs even dimensions.
-        config.width = Int(filter.contentRect.width * scale) & ~1
-        config.height = Int(filter.contentRect.height * scale) & ~1
+        config.width = Int(size.width * scale) & ~1
+        config.height = Int(size.height * scale) & ~1
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
         config.queueDepth = 8
         config.showsCursor = false

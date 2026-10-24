@@ -20,6 +20,8 @@ nonisolated struct RecordingProject: Codable, Hashable {
     var camera: Camera?
     var audio: Audio
     var edit: EditSettings?
+    /// Recorded in camera-only mode: the video starts as a full-length Camera Only scene.
+    var cameraOnly: Bool?
 
     struct Screen: Codable, Hashable {
         var pixelWidth: Int
@@ -88,6 +90,9 @@ nonisolated extension RecordingProject {
             edit.camera = bubble
         } else if let center = camera?.bubbleCenter {
             edit.camera.position = CGPoint(x: min(max(center.x, 0.08), 0.92), y: min(max(center.y, 0.1), 0.9))
+        }
+        if cameraOnly == true {
+            edit.scenes = [EditSettings.SceneSegment(start: 0, end: max(duration, 0.1), layout: .cameraOnly, transition: 0)]
         }
         return edit
     }
