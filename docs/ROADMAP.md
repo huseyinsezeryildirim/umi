@@ -33,6 +33,17 @@ Hedef: **Loom'un hızı + Cap Studio'nun cilası**, native ve ücretsiz. Ayrınt
 - [x] Klipler: hız (0.25–8x), sıralama, crossfade; müzik (döngü + fade out)
 - [ ] Hazır müzik kütüphanesi (telifsiz parçalar gerekiyor)
 
+## M2.6 — Cap ile eşitlik (2026-10-24)
+- [x] Alan seçerek kayıt, yalnız kamera, kalite ayarları (çözünürlük/fps)
+- [x] Instant / Studio modları (Instant: dışa aktar + panoya kopyala; link bulut gelince)
+- [x] En-boy oranı, Crop, Presets, kenarlık, padding %40
+- [x] Editör düzeni: araç çubukları, ortalanmış transport, timeline zoom, Add track, ses dalgası, sarı trim tutamakları
+- [x] Media kanalı (B-roll fill / PiP, sürükle-bırak), aralık Cut
+- [x] MOV / GIF dışa aktarma, logo (branding), imleç stili/motion blur/idle gizleme, bulanık ekran ve masaüstü duvar kağıdı arka planı
+- [x] Screenshot modu (⌥⇧4): güzelleştir + ok/kutu/yazı/vurgu/blur, kopyala/kaydet/paylaş
+- [ ] Özelleştirilebilir kısayollar, çoklu yazı kanalı, squircle köşe
+- [ ] Hazır müzik kütüphanesi (telifsiz parçalar gerekiyor)
+
 ## M3 — Paylaşım ve izleyici sayfası (ücretli bulut)
 - [ ] Durdur → yükle → link panoda; yeniden denenebilir/devam ettirilebilir yükleme
 - [ ] İzleyici sayfası: hesapsız izleme, hız, tam ekran, `t=` zaman linki, OG önizleme
