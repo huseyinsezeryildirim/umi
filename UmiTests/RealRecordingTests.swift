@@ -20,7 +20,7 @@ final class RealRecordingTests: XCTestCase {
         generator.videoComposition = built.videoComposition
         generator.requestedTimeToleranceBefore = .zero
         generator.requestedTimeToleranceAfter = .zero
-        for t in [1.0, 5.0] {
+        for t in [0.0, 1.0, 5.0] {
             let (image, _) = try await generator.image(at: CMTime(seconds: t, preferredTimescale: 600))
             try CIContext().writePNGRepresentation(of: CIImage(cgImage: image), to: URL(fileURLWithPath: "/tmp/umi-fixtures/real-\(t).png"),
                                                    format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)

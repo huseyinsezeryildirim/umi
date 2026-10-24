@@ -10,7 +10,7 @@ enum ScreenshotEditor {
     static func captureArea() {
         AppModel.shared.closeLauncher()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            AppModel.shared.areaSelector.pick(initial: nil) { rect in
+            AppModel.shared.areaSelector.pick(initial: nil, confirmTitle: "Capture This Area") { rect in
                 guard let rect else { return }
                 Task {
                     // Let the selector fade before grabbing the screen.

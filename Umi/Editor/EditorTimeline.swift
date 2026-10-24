@@ -317,13 +317,16 @@ struct EditorTimeline: View {
         model.edit.moves.map { SegmentTrack.Item(selection: .move($0.id), start: $0.start, end: $0.end, label: $0.kind.label, tint: Color(hex: 0xE8590C)) }
     }
 
-    static func tickStep(for duration: Double) -> Double {
-        switch duration {
-        case ..<20: 0.5
-        case ..<90: 1
-        case ..<600: 5
-        default: 15
-        }
+    /// Seconds between labelled ticks, so labels stay ~80pt apart at any zoom.
+    static func majorStep(pointsPerSecond: CGFloat) -> Double {
+        let steps: [Double] = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600]
+        return steps.first { $0 * Double(pointsPerSecond) >= 80 } ?? 600
+    }
+
+    /// "0:05", or "0:02.5" when labels fall between whole seconds.
+    static func rulerLabel(_ t: Double, step: Double) -> String {
+        let minutes = Int(t) / 60, seconds = t - Double(minutes * 60)
+        return step < 1 ? String(format: "%d:%04.1f", minutes, seconds) : String(format: "%d:%02d", minutes, Int(seconds.rounded()))
     }
 }
 
@@ -333,21 +336,24 @@ private struct RulerView: View {
     let width: CGFloat
 
     var body: some View {
-        let step = EditorTimeline.tickStep(for: model.outputDuration)
+        let major = EditorTimeline.majorStep(pointsPerSecond: scale)
+        let step = major / 5
         let duration = model.outputDuration
         Canvas { context, size in
-            var t = 0.0
-            while t <= duration + 0.001 {
+            var i = 0
+            while Double(i) * step <= duration + 0.001 {
+                let t = Double(i) * step
                 let x = t * scale
-                let major = Int((t / step).rounded()) % 5 == 0
+                let isMajor = i % 5 == 0
                 var tick = Path()
                 tick.move(to: CGPoint(x: x, y: size.height))
-                tick.addLine(to: CGPoint(x: x, y: size.height - (major ? 9 : 4)))
+                tick.addLine(to: CGPoint(x: x, y: size.height - (isMajor ? 9 : 4)))
                 context.stroke(tick, with: .color(.secondary.opacity(0.7)), lineWidth: 1)
-                if major {
-                    context.draw(Text(t.formattedDuration).font(.system(size: 9)).foregroundStyle(.secondary), at: CGPoint(x: x + 2, y: 5), anchor: .leading)
+                if isMajor {
+                    context.draw(Text(EditorTimeline.rulerLabel(t, step: major)).font(.system(size: 9).monospacedDigit()).foregroundStyle(.secondary),
+                                 at: CGPoint(x: x + 3, y: 5), anchor: .leading)
                 }
-                t += step
+                i += 1
             }
         }
         .frame(width: width, height: 20)
@@ -480,7 +486,8 @@ private struct Filmstrip: View {
 
     var body: some View {
         GeometryReader { geo in
-            let count = max(Int(geo.size.width / 56), 1)
+            // One thumbnail per ~56pt, capped so deep zooms stay quick to load.
+            let count = min(max(Int(geo.size.width / 56), 1), 120)
             HStack(spacing: 0) {
                 ForEach(images.indices, id: \.self) { i in
                     Image(nsImage: images[i]).resizable().aspectRatio(contentMode: .fill)
@@ -494,9 +501,13 @@ private struct Filmstrip: View {
 
     private func load(count: Int, height: CGFloat) async {
         let generator = AVAssetImageGenerator(asset: AVURLAsset(url: screenURL))
-        generator.maximumSize = CGSize(width: height * 3, height: height * 2)
-        generator.requestedTimeToleranceBefore = CMTime(seconds: 0.5, preferredTimescale: 600)
-        generator.requestedTimeToleranceAfter = CMTime(seconds: 0.5, preferredTimescale: 600)
+        // Retina: twice the point size, so thumbnails stay sharp.
+        generator.maximumSize = CGSize(width: height * 6, height: height * 4)
+        // Tight tolerance when zoomed in (thumbnails close in time), loose otherwise.
+        let spacing = clip.duration / Double(max(count, 1))
+        let tolerance = CMTime(seconds: min(0.5, spacing / 2), preferredTimescale: 600)
+        generator.requestedTimeToleranceBefore = tolerance
+        generator.requestedTimeToleranceAfter = tolerance
         var result: [NSImage] = []
         for i in 0..<count {
             let t = clip.start + (clip.duration * (Double(i) + 0.5) / Double(count))

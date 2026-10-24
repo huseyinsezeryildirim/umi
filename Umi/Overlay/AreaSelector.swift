@@ -9,7 +9,8 @@ final class AreaSelector {
     private var keyMonitor: Any?
 
     /// Calls back with the rect in global screen points (top-left origin), or nil.
-    func pick(on screen: NSScreen = NSScreen.main ?? NSScreen.screens[0], initial: CGRect?, completion: @escaping (CGRect?) -> Void) {
+    func pick(on screen: NSScreen = NSScreen.main ?? NSScreen.screens[0], initial: CGRect?, confirmTitle: String = "Record This Area",
+              completion: @escaping (CGRect?) -> Void) {
         close()
         self.completion = completion
         let frame = screen.frame
@@ -23,7 +24,7 @@ final class AreaSelector {
         let primaryHeight = NSScreen.screens.first?.frame.height ?? frame.height
         let screenTopLeft = CGPoint(x: frame.minX, y: primaryHeight - frame.maxY)
         let start = initial.map { $0.offsetBy(dx: -screenTopLeft.x, dy: -screenTopLeft.y) }
-        let view = AreaSelectorView(initial: start, size: frame.size) { [weak self] rect in
+        let view = AreaSelectorView(initial: start, size: frame.size, confirmTitle: confirmTitle) { [weak self] rect in
             self?.finish(rect.map { $0.offsetBy(dx: screenTopLeft.x, dy: screenTopLeft.y) })
         }
         window.contentView = NSHostingView(rootView: view)
@@ -60,11 +61,13 @@ private struct AreaSelectorView: View {
     @State private var dragStart: CGPoint?
     @State private var moveOrigin: CGRect?
     let size: CGSize
+    let confirmTitle: String
     let done: (CGRect?) -> Void
 
-    init(initial: CGRect?, size: CGSize, done: @escaping (CGRect?) -> Void) {
+    init(initial: CGRect?, size: CGSize, confirmTitle: String, done: @escaping (CGRect?) -> Void) {
         _rect = State(initialValue: initial)
         self.size = size
+        self.confirmTitle = confirmTitle
         self.done = done
     }
 
@@ -94,13 +97,13 @@ private struct AreaSelectorView: View {
                 HStack(spacing: 8) {
                     Button("Cancel") { done(nil) }
                         .buttonStyle(GlassButtonStyle(height: 34, cornerRadius: 11))
-                    Button("Record This Area") { done(rect) }
+                    Button(confirmTitle) { done(rect) }
                         .buttonStyle(InkCompactButtonStyle())
                         .keyboardShortcut(.defaultAction)
                 }
                 .offset(x: min(rect.minX, size.width - 260), y: min(rect.maxY + 10, size.height - 50))
             } else {
-                Text("Drag to select the area to record · Esc to cancel")
+                Text("Drag to select an area · Esc to cancel")
                     .font(.system(size: 15, weight: .medium))
                     .padding(.horizontal, 16).padding(.vertical, 10)
                     .background(Capsule().fill(.black.opacity(0.7)))
