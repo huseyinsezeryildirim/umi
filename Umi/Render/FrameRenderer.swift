@@ -97,7 +97,8 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
         }
 
         // Zoom the composed screen (not the camera), keeping the view inside the canvas.
-        let (scale, focus) = applyZoomAndMoves ? zoom.state(at: time) : (1, CGPoint(x: 0.5, y: 0.5))
+        let (rawScale, focus) = applyZoomAndMoves ? zoom.state(at: time) : (1, CGPoint(x: 0.5, y: 0.5))
+        let scale = 1 + (rawScale - 1) * scene.zoomAllowance
         if scale > 1.001 {
             let content = DeviceFrameGeometry.contentRect(settings.frame, outer: scene.screenRect)
             let viewSize = CGSize(width: size.width / scale, height: size.height / scale)

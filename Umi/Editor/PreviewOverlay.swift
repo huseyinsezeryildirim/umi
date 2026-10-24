@@ -29,6 +29,7 @@ struct PreviewOverlay: View {
                     EmptyView()
                 }
             }
+            .coordinateSpace(.named("preview"))
         }
     }
 
@@ -58,7 +59,7 @@ struct PreviewOverlay: View {
                 .fill(UmiTheme.accent.opacity(0.08))
                 .overlay(Rectangle().strokeBorder(UmiTheme.accent, style: StrokeStyle(lineWidth: 2, dash: [6, 4])))
                 .contentShape(Rectangle())
-                .gesture(DragGesture(minimumDistance: 1)
+                .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
                     .onChanged { v in
                         let start = beginMask(mask)
                         model.updateMask(mask.id) {
@@ -72,7 +73,7 @@ struct PreviewOverlay: View {
                 .overlay(Circle().strokeBorder(UmiTheme.accent, lineWidth: 2))
                 .frame(width: 14, height: 14)
                 .offset(x: 7, y: 7)
-                .gesture(DragGesture(minimumDistance: 1)
+                .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
                     .onChanged { v in
                         let start = beginMask(mask)
                         model.updateMask(mask.id) {
@@ -106,8 +107,9 @@ struct PreviewOverlay: View {
                 .fill(Color.white.opacity(0.001))
                 .frame(width: content.width, height: content.height)
                 .offset(x: content.minX, y: content.minY)
-                .gesture(SpatialTapGesture().onEnded { tap in
-                    let p = CGPoint(x: min(max(tap.location.x / content.width, 0), 1), y: min(max(tap.location.y / content.height, 0), 1))
+                .gesture(SpatialTapGesture(coordinateSpace: .named("preview")).onEnded { tap in
+                    let p = CGPoint(x: min(max((tap.location.x - content.minX) / content.width, 0), 1),
+                                    y: min(max((tap.location.y - content.minY) / content.height, 0), 1))
                     model.updateZoom(id) { $0.focus = p }
                 })
             Image(systemName: "scope")
@@ -128,7 +130,7 @@ struct PreviewOverlay: View {
             .frame(width: 18, height: 18)
             .shadow(color: .black.opacity(0.4), radius: 3)
             .position(x: video.minX + text.position.x * video.width, y: video.minY + text.position.y * video.height)
-            .gesture(DragGesture(minimumDistance: 1)
+            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
                 .onChanged { v in
                     if textOrigin == nil { textOrigin = text.position; model.beginGesture() }
                     guard let start = textOrigin else { return }

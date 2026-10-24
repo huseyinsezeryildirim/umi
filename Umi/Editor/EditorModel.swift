@@ -176,7 +176,14 @@ final class EditorModel {
 
     func addZoom(at outputTime: Double) {
         guard let source = sourceTime(for: outputTime) else { return }
-        let segment = EditSettings.ZoomSegment(start: source, end: min(source + 3, project.duration), scale: edit.zoom.scale)
+        // Inside an existing zoom: select it instead of stacking another on top.
+        if let existing = zoomSegments.first(where: { source >= $0.start && source <= $0.end }) {
+            selection = .zoom(existing.id)
+            return
+        }
+        // Up to 3 s, stopping short of the next zoom.
+        let next = zoomSegments.map(\.start).filter { $0 > source }.min() ?? project.duration
+        let segment = EditSettings.ZoomSegment(start: source, end: min(source + 3, next - 0.05, project.duration), scale: edit.zoom.scale)
         update { edit in
             materializeAutoZoom(&edit)
             edit.zoom.segments.append(segment)
@@ -217,6 +224,7 @@ final class EditorModel {
         let mask = EditSettings.PrivacyMask(start: source, end: min(source + 3, project.duration), rect: CGRect(x: 0.35, y: 0.35, width: 0.3, height: 0.2))
         update { $0.masks.append(mask) }
         selection = .mask(mask.id)
+        reveal(mask.start)
     }
 
     func addScene(_ layout: EditSettings.SceneLayout, at outputTime: Double) {
@@ -224,6 +232,7 @@ final class EditorModel {
         let scene = EditSettings.SceneSegment(start: source, end: min(source + 4, project.duration), layout: layout)
         update { $0.scenes.append(scene) }
         selection = .scene(scene.id)
+        reveal(scene.start + scene.transition)
     }
 
     func addText(_ style: EditSettings.TextStyle, at outputTime: Double) {
@@ -240,6 +249,7 @@ final class EditorModel {
                                                position: position, animation: style == .typewriter ? .typewriter : .slide)
         update { $0.texts.append(overlay) }
         selection = .text(overlay.id)
+        reveal(overlay.start + 0.4)
     }
 
     func addMove(_ kind: EditSettings.MoveKind, at outputTime: Double) {
@@ -247,6 +257,12 @@ final class EditorModel {
         let move = EditSettings.CameraMove(start: source, end: min(source + 4, project.duration), kind: kind)
         update { $0.moves.append(move) }
         selection = .move(move.id)
+        reveal(move.start + 1)
+    }
+
+    /// Moves the playhead to a source time (past an item's fade-in) so a new item shows.
+    private func reveal(_ sourceTime: Double) {
+        if let t = outputTime(for: min(sourceTime + 0.25, project.duration)) { seek(to: t) }
     }
 
     func updateMask(_ id: UUID, _ change: (inout EditSettings.PrivacyMask) -> Void) { updateItem(\.masks, id, change) }
@@ -382,6 +398,20 @@ final class EditorModel {
         return min(p.clip.start + (outputTime - p.outputStart) * p.clip.speed, p.clip.end)
     }
 
+    /// Playback speed of the clip containing a source time (1 if it's cut out).
+    func speed(atSource sourceTime: Double) -> Double {
+        placements.first { sourceTime >= $0.clip.start && sourceTime <= $0.clip.end }?.clip.speed ?? 1
+    }
+
+    /// An item's span on the output timeline, following speed changes and clamped to
+    /// the clip it starts in (nil if it starts in a cut-out part).
+    func outputRange(start: Double, end: Double) -> ClosedRange<Double>? {
+        guard let p = placements.first(where: { start >= $0.clip.start && start <= $0.clip.end }) else { return nil }
+        let a = p.outputStart + (start - p.clip.start) / p.clip.speed
+        let b = outputTime(for: end) ?? (p.outputStart + (min(end, p.clip.end) - p.clip.start) / p.clip.speed)
+        return a...max(a, min(b, outputDuration))
+    }
+
     func outputTime(for sourceTime: Double) -> Double? {
         placements.first { sourceTime >= $0.clip.start && sourceTime <= $0.clip.end }
             .map { $0.outputStart + (sourceTime - $0.clip.start) / $0.clip.speed }
@@ -453,10 +483,13 @@ final class EditorModel {
                                      applyZoomAndMoves: !editingOnPreview)
         let size = previewSize
         let bundle = bundle
-        let resumeAt = keepTime ? currentTime : 0
         let wasPlaying = player.rate != 0
 
+        let throttle = gestureSnapshot != nil
         rebuildTask = Task {
+            // While dragging, coalesce updates so the preview keeps up with the mouse.
+            if throttle { try? await Task.sleep(for: .milliseconds(60)) }
+            guard !Task.isCancelled else { return }
             do {
                 let built = try await CompositionBuilder.build(bundle: bundle, renderer: renderer, renderSize: size)
                 guard !Task.isCancelled else { return }
@@ -468,7 +501,8 @@ final class EditorModel {
                 item.audioMix = built.audioMix
                 item.audioTimePitchAlgorithm = .timeDomain
                 player.replaceCurrentItem(with: item)
-                seek(to: min(resumeAt, built.duration))
+                // Read the playhead now, not when the rebuild started: it may have moved since.
+                seek(to: min(keepTime ? currentTime : 0, built.duration))
                 if wasPlaying { player.play() }
                 loadError = nil
             } catch {

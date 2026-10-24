@@ -12,16 +12,19 @@ struct EditorView: View {
 
     var body: some View {
         HSplitView {
-            VStack(spacing: 0) {
-                PlayerSurface(player: model.player)
-                    .background(Color.black.opacity(0.9))
-                    .overlay { PreviewOverlay(model: model) }
-                    .frame(minWidth: 560, minHeight: 320)
-                TransportBar(model: model)
-                Divider()
+            // Drag the divider to trade preview size for timeline space.
+            VSplitView {
+                VStack(spacing: 0) {
+                    PlayerSurface(player: model.player)
+                        .background(Color.black.opacity(0.9))
+                        .overlay { PreviewOverlay(model: model) }
+                        .frame(minWidth: 560, minHeight: 280)
+                    TransportBar(model: model)
+                }
                 EditorTimeline(model: model)
-                    .frame(minHeight: 150, idealHeight: 250)
+                    .frame(minHeight: 180, idealHeight: 290, maxHeight: 520)
             }
+            .background(EditorKeys(model: model))
             InspectorView(model: model)
                 .frame(minWidth: 280, idealWidth: 300, maxWidth: 360)
         }
@@ -82,7 +85,6 @@ private struct TransportBar: View {
                 Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
                     .frame(width: 18)
             }
-            .keyboardShortcut(.space, modifiers: [])
             .help("Play / Pause (Space)")
 
             Text("\(model.currentTime.formattedPrecise) / \(model.outputDuration.formattedPrecise)")
@@ -96,7 +98,6 @@ private struct TransportBar: View {
             } label: {
                 Label("Split", systemImage: "scissors")
             }
-            .keyboardShortcut("s", modifiers: [])
             .help("Split at playhead (S)")
 
             Button {
@@ -104,7 +105,6 @@ private struct TransportBar: View {
             } label: {
                 Label("Add Zoom", systemImage: "plus.magnifyingglass")
             }
-            .keyboardShortcut("z", modifiers: [])
             .help("Add a zoom at the playhead (Z)")
         }
         .buttonStyle(.borderless)
@@ -170,3 +170,62 @@ extension Double {
         return String(format: "%02d:%04.1f", minutes, seconds)
     }
 }
+
+/// Editor shortcuts that work wherever focus is in the window (but not while typing in a
+/// text field): Delete/Backspace removes the selection, Escape deselects, Space plays,
+/// S splits and Z adds a zoom at the playhead.
+private struct EditorKeys: NSViewRepresentable {
+    let model: EditorModel
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        context.coordinator.install(on: view, model: model)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.uninstall()
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator {
+        private var monitor: Any?
+
+        func install(on view: NSView, model: EditorModel) {
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak view] event in
+                guard let window = view?.window, event.window === window else { return event }
+                if window.firstResponder is NSTextView { return event } // typing in a field
+                switch event.keyCode {
+                case 51, 117: // Backspace, forward Delete
+                    guard model.selection != nil else { return event }
+                    model.deleteSelection()
+                    return nil
+                case 53: // Escape
+                    guard model.selection != nil else { return event }
+                    model.selection = nil
+                    return nil
+                case 49 where event.modifierFlags.intersection([.command, .option, .control]).isEmpty: // Space
+                    model.togglePlay()
+                    return nil
+                case 1 where event.modifierFlags.intersection([.command, .option, .control]).isEmpty: // S
+                    model.split(at: model.currentTime)
+                    return nil
+                case 6 where event.modifierFlags.intersection([.command, .option, .control]).isEmpty: // Z
+                    model.addZoom(at: model.currentTime)
+                    return nil
+                default:
+                    return event
+                }
+            }
+        }
+
+        func uninstall() {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+        }
+    }
+}
+
