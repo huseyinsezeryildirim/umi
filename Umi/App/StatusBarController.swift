@@ -346,6 +346,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         tour.endIfActive()
         if keepCameraOnClose {
             keepCameraOnClose = false
+            model.recorder.launcherDidCloseKeepingCamera()
         } else {
             model.recorder.launcherDidClose()
         }

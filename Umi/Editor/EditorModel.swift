@@ -561,7 +561,10 @@ final class EditorModel {
     func seek(to time: Double) {
         let clamped = min(max(time, 0), outputDuration)
         currentTime = clamped
-        player.seek(to: CMTime(seconds: clamped, preferredTimescale: 6000), toleranceBefore: .zero, toleranceAfter: .zero)
+        // Recordings can start a few ms after 0; an exact seek there finds no frame and the
+        // preview shows only the background, so let it land on the first frame instead.
+        let after = clamped < 0.1 ? CMTime(seconds: 0.1, preferredTimescale: 6000) : .zero
+        player.seek(to: CMTime(seconds: clamped, preferredTimescale: 6000), toleranceBefore: .zero, toleranceAfter: after)
     }
 
     // MARK: Export

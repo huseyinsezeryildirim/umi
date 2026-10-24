@@ -122,3 +122,65 @@ private struct ControlButton: View {
         .help(help)
     }
 }
+
+/// Shown while the camera is on but the launcher is closed and nothing is recording:
+/// start recording, turn the camera off, or reopen the launcher.
+final class ReadyBarController {
+    private var panel: NSPanel?
+
+    func show(recorder: RecordingController) {
+        guard panel == nil else { return }
+        let size = CGSize(width: 64, height: 180)
+        let screen = NSScreen.main?.visibleFrame ?? .zero
+        let panel = NSPanel(contentRect: CGRect(x: screen.minX + 20, y: screen.midY - size.height / 2, width: size.width, height: size.height),
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.level = .floating
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.isMovableByWindowBackground = true
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.hidesOnDeactivate = false
+        panel.contentView = FirstMouseHostingView(rootView: ReadyBarView(recorder: recorder))
+        panel.orderFrontRegardless()
+        self.panel = panel
+    }
+
+    func hide() {
+        panel?.orderOut(nil)
+        panel = nil
+    }
+}
+
+private struct ReadyBarView: View {
+    let recorder: RecordingController
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Button { recorder.start() } label: {
+                Circle().fill(UmiTheme.record).frame(width: 16, height: 16)
+                    .frame(width: 40, height: 40)
+                    .background(Circle().fill(.white))
+            }
+            .buttonStyle(.plain)
+            .help("Start recording  \(HotKeys.Action.startStop.display)")
+            Rectangle().fill(.white.opacity(0.12)).frame(width: 28, height: 1)
+            Button { recorder.turnCameraOff() } label: {
+                Image(systemName: "video.slash").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
+                    .frame(width: 40, height: 40)
+            }
+            .buttonStyle(.plain)
+            .help("Turn the camera off")
+            Button { recorder.onOpenLauncher() } label: {
+                Image(systemName: "slider.horizontal.3").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
+                    .frame(width: 40, height: 40)
+            }
+            .buttonStyle(.plain)
+            .help("Open Umi  \(HotKeys.Action.launcher.display)")
+        }
+        .padding(.vertical, 11)
+        .frame(width: 60, height: 176)
+        .umiGlass(in: Capsule(), tint: UmiTheme.night.opacity(0.72), dark: true)
+        .overlay(Capsule().strokeBorder(LinearGradient(colors: [.white.opacity(0.28), .white.opacity(0.06)], startPoint: .top, endPoint: .bottom), lineWidth: 1))
+        .environment(\.colorScheme, .dark)
+    }
+}

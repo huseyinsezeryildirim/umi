@@ -80,6 +80,15 @@ case "type":
             usleep(12_000)
         }
     }
+case "optshiftkey":
+    let code = CGKeyCode(Int(args.dropFirst().first!)!)
+    let src = CGEventSource(stateID: .hidSystemState)
+    for down in [true, false] {
+        let event = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: down)
+        event?.flags = [.maskAlternate, .maskShift]
+        event?.post(tap: .cghidEventTap)
+        usleep(40_000)
+    }
 case "cmdshiftkey":
     let code = CGKeyCode(Int(args.dropFirst().first!)!)
     let src = CGEventSource(stateID: .hidSystemState)

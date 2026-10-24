@@ -58,10 +58,20 @@ nonisolated enum CompositionBuilder {
             pairs += zip(audioSources, audioTracks[set]).map { ($0, $1) }
 
             for (source, out) in pairs {
-                let available = try await source.load(.timeRange)
+                var available = try await source.load(.timeRange)
+                // Skip a leading empty edit: the track's range can start at 0 while its first
+                // sample comes a few ms later.
+                if let first = try? await source.load(.segments).first(where: { !$0.isEmpty })?.timeMapping.target.start,
+                   first > available.start, first < available.end {
+                    available = CMTimeRange(start: first, end: available.end)
+                }
                 let range = CMTimeRange(start: time(placement.clip.start), end: time(placement.clip.end)).intersection(available)
                 guard !range.isEmpty else { continue }
-                let at = time(placement.outputStart + (range.start.seconds - placement.clip.start) / placement.clip.speed)
+                // Tracks often start a few ms after 0. Close that gap so the clip's first
+                // output frame has a source frame (otherwise it renders background only).
+                var lead = (range.start.seconds - placement.clip.start) / placement.clip.speed
+                if lead < 0.1 { lead = 0 }
+                let at = time(placement.outputStart + lead)
                 try out.insertTimeRange(range, of: source, at: at)
                 if placement.clip.speed != 1 {
                     out.scaleTimeRange(CMTimeRange(start: at, duration: range.duration),

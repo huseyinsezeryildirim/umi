@@ -25,6 +25,7 @@ final class RecordingController {
     private let camera = CameraBubbleController()
     private let countdown = CountdownOverlay()
     private let controlBar = ControlBarController()
+    private let readyBar = ReadyBarController()
     private let hotKeys = HotKeys()
     private var launcherOpen = false
     /// Set by the status bar; opens or closes the launcher (⌥⇧U).
@@ -83,6 +84,7 @@ final class RecordingController {
     /// and during a recording, never otherwise.
     func launcherDidOpen() {
         launcherOpen = true
+        readyBar.hide()
         if phase == .idle, settings.showCamera { camera.show() }
     }
 
@@ -124,6 +126,21 @@ final class RecordingController {
     func launcherDidClose() {
         launcherOpen = false
         if phase == .idle { camera.hide() }
+    }
+
+    /// The launcher closed but the camera stays on (e.g. for macOS video effects): show a
+    /// small bar so recording can start, or the camera can be turned off, from there.
+    func launcherDidCloseKeepingCamera() {
+        launcherOpen = false
+        guard phase == .idle else { return }
+        readyBar.show(recorder: self)
+    }
+
+    /// Turns the camera off from outside the launcher (ready bar).
+    func turnCameraOff() {
+        settings.showCamera = false
+        camera.hide()
+        readyBar.hide()
     }
 
     // MARK: Sources
@@ -195,6 +212,7 @@ final class RecordingController {
 
     func start() {
         guard phase == .idle else { return }
+        readyBar.hide()
         lastError = nil
         startTask = Task { await runStart() }
     }
@@ -394,6 +412,7 @@ final class RecordingController {
     private func finish() {
         camera.hide()
         controlBar.hide()
+        readyBar.hide()
         session = nil
         phase = .idle
         startTask = nil
