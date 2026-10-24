@@ -224,7 +224,11 @@ nonisolated final class UmiInstruction: NSObject, AVVideoCompositionInstructionP
     let timeRange: CMTimeRange
     let enablePostProcessing = false
     let containsTweening = true
-    let requiredSourceTrackIDs: [NSValue]?
+    /// Kept as one NSArray the instruction owns, returned as-is: bridging a Swift array on
+    /// every read hands AVFoundation's background threads short-lived arrays, and
+    /// MediaToolbox crashed reading one after it was freed.
+    private let trackIDs: NSArray
+    var requiredSourceTrackIDs: [NSValue]? { trackIDs as? [NSValue] }
     let passthroughTrackID = kCMPersistentTrackID_Invalid
     let layers: [Layer]
     /// Media track videos by overlay id.
@@ -237,7 +241,7 @@ nonisolated final class UmiInstruction: NSObject, AVVideoCompositionInstructionP
         self.overlayTracks = overlayTracks
         self.renderer = renderer
         let ids = layers.flatMap { [$0.screenTrackID] + ($0.cameraTrackID.map { [$0] } ?? []) } + overlayTracks.values
-        requiredSourceTrackIDs = ids.map { NSNumber(value: $0) }
+        trackIDs = NSArray(array: ids.map { NSNumber(value: $0) })
     }
 }
 
