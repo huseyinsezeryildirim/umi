@@ -271,9 +271,10 @@ private struct CanvasSection: View {
             Picker("Device", selection: Binding(get: { model.edit.frame }, set: { f in model.update { $0.frame = f } })) {
                 ForEach(EditSettings.DeviceFrame.allCases, id: \.self) { Text($0.label).tag($0) }
             }
-            Slider2("Padding", value: model.edit.padding, range: 0...0.25, format: "%.0f%%", percent: true, model: model) { v in model.update { $0.padding = v } }
+            Slider2("Padding", value: model.edit.padding, range: 0...0.4, format: "%.0f%%", percent: true, model: model) { v in model.update { $0.padding = v } }
             Slider2("Corners", value: model.edit.cornerRadius, range: 0...0.08, format: "%.0f%%", percent: true, model: model) { v in model.update { $0.cornerRadius = v } }
             Slider2("Shadow", value: model.edit.shadow, range: 0...1, format: "%.0f%%", percent: true, model: model) { v in model.update { $0.shadow = v } }
+            Slider2("Border", value: model.edit.border, range: 0...0.02, format: "%.0f%%", percent: true, model: model) { v in model.update { $0.border = v } }
         }
     }
 

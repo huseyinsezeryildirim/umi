@@ -52,6 +52,11 @@ struct PreviewOverlay: View {
     // MARK: Mask
 
     private func maskBox(_ mask: EditSettings.PrivacyMask, content: CGRect) -> some View {
+        // Masks live in full-recording coordinates; the preview shows the cropped part.
+        let c = model.edit.crop ?? CGRect(x: 0, y: 0, width: 1, height: 1)
+        let full = CGRect(x: content.minX - c.minX / c.width * content.width, y: content.minY - c.minY / c.height * content.height,
+                          width: content.width / c.width, height: content.height / c.height)
+        let content = full
         let r = CGRect(x: content.minX + mask.rect.minX * content.width, y: content.minY + mask.rect.minY * content.height,
                        width: mask.rect.width * content.width, height: mask.rect.height * content.height)
         return ZStack(alignment: .bottomTrailing) {

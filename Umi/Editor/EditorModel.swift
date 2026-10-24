@@ -55,7 +55,16 @@ final class EditorModel {
     var undoManager: UndoManager?
     /// The renderer behind the current preview, for mapping overlay handles.
     private(set) var renderer: FrameRenderer?
-    let previewSize: CGSize
+    /// Preview resolution: 1 = up to 1080p, 0.5 = half (smoother on big recordings).
+    var previewQuality = 1.0 {
+        didSet { rebuild(keepTime: true) }
+    }
+    /// Size of the preview canvas: the export's shape at preview resolution.
+    var previewSize: CGSize {
+        var project = project
+        project.edit = edit
+        return CompositionBuilder.renderSize(for: project, maxHeight: Int(1080 * previewQuality))
+    }
 
     private var cursorData = CursorData()
     private let cursorImage = FrameRenderer.CursorImage.arrow
@@ -70,7 +79,6 @@ final class EditorModel {
             ?? RecordingProject(createdAt: .now, duration: 0, screen: .init(pixelWidth: 1920, pixelHeight: 1080, captureRect: .zero, fps: 60), audio: .init())
         self.project = project
         edit = project.edit ?? project.defaultEdit
-        previewSize = CompositionBuilder.renderSize(for: project, maxHeight: 1080)
         cursorData = (try? ProjectStore.read(CursorData.self, from: bundle.appendingPathComponent(RecordingProject.cursorFile))) ?? CursorData()
 
         let interval = CMTime(value: 1, timescale: 30)
@@ -82,6 +90,8 @@ final class EditorModel {
             }
         }
         rebuild(keepTime: false)
+        let screen = bundle.appendingPathComponent(RecordingProject.screenFile), mic = project.audio.microphoneTrack
+        Task { waveform = await Waveform.load(screen, preferredTrack: mic) }
     }
 
     // MARK: Editing
@@ -528,6 +538,20 @@ final class EditorModel {
         isPlaying = player.rate != 0
         refreshPreviewMode()
     }
+
+    /// Horizontal zoom of the timeline (1 = whole video fits).
+    var timelineZoom = 1.0
+    /// Voice loudness for the clip track (`Waveform.samplesPerSecond` per second of recording).
+    private(set) var waveform: [Float] = []
+
+    /// Tracks added from "Add track" that have nothing on them yet.
+    var shownTracks: Set<TrackKind> = []
+
+    /// Clip boundaries, for jumping between cuts.
+    private var edges: [Double] { [0] + placements.map(\.outputEnd) }
+
+    func previousEdge() -> Double { edges.filter { $0 < currentTime - 0.05 }.max() ?? 0 }
+    func nextEdge() -> Double { edges.filter { $0 > currentTime + 0.05 }.min() ?? outputDuration }
 
     func seek(to time: Double) {
         let clamped = min(max(time, 0), outputDuration)

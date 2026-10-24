@@ -15,12 +15,18 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
     /// Film grain over the background, 0…1.
     var backgroundNoise = 0.0
     var frame = DeviceFrame.none
+    /// Output shape of the video.
+    var aspect = AspectRatio.auto
+    /// Part of the screen recording to keep, normalized (top-left origin); nil = all of it.
+    var crop: CGRect?
     /// Space around the screen, as a fraction of the canvas' shorter side.
     var padding = 0.08
     /// Screen corner radius, as a fraction of the screen's shorter side.
     var cornerRadius = 0.025
     /// 0…1
     var shadow = 0.6
+    /// Border around the screen, as a fraction of the screen's shorter side (0 = none).
+    var border = 0.0
 
     var cursor = Cursor()
     var camera = Camera()
@@ -49,9 +55,12 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
         backgroundAngle = c.value(.backgroundAngle, d.backgroundAngle)
         backgroundNoise = c.value(.backgroundNoise, d.backgroundNoise)
         frame = c.value(.frame, d.frame)
+        aspect = c.value(.aspect, d.aspect)
+        crop = c.value(.crop, d.crop)
         padding = c.value(.padding, d.padding)
         cornerRadius = c.value(.cornerRadius, d.cornerRadius)
         shadow = c.value(.shadow, d.shadow)
+        border = c.value(.border, d.border)
         cursor = c.value(.cursor, d.cursor)
         camera = c.value(.camera, d.camera)
         zoom = c.value(.zoom, d.zoom)
@@ -99,6 +108,33 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
             case .night: (RGBA(0.20, 0.22, 0.30), RGBA(0.05, 0.05, 0.09))
             case .sand: (RGBA(0.96, 0.91, 0.82), RGBA(0.82, 0.71, 0.58))
             case .umay: (RGBA(1.00, 0.62, 0.78), RGBA(0.55, 0.78, 1.00))
+            }
+        }
+    }
+
+    enum AspectRatio: String, Codable, CaseIterable, Sendable {
+        case auto, wide, vertical, square, classic, portrait
+
+        var label: String {
+            switch self {
+            case .auto: "Auto"
+            case .wide: "16:9 Wide"
+            case .vertical: "9:16 Vertical"
+            case .square: "1:1 Square"
+            case .classic: "4:3 Classic"
+            case .portrait: "4:5 Portrait"
+            }
+        }
+
+        /// Width / height; nil = follow the recording.
+        var ratio: Double? {
+            switch self {
+            case .auto: nil
+            case .wide: 16.0 / 9
+            case .vertical: 9.0 / 16
+            case .square: 1
+            case .classic: 4.0 / 3
+            case .portrait: 4.0 / 5
             }
         }
     }

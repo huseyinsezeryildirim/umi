@@ -86,6 +86,30 @@ final class RenderTests: XCTestCase {
         XCTAssertEqual(duration, 6, accuracy: 0.2)
     }
 
+    /// Crop to the left half and export vertical 9:16.
+    @MainActor
+    func testCropAndVerticalAspect() async throws {
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: fixture.path), "Run scripts/make-fixture.sh first")
+        var project = try ProjectStore.read(RecordingProject.self, from: fixture.appendingPathComponent(RecordingProject.fileName))
+        var edit = EditSettings()
+        edit.crop = CGRect(x: 0, y: 0, width: 0.5, height: 1)
+        edit.aspect = .vertical
+        edit.zoom.auto = false
+        edit.border = 0.006
+        project.edit = edit
+        let cursor = try ProjectStore.read(CursorData.self, from: fixture.appendingPathComponent(RecordingProject.cursorFile))
+        let renderer = FrameRenderer(project: project, cursorData: cursor, cursorImage: .arrow, bundle: fixture)
+        let output = root.appendingPathComponent("export-vertical.mp4")
+        try await Exporter.export(bundle: fixture, renderer: renderer, resolution: .p720, fps: 30, to: output)
+        let asset = AVURLAsset(url: output)
+        let size = try await asset.loadTracks(withMediaType: .video)[0].load(.naturalSize)
+        XCTAssertEqual(size.width, 720)
+        XCTAssertEqual(size.height, 1280)
+        let (image, _) = try await AVAssetImageGenerator(asset: asset).image(at: CMTime(seconds: 1, preferredTimescale: 600))
+        try CIContext().writePNGRepresentation(of: CIImage(cgImage: image), to: root.appendingPathComponent("frames/vertical.png"),
+                                               format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+    }
+
     func testCameraOnlyRecordingStartsAsCameraOnlyScene() {
         let project = RecordingProject(createdAt: .now, duration: 12, screen: .init(pixelWidth: 640, pixelHeight: 360, captureRect: .zero, fps: 15),
                                        camera: .init(), audio: .init(), cameraOnly: true)
