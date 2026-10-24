@@ -18,6 +18,35 @@ case "click":
     CGEvent(mouseEventSource: src, mouseType: .leftMouseDown, mouseCursorPosition: p, mouseButton: .left)?.post(tap: .cghidEventTap)
     usleep(60_000)
     CGEvent(mouseEventSource: src, mouseType: .leftMouseUp, mouseCursorPosition: p, mouseButton: .left)?.post(tap: .cghidEventTap)
+case "drag":
+    let v = args.dropFirst().compactMap(Double.init)
+    let from = CGPoint(x: v[0], y: v[1]), to = CGPoint(x: v[2], y: v[3])
+    let src = CGEventSource(stateID: .hidSystemState)
+    CGEvent(mouseEventSource: src, mouseType: .mouseMoved, mouseCursorPosition: from, mouseButton: .left)?.post(tap: .cghidEventTap)
+    usleep(80_000)
+    CGEvent(mouseEventSource: src, mouseType: .leftMouseDown, mouseCursorPosition: from, mouseButton: .left)?.post(tap: .cghidEventTap)
+    usleep(80_000)
+    for i in 1...20 {
+        let t = Double(i) / 20
+        let p = CGPoint(x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t)
+        CGEvent(mouseEventSource: src, mouseType: .leftMouseDragged, mouseCursorPosition: p, mouseButton: .left)?.post(tap: .cghidEventTap)
+        usleep(25_000)
+    }
+    usleep(80_000)
+    CGEvent(mouseEventSource: src, mouseType: .leftMouseUp, mouseCursorPosition: to, mouseButton: .left)?.post(tap: .cghidEventTap)
+case "key", "cmdkey":
+    let code = CGKeyCode(Int(args.dropFirst().first!)!)
+    let flags: CGEventFlags = args.first == "cmdkey" ? .maskCommand : []
+    let src = CGEventSource(stateID: .hidSystemState)
+    // Explicit empty flags: the HID source state can carry stray modifiers (e.g. ⌘).
+    for down in [true, false] {
+        let event = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: down)
+        event?.flags = flags
+        event?.post(tap: .cghidEventTap)
+        usleep(40_000)
+    }
+case "frontmost":
+    print(NSWorkspace.shared.frontmostApplication?.localizedName ?? "")
 case "notify":
     DistributedNotificationCenter.default().postNotificationName(.init(args.dropFirst().first!), object: nil, userInfo: nil, deliverImmediately: true)
 case "trusted":

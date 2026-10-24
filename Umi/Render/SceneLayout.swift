@@ -10,6 +10,9 @@ nonisolated struct SceneState: Sendable {
     var cameraRect: CGRect
     var cameraRadius: CGFloat
     var cameraAlpha: Double
+    /// How much click/manual zoom applies: full in the default layouts, none when the
+    /// canvas is shared with the camera (split, floating, camera only).
+    var zoomAllowance: Double = 1
 
     func lerp(to other: SceneState, _ t: Double) -> SceneState {
         func l(_ a: CGFloat, _ b: CGFloat) -> CGFloat { a + (b - a) * t }
@@ -21,7 +24,8 @@ nonisolated struct SceneState: Sendable {
             screenAlpha: screenAlpha + (other.screenAlpha - screenAlpha) * t,
             cameraRect: r(cameraRect, other.cameraRect),
             cameraRadius: l(cameraRadius, other.cameraRadius),
-            cameraAlpha: cameraAlpha + (other.cameraAlpha - cameraAlpha) * t
+            cameraAlpha: cameraAlpha + (other.cameraAlpha - cameraAlpha) * t,
+            zoomAllowance: zoomAllowance + (other.zoomAllowance - zoomAllowance) * t
         )
     }
 }
@@ -76,7 +80,7 @@ nonisolated struct SceneLayoutEngine: Sendable {
             let full = available
             let small = DeviceFrameGeometry.fit(settings.frame, aspect: screenAspect, in: available.insetBy(dx: available.width * 0.2, dy: available.height * 0.2))
             return SceneState(screenRect: small, screenAlpha: 0, cameraRect: full,
-                              cameraRadius: settings.cornerRadius * min(full.width, full.height) * 1.6, cameraAlpha: hasCamera ? 1 : 0)
+                              cameraRadius: settings.cornerRadius * min(full.width, full.height) * 1.6, cameraAlpha: hasCamera ? 1 : 0, zoomAllowance: 0)
         case .splitScreen:
             let gap = short * 0.03
             let cameraWidth = available.width * 0.34
@@ -84,7 +88,7 @@ nonisolated struct SceneLayoutEngine: Sendable {
             let screen = DeviceFrameGeometry.fit(settings.frame, aspect: screenAspect, in: screenBox)
             let camera = CGRect(x: available.maxX - cameraWidth, y: screen.minY, width: cameraWidth, height: screen.height)
             return SceneState(screenRect: screen, screenAlpha: 1, cameraRect: camera,
-                              cameraRadius: settings.cornerRadius * min(camera.width, camera.height) * 1.6, cameraAlpha: hasCamera ? 1 : 0)
+                              cameraRadius: settings.cornerRadius * min(camera.width, camera.height) * 1.6, cameraAlpha: hasCamera ? 1 : 0, zoomAllowance: 0)
         case .floating:
             let screenBox = CGRect(x: available.minX, y: available.minY + available.height * 0.1,
                                    width: available.width * 0.78, height: available.height * 0.9)
@@ -92,7 +96,7 @@ nonisolated struct SceneLayoutEngine: Sendable {
             let cameraWidth = available.width * 0.3
             let camera = CGRect(x: available.maxX - cameraWidth, y: available.minY, width: cameraWidth, height: cameraWidth * 1.15)
             return SceneState(screenRect: screen, screenAlpha: 1, cameraRect: camera,
-                              cameraRadius: cameraWidth * 0.08, cameraAlpha: hasCamera ? 1 : 0)
+                              cameraRadius: cameraWidth * 0.08, cameraAlpha: hasCamera ? 1 : 0, zoomAllowance: 0)
         }
     }
 

@@ -68,9 +68,12 @@ nonisolated final class MovieWriter: @unchecked Sendable {
 
     func appendVideo(_ buffer: CMSampleBuffer, at time: CMTime) {
         lock.withLockUnchecked {
-            guard !finished, let input = videoInput, input.isReadyForMoreMediaData, time > lastVideoTime,
-                  let retimed = buffer.retimed(to: time) else { return }
-            if input.append(retimed) { lastVideoTime = time }
+            // The first frame is placed at zero: ScreenCaptureKit only sends a frame once the
+            // screen changes, and an empty start would show as a blank first moment.
+            let at = lastVideoTime == .negativeInfinity ? CMTime.zero : time
+            guard !finished, let input = videoInput, input.isReadyForMoreMediaData, at > lastVideoTime,
+                  let retimed = buffer.retimed(to: at) else { return }
+            if input.append(retimed) { lastVideoTime = at }
         }
     }
 

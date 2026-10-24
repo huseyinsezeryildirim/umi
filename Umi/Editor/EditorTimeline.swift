@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 
 /// The editor timeline: a ruler, the clip track (trim, split, speed, reorder) and one
@@ -6,7 +7,8 @@ struct EditorTimeline: View {
     let model: EditorModel
 
     static let labelWidth: CGFloat = 96
-    static let trackHeight: CGFloat = 30
+    static let trackHeight: CGFloat = 32
+    static let clipHeight: CGFloat = 46
 
     var body: some View {
         GeometryReader { geo in
@@ -25,6 +27,7 @@ struct EditorTimeline: View {
                 }
                 .padding(.vertical, 6)
                 .overlay(alignment: .topLeading) { playhead(scale: scale) }
+                .coordinateSpace(.named("timeline"))
             }
         }
         .background(Color(nsColor: .underPageBackgroundColor))
@@ -33,13 +36,24 @@ struct EditorTimeline: View {
         .focusEffectDisabled()
     }
 
+    /// The playhead: a thin line with a grab handle on the ruler. The whole 14 pt strip
+    /// around the line is draggable, not just the line.
     private func playhead(scale: CGFloat) -> some View {
-        Rectangle()
-            .fill(UmiTheme.record)
-            .frame(width: 2)
-            .overlay(alignment: .top) { Circle().fill(UmiTheme.record).frame(width: 10, height: 10).offset(y: -3) }
-            .offset(x: Self.labelWidth + 8 + model.currentTime * scale - 1)
-            .allowsHitTesting(false)
+        ZStack(alignment: .top) {
+            Rectangle().fill(UmiTheme.record).frame(width: 2)
+            UnevenRoundedRectangle(topLeadingRadius: 3, bottomLeadingRadius: 7, bottomTrailingRadius: 7, topTrailingRadius: 3)
+                .fill(UmiTheme.record)
+                .frame(width: 14, height: 18)
+                .shadow(color: .black.opacity(0.3), radius: 1.5, y: 1)
+        }
+        .frame(width: 14)
+        .contentShape(Rectangle())
+        .offset(x: Self.labelWidth + 8 + model.currentTime * scale - 7)
+        .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("timeline")).onChanged { value in
+            model.seek(to: (value.location.x - Self.labelWidth - 8) / scale)
+        })
+        .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
+        .help("Drag to scrub")
     }
 
     // MARK: Rows
@@ -195,34 +209,48 @@ private struct ClipTrack: View {
                 clip(index, placement)
             }
         }
-        .frame(height: EditorTimeline.trackHeight, alignment: .topLeading)
+        .frame(height: EditorTimeline.clipHeight, alignment: .topLeading)
     }
 
     private func clip(_ index: Int, _ placement: CompositionBuilder.Placement) -> some View {
+        let offset: CGFloat = reorder?.index == index ? (reorder?.offset ?? 0) : 0
+        let width: CGFloat = max(CGFloat(placement.outputDuration) * scale - 2, 6)
+        let x: CGFloat = CGFloat(placement.outputStart) * scale + 1 + offset
+        return clipBody(index, placement)
+            .frame(width: width, height: EditorTimeline.clipHeight)
+            .offset(x: x)
+            .zIndex(reorder?.index == index ? 1 : 0)
+            .onTapGesture { model.selection = .clip(index) }
+            .gesture(reorderGesture(index, placement))
+    }
+
+    private func clipBody(_ index: Int, _ placement: CompositionBuilder.Placement) -> some View {
         let selected = model.selection == .clip(index)
         let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
-        let offset = reorder?.index == index ? reorder?.offset ?? 0 : 0
+        let screen = model.bundle.appendingPathComponent(RecordingProject.screenFile)
+        let border: Color = selected ? UmiTheme.accent : Color.white.opacity(0.15)
         return shape
-            .fill(UmiTheme.ink.opacity(selected ? 0.75 : 0.55))
-            .overlay(shape.strokeBorder(selected ? UmiTheme.accent : Color.white.opacity(0.15), lineWidth: selected ? 2 : 1))
+            .fill(UmiTheme.ink)
+            .overlay { Filmstrip(screenURL: screen, clip: placement.clip).clipShape(shape) }
+            .overlay(shape.fill(UmiTheme.ink.opacity(selected ? 0.25 : 0.45)))
+            .overlay(shape.strokeBorder(border, lineWidth: selected ? 2 : 1))
             .overlay(alignment: .leading) { title(index, placement) }
             .overlay(alignment: .leading) { handle { trim(index, startDelta: $0) } }
             .overlay(alignment: .trailing) { handle { trim(index, endDelta: $0) } }
-            .frame(width: max(placement.outputDuration * scale - 2, 6), height: EditorTimeline.trackHeight)
-            .offset(x: placement.outputStart * scale + 1 + offset)
-            .zIndex(reorder?.index == index ? 1 : 0)
-            .onTapGesture { model.selection = .clip(index) }
-            .gesture(DragGesture(minimumDistance: 6)
-                .onChanged { value in
-                    reorder = (index, value.translation.width)
-                    model.selection = .clip(index)
-                }
-                .onEnded { value in
-                    let center = placement.outputStart + placement.outputDuration / 2 + value.translation.width / scale
-                    let target = model.placements.lastIndex { $0.outputStart <= center } ?? 0
-                    reorder = nil
-                    model.moveClip(from: index, to: target)
-                })
+    }
+
+    private func reorderGesture(_ index: Int, _ placement: CompositionBuilder.Placement) -> some Gesture {
+        DragGesture(minimumDistance: 6)
+            .onChanged { value in
+                reorder = (index, value.translation.width)
+                model.selection = .clip(index)
+            }
+            .onEnded { value in
+                let center = placement.outputStart + placement.outputDuration / 2 + Double(value.translation.width / scale)
+                let target = model.placements.lastIndex { $0.outputStart <= center } ?? 0
+                reorder = nil
+                model.moveClip(from: index, to: target)
+            }
     }
 
     private func title(_ index: Int, _ placement: CompositionBuilder.Placement) -> some View {
@@ -243,7 +271,7 @@ private struct ClipTrack: View {
     private func handle(onDrag: @escaping (Double?) -> Void) -> some View {
         RoundedRectangle(cornerRadius: 2)
             .fill(Color.white.opacity(0.85))
-            .frame(width: 3, height: EditorTimeline.trackHeight - 12)
+            .frame(width: 3, height: EditorTimeline.clipHeight - 16)
             .padding(.horizontal, 3)
             .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
@@ -277,6 +305,43 @@ private struct ClipTrack: View {
     }
 }
 
+/// Thumbnails of the screen across a clip, tiled to fill its width.
+private struct Filmstrip: View {
+    let screenURL: URL
+    let clip: EditSettings.Clip
+    @State private var images: [NSImage] = []
+
+    var body: some View {
+        GeometryReader { geo in
+            let count = max(Int(geo.size.width / 56), 1)
+            HStack(spacing: 0) {
+                ForEach(images.indices, id: \.self) { i in
+                    Image(nsImage: images[i]).resizable().aspectRatio(contentMode: .fill)
+                        .frame(width: geo.size.width / CGFloat(max(images.count, 1)), height: geo.size.height)
+                        .clipped()
+                }
+            }
+            .task(id: "\(clip.start)-\(clip.end)-\(count)") { await load(count: count, height: geo.size.height) }
+        }
+    }
+
+    private func load(count: Int, height: CGFloat) async {
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: screenURL))
+        generator.maximumSize = CGSize(width: height * 3, height: height * 2)
+        generator.requestedTimeToleranceBefore = CMTime(seconds: 0.5, preferredTimescale: 600)
+        generator.requestedTimeToleranceAfter = CMTime(seconds: 0.5, preferredTimescale: 600)
+        var result: [NSImage] = []
+        for i in 0..<count {
+            let t = clip.start + (clip.duration * (Double(i) + 0.5) / Double(count))
+            if let (cg, _) = try? await generator.image(at: CMTime(seconds: t, preferredTimescale: 600)) {
+                result.append(NSImage(cgImage: cg, size: .zero))
+            }
+            if Task.isCancelled { return }
+        }
+        images = result
+    }
+}
+
 // MARK: - Segment track
 
 /// A row of timed items (source-time ranges drawn on the output timeline) that can be
@@ -302,12 +367,16 @@ struct SegmentTrack: View {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(Color.secondary.opacity(0.07))
                 .frame(height: EditorTimeline.trackHeight)
+                .contentShape(Rectangle())
+                .gesture(SpatialTapGesture().onEnded { tap in
+                    model.selection = nil
+                    model.seek(to: Double(tap.location.x / scale))
+                })
             ForEach(items) { item in
-                if let start = model.outputTime(for: item.start) {
-                    let end = model.outputTime(for: item.end) ?? (start + item.end - item.start)
+                if let range = model.outputRange(start: item.start, end: item.end) {
                     chip(item)
-                        .frame(width: max((end - start) * Double(scale) - 2, 14), height: EditorTimeline.trackHeight)
-                        .offset(x: start * Double(scale) + 1)
+                        .frame(width: max((range.upperBound - range.lowerBound) * Double(scale) - 2, 14), height: EditorTimeline.trackHeight)
+                        .offset(x: range.lowerBound * Double(scale) + 1)
                 }
             }
         }
@@ -355,7 +424,8 @@ struct SegmentTrack: View {
             model.selection = item.selection
         }
         guard let origin else { return }
-        let seconds = Double(delta / scale)
+        // Points are output time; items live in source time, which runs `speed` times faster.
+        let seconds = Double(delta / scale) * model.speed(atSource: origin.start)
         model.retime(item.selection, start: moveStart ? origin.start + seconds : origin.start, end: moveEnd ? origin.end + seconds : origin.end)
     }
 

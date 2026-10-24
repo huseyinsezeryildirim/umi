@@ -27,7 +27,10 @@ nonisolated struct ZoomTrack: Sendable {
         var groupStart: Double?, groupEnd = 0.0
         func flush() {
             guard let start = groupStart else { return }
-            let segment = EditSettings.ZoomSegment(start: max(0, start - 0.6), end: min(duration, groupEnd + 1.8), scale: scale)
+            let begin = max(0, start - 0.6)
+            // A stable id (from the start time) so a generated zoom stays selected across rebuilds.
+            let id = UUID(uuidString: String(format: "00000000-0000-4000-8000-%012llx", UInt64(begin * 1000))) ?? UUID()
+            let segment = EditSettings.ZoomSegment(id: id, start: begin, end: min(duration, groupEnd + 1.8), scale: scale)
             if let last = result.last, segment.start <= last.end {
                 result[result.count - 1].end = segment.end
             } else {
