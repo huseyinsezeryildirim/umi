@@ -27,7 +27,9 @@ final class RecordingController {
     private let controlBar = ControlBarController()
     private let readyBar = ReadyBarController()
     private let hotKeys = HotKeys()
-    private var launcherOpen = false
+    /// Whether the launcher is showing (the popover keeps its view alive, so views can't
+    /// rely on onAppear/onDisappear for this).
+    private(set) var launcherOpen = false
     /// Set by the status bar; opens or closes the launcher (⌥⇧U).
     var onOpenLauncher: () -> Void = {}
     private var startTask: Task<Void, Never>?
