@@ -54,7 +54,7 @@ struct EditorTimeline: View {
                         addTrackMenu.frame(height: Self.rulerHeight)
                         header("Video", icon: "film", height: Self.clipHeight)
                         ForEach(tracks, id: \.self) { kind in
-                            header(kind.title, icon: kind.icon, height: Self.trackHeight, add: { add(kind) }, menu: menu(for: kind))
+                            header(kind.title, icon: kind.icon, height: height(of: kind), add: { add(kind) }, menu: menu(for: kind))
                         }
                     }
                     .frame(width: Self.labelWidth)
@@ -140,12 +140,21 @@ struct EditorTimeline: View {
         }
     }
 
+    /// Text and media items that overlap in time sit on extra rows, so the lane grows.
+    private func height(of kind: TrackKind) -> CGFloat {
+        switch kind {
+        case .text: SegmentTrack.height(rows: SegmentTrack.rows(for: textItems, model: model).count)
+        case .media: SegmentTrack.height(rows: SegmentTrack.rows(for: mediaItems, model: model).count)
+        default: Self.trackHeight
+        }
+    }
+
     @ViewBuilder
     private func content(_ kind: TrackKind, scale: CGFloat) -> some View {
         switch kind {
         case .media:
             SegmentTrack(model: model, items: mediaItems, scale: scale,
-                         emptyHint: model.edit.overlays.isEmpty ? "Drop a video or image here, or click +" : nil)
+                         emptyHint: model.edit.overlays.isEmpty ? "Drop a video or image here, or click +" : nil, stacks: true)
                 .onDrop(of: [.fileURL], isTargeted: nil) { providers, location in
                     for provider in providers {
                         _ = provider.loadObject(ofClass: URL.self) { url, _ in
@@ -158,7 +167,7 @@ struct EditorTimeline: View {
         case .zoom: SegmentTrack(model: model, items: zoomItems, scale: scale, emptyHint: hint(kind))
         case .scenes: SegmentTrack(model: model, items: sceneItems, scale: scale, emptyHint: hint(kind))
         case .masks: SegmentTrack(model: model, items: maskItems, scale: scale, emptyHint: hint(kind))
-        case .text: SegmentTrack(model: model, items: textItems, scale: scale, emptyHint: hint(kind))
+        case .text: SegmentTrack(model: model, items: textItems, scale: scale, emptyHint: hint(kind), stacks: true)
         case .moves: SegmentTrack(model: model, items: moveItems, scale: scale, emptyHint: hint(kind))
         case .music: MusicTrack(model: model, scale: scale)
         }
@@ -183,7 +192,7 @@ struct EditorTimeline: View {
     private func header(_ title: String, icon: String, height: CGFloat, add: (() -> Void)? = nil, menu: [MenuEntry] = []) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon).font(.system(size: 10.5, weight: .semibold))
-            Text(title).font(.system(size: 11.5, weight: .semibold))
+            Text(title).font(.system(size: 11.5, weight: .semibold)).lineLimit(1).fixedSize()
             Spacer(minLength: 0)
             if add != nil || !menu.isEmpty { addButton(title: title, add: menu.isEmpty ? add : nil, menu: menu) }
         }
@@ -582,13 +591,48 @@ struct SegmentTrack: View {
     let items: [Item]
     let scale: CGFloat
     var emptyHint: String?
+    /// Put overlapping items on separate rows (text, media) instead of on top of each other.
+    var stacks = false
     @State private var origin: (start: Double, end: Double)?
 
+    static let rowGap: CGFloat = 3
+
+    static func height(rows: Int) -> CGFloat {
+        let rows = CGFloat(max(rows, 1))
+        return rows * EditorTimeline.trackHeight + (rows - 1) * rowGap
+    }
+
+    /// Output range of an item on the timeline (nil when cut away).
+    static func range(of item: Item, model: EditorModel) -> ClosedRange<Double>? {
+        item.outputTime ? item.start...max(item.start, item.end) : model.outputRange(start: item.start, end: item.end)
+    }
+
+    /// Row per item: each goes on the first row that's free at its start. Returns the
+    /// assignment and the row count via `count`.
+    static func rows(for items: [Item], model: EditorModel) -> (rows: [EditorSelection: Int], count: Int) {
+        var ends: [Double] = []
+        var rows: [EditorSelection: Int] = [:]
+        let placed = items.compactMap { item in range(of: item, model: model).map { (item, $0) } }
+            .sorted { $0.1.lowerBound < $1.1.lowerBound }
+        for (item, range) in placed {
+            if let row = ends.firstIndex(where: { $0 <= range.lowerBound + 0.001 }) {
+                rows[item.selection] = row
+                ends[row] = range.upperBound
+            } else {
+                rows[item.selection] = ends.count
+                ends.append(range.upperBound)
+            }
+        }
+        return (rows, max(ends.count, 1))
+    }
+
     var body: some View {
+        let layout: (rows: [EditorSelection: Int], count: Int) = stacks ? Self.rows(for: items, model: model) : ([:], 1)
+        let height = Self.height(rows: layout.count)
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(Color.secondary.opacity(0.07))
-                .frame(height: EditorTimeline.trackHeight)
+                .frame(height: height)
                 .contentShape(Rectangle())
                 .gesture(SpatialTapGesture().onEnded { tap in
                     model.selection = nil
@@ -603,14 +647,15 @@ struct SegmentTrack: View {
                     .allowsHitTesting(false)
             }
             ForEach(items) { item in
-                if let range = item.outputTime ? item.start...max(item.start, item.end) : model.outputRange(start: item.start, end: item.end) {
+                if let range = Self.range(of: item, model: model) {
+                    let row = CGFloat(layout.rows[item.selection] ?? 0)
                     chip(item)
                         .frame(width: max((range.upperBound - range.lowerBound) * Double(scale) - 2, 14), height: EditorTimeline.trackHeight)
-                        .offset(x: range.lowerBound * Double(scale) + 1)
+                        .offset(x: range.lowerBound * Double(scale) + 1, y: row * (EditorTimeline.trackHeight + Self.rowGap))
                 }
             }
         }
-        .frame(height: EditorTimeline.trackHeight, alignment: .topLeading)
+        .frame(height: height, alignment: .topLeading)
     }
 
     private func chip(_ item: Item) -> some View {
