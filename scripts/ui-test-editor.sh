@@ -75,7 +75,17 @@ check "Z twice doesn't stack zooms" "$(python3 -c "print($(edit "len(e['zoom']['
 front
 # Resizing a zoom from its edge updates while the mouse is still down.
 $tool key 53; sleep 0.3
-first_end=$(edit "min(z['end'] for z in e['zoom']['segments'])")
+# First zoom's end: a manual one if any, else the first auto zoom (same rule as ZoomTrack).
+first_end=$(python3 -c "
+import json
+e=json.load(open('$work/project.json')).get('edit',{}); seg=e.get('zoom',{}).get('segments',[])
+if seg: print(min(z['end'] for z in seg))
+else:
+    t=sorted(c['t'] for c in json.load(open('$work/cursor.json'))['clicks'] if c['button']=='left'); end=t[0]
+    for x in t[1:]:
+        if x-end<3: end=x
+        else: break
+    print(end+1.8)")
 ex=$(python3 -c "print(int($x0 + $first_end * $scale - 3))")
 $tool down $ex $row_zoom; sleep 0.2; $tool move $ex $row_zoom $((ex+60)) $row_zoom; sleep 0.9
 mid_end=$(edit "min(z['end'] for z in e['zoom']['segments'])")
