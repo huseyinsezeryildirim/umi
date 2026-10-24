@@ -185,6 +185,9 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         DistributedNotificationCenter.default().addObserver(forName: .init("cam.umi.debug.toggleLauncher"), object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.togglePopover() }
         }
+        DistributedNotificationCenter.default().addObserver(forName: .init("cam.umi.debug.shortcuts"), object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { ShortcutsWindow.show() }
+        }
         #endif
     }
 
