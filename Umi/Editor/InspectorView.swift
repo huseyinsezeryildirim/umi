@@ -214,7 +214,7 @@ private struct CanvasSection: View {
     @State private var kind = Kind.gradient
     @State private var wallpapers: [URL] = []
 
-    enum Kind: String, CaseIterable { case gradient = "Gradient", color = "Color", wallpaper = "Wallpaper", image = "Image" }
+    enum Kind: String, CaseIterable { case gradient = "Gradient", color = "Color", wallpaper = "Wallpaper", image = "Image", blur = "Blur" }
 
     var body: some View {
         Section2("Background", icon: "paintpalette") {
@@ -243,7 +243,13 @@ private struct CanvasSection: View {
                 }
             case .color:
                 ColorPicker("Color", selection: colorBinding, supportsOpacity: false)
+            case .blur:
+                Hint("Your recording, blurred and dimmed behind itself.")
+                    .onAppear { if model.edit.background != .blurredScreen { model.update { $0.background = .blurredScreen } } }
             case .wallpaper:
+                Button("Use My Desktop Wallpaper") {
+                    if let screen = NSScreen.main, let url = NSWorkspace.shared.desktopImageURL(for: screen) { model.setBackgroundImage(url) }
+                }
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                     ForEach(wallpapers, id: \.self) { url in
                         WallpaperThumb(url: url, selected: model.edit.background == .image(url.path)) { model.setBackgroundImage(url) }
@@ -264,6 +270,29 @@ private struct CanvasSection: View {
             case .gradient: kind = .gradient
             case .color: kind = .color
             case .image(let path): kind = path.hasPrefix("/System") ? .wallpaper : .image
+            case .blurredScreen: kind = .blur
+            }
+        }
+
+        Section2("Branding", icon: "seal") {
+            if let mark = model.edit.watermark {
+                Label(mark.file, systemImage: "photo").lineLimit(1).truncationMode(.middle)
+                Picker("Corner", selection: Binding(get: { mark.corner }, set: { c in model.update { $0.watermark?.corner = c } })) {
+                    Text("Top left").tag(EditSettings.Watermark.Corner.topLeft)
+                    Text("Top right").tag(EditSettings.Watermark.Corner.topRight)
+                    Text("Bottom left").tag(EditSettings.Watermark.Corner.bottomLeft)
+                    Text("Bottom right").tag(EditSettings.Watermark.Corner.bottomRight)
+                }
+                Slider2("Size", value: mark.size, range: 0.04...0.3, format: "%.0f%%", percent: true, model: model) { v in model.update { $0.watermark?.size = v } }
+                Slider2("Opacity", value: mark.opacity, range: 0.2...1, format: "%.0f%%", percent: true, model: model) { v in model.update { $0.watermark?.opacity = v } }
+                Button("Remove Logo", role: .destructive) { model.update { $0.watermark = nil } }
+            } else {
+                Button("Add Logo…") {
+                    let panel = NSOpenPanel()
+                    panel.allowedContentTypes = [.image]
+                    if panel.runModal() == .OK, let url = panel.url { model.setWatermark(url) }
+                }
+                Hint("Your logo stays in a corner for the whole video.")
             }
         }
 
@@ -343,6 +372,13 @@ private struct CursorSection: View {
                 ForEach(EditSettings.Smoothing.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
             }
             Toggle("Click rings", isOn: bind(\.cursor.clickRings))
+            Picker("Style", selection: bind(\.cursor.style)) {
+                Text("Arrow").tag(EditSettings.Cursor.Style.arrow)
+                Text("Dot").tag(EditSettings.Cursor.Style.dot)
+            }
+            .pickerStyle(.segmented)
+            Toggle("Motion blur", isOn: bind(\.cursor.motionBlur))
+            Toggle("Hide when idle", isOn: bind(\.cursor.hideWhenIdle))
         }
     }
 

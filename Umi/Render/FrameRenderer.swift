@@ -90,7 +90,7 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
         let scene = scenes.state(at: time, canvas: canvas)
         let move = applyZoomAndMoves ? Effects.movePose(settings.moves, at: time, canvas: canvas) : nil
 
-        var frame = background(in: canvas, time: time)
+        var frame = background(in: canvas, time: time, screen: screen)
         if let move, move.amount > 0 {
             // Shallow focus: the background softens while the card moves in 3D.
             frame = frame.clampedToExtent().applyingGaussianBlur(sigma: short * 0.006 * move.amount).cropped(to: canvas)
@@ -144,6 +144,9 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
         if let caption = text.caption(settings.captions, at: time, canvas: canvas, accent: CGColor(red: 0.067, green: 0.435, blue: 0.96, alpha: 1)) {
             frame = caption.composited(over: frame)
         }
+        if let watermark = settings.watermark, let logo = overlayImage(watermark.file) {
+            frame = drawWatermark(watermark, logo: logo, over: frame, canvas: canvas)
+        }
         return frame.cropped(to: canvas)
     }
 
@@ -193,9 +196,22 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
         return drawCursor(over: card, screenRect: content, at: time).cropped(to: canvas.insetBy(dx: -short, dy: -short))
     }
 
-    private func background(in canvas: CGRect, time: Double) -> CIImage {
+    private func background(in canvas: CGRect, time: Double, screen: CIImage?) -> CIImage {
         var image: CIImage
         switch settings.background {
+        case .blurredScreen:
+            if let screen {
+                // The recording itself, filling the canvas, heavily blurred and dimmed.
+                let s = max(canvas.width / screen.extent.width, canvas.height / screen.extent.height) * 1.1
+                let scaled = screen.transformed(by: CGAffineTransform(scaleX: s, y: s))
+                image = scaled.transformed(by: CGAffineTransform(translationX: canvas.midX - scaled.extent.midX, y: canvas.midY - scaled.extent.midY))
+                    .clampedToExtent()
+                    .applyingGaussianBlur(sigma: min(canvas.width, canvas.height) * 0.04)
+                    .applyingFilter("CIColorControls", parameters: [kCIInputBrightnessKey: -0.12, kCIInputSaturationKey: 1.2])
+                    .cropped(to: canvas)
+            } else {
+                image = CIImage(color: CIColor(red: 0.12, green: 0.13, blue: 0.16)).cropped(to: canvas)
+            }
         case .color(let c):
             image = CIImage(color: CIColor(red: c.r, green: c.g, blue: c.b, alpha: c.a)).cropped(to: canvas)
         case .gradient(let preset):
@@ -251,14 +267,59 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
         }
 
         let scale = pointScale * settings.cursor.size
-        let image = cursorImage.image
-        let drawn = image
-            .transformed(by: CGAffineTransform(scaleX: cursorImage.size.width * scale / image.extent.width, y: cursorImage.size.height * scale / image.extent.height))
-            .transformed(by: CGAffineTransform(
-                translationX: anchor.x - cursorImage.hotSpot.x * scale,
-                y: anchor.y - (cursorImage.size.height - cursorImage.hotSpot.y) * scale
-            ))
-        return drawn.composited(over: result)
+        let fade = settings.cursor.hideWhenIdle ? idleAlpha(at: time) : 1
+        guard fade > 0.01 else { return result }
+
+        // Motion blur: fading copies along the recent path when the cursor moves fast.
+        if settings.cursor.motionBlur {
+            for k in stride(from: 4, through: 1, by: -1) {
+                guard let past = cursor.position(at: time - Double(k) / 120) else { continue }
+                let q = toContent(past)
+                let distance = hypot((q.x - p.x) * screenRect.width, (q.y - p.y) * screenRect.height)
+                guard distance > 6 * Double(k) else { continue }
+                let ghostAnchor = CGPoint(x: screenRect.minX + q.x * screenRect.width, y: screenRect.maxY - q.y * screenRect.height)
+                result = cursorImage(at: ghostAnchor, scale: scale, alpha: fade * 0.16 * Double(5 - k)).composited(over: result)
+            }
+        }
+        return cursorImage(at: anchor, scale: scale, alpha: fade).composited(over: result)
+    }
+
+    /// The cursor drawn with its hot spot at `anchor`.
+    private func cursorImage(at anchor: CGPoint, scale: CGFloat, alpha: Double) -> CIImage {
+        let drawn: CIImage
+        switch settings.cursor.style {
+        case .arrow:
+            let image = cursorImage.image
+            drawn = image
+                .transformed(by: CGAffineTransform(scaleX: cursorImage.size.width * scale / image.extent.width, y: cursorImage.size.height * scale / image.extent.height))
+                .transformed(by: CGAffineTransform(
+                    translationX: anchor.x - cursorImage.hotSpot.x * scale,
+                    y: anchor.y - (cursorImage.size.height - cursorImage.hotSpot.y) * scale
+                ))
+        case .dot:
+            let d = 22 * scale
+            let rect = CGRect(x: anchor.x - d / 2, y: anchor.y - d / 2, width: d, height: d)
+            let fill = Effects.roundedRect(rect, radius: d / 2, alpha: 1)
+                .applyingFilter("CIColorMatrix", parameters: ["inputRVector": CIVector(x: 0.2, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0.25, z: 0, w: 0),
+                                                              "inputBVector": CIVector(x: 0, y: 0, z: 0.35, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.45)])
+            let ring = CIFilter(name: "CIRoundedRectangleStrokeGenerator", parameters: [
+                "inputExtent": CIVector(cgRect: rect), "inputRadius": d / 2, "inputWidth": max(1.5, d * 0.08),
+                "inputColor": CIColor(red: 1, green: 1, blue: 1, alpha: 0.95),
+            ])?.outputImage ?? CIImage.empty()
+            drawn = ring.composited(over: fill)
+        }
+        guard alpha < 0.999 else { return drawn }
+        return drawn.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: alpha)])
+    }
+
+    /// 1 while the cursor moves; fades to 0 once it has rested for 1.5 s.
+    private func idleAlpha(at time: Double) -> Double {
+        guard let now = cursor.position(at: time) else { return 1 }
+        var rest = 0.0
+        while rest < 3, let past = cursor.position(at: time - rest - 0.1), hypot(past.x - now.x, past.y - now.y) < 0.002 {
+            rest += 0.1
+        }
+        return min(max(1 - (rest - 1.5) / 0.4, 0), 1)
     }
 
     /// The camera cropped to fill `rect` (any aspect), with rounded corners and a shadow.
@@ -290,6 +351,21 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
             .applyingGaussianBlur(sigma: size * 0.04)
             .transformed(by: CGAffineTransform(translationX: 0, y: -size * 0.02))
         return Effects.blend(image, over: shadow.composited(over: frame), mask: Effects.roundedRect(rect, radius: radius, alpha: alpha))
+    }
+
+    // MARK: Branding
+
+    private func drawWatermark(_ mark: EditSettings.Watermark, logo: CIImage, over frame: CIImage, canvas: CGRect) -> CIImage {
+        let w = canvas.width * mark.size
+        let s = w / max(logo.extent.width, 1)
+        let h = logo.extent.height * s
+        let margin = min(canvas.width, canvas.height) * 0.035
+        let x = mark.corner == .topLeft || mark.corner == .bottomLeft ? margin : canvas.width - w - margin
+        let y = mark.corner == .bottomLeft || mark.corner == .bottomRight ? margin : canvas.height - h - margin
+        let placed = logo.transformed(by: CGAffineTransform(translationX: -logo.extent.minX, y: -logo.extent.minY)
+            .concatenating(CGAffineTransform(scaleX: s, y: s)).concatenating(CGAffineTransform(translationX: x, y: y)))
+            .applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: mark.opacity)])
+        return placed.composited(over: frame)
     }
 
     // MARK: Crop

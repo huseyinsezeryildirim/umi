@@ -1,4 +1,5 @@
 import AVFoundation
+import ImageIO
 import CoreImage
 import XCTest
 @testable import Umi
@@ -107,6 +108,32 @@ final class RenderTests: XCTestCase {
         XCTAssertEqual(size.height, 1280)
         let (image, _) = try await AVAssetImageGenerator(asset: asset).image(at: CMTime(seconds: 1, preferredTimescale: 600))
         try CIContext().writePNGRepresentation(of: CIImage(cgImage: image), to: root.appendingPathComponent("frames/vertical.png"),
+                                               format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+    }
+
+    /// GIF export plus the new looks: blurred background, dot cursor, logo.
+    @MainActor
+    func testGIFExportWithBlurBackgroundAndLogo() async throws {
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: fixture.path), "Run scripts/make-fixture.sh first")
+        let logo = root.appendingPathComponent("frames/frame-0.5.png")
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: logo.path))
+        try? FileManager.default.removeItem(at: fixture.appendingPathComponent("logo-test.png"))
+        try FileManager.default.copyItem(at: logo, to: fixture.appendingPathComponent("logo-test.png"))
+        var project = try ProjectStore.read(RecordingProject.self, from: fixture.appendingPathComponent(RecordingProject.fileName))
+        var edit = EditSettings()
+        edit.background = .blurredScreen
+        edit.cursor.style = .dot
+        edit.watermark = .init(file: "logo-test.png", corner: .topRight, size: 0.15, opacity: 0.9)
+        edit.clips = [.init(start: 1, end: 3)]
+        project.edit = edit
+        let cursor = try ProjectStore.read(CursorData.self, from: fixture.appendingPathComponent(RecordingProject.cursorFile))
+        let renderer = FrameRenderer(project: project, cursorData: cursor, cursorImage: .arrow, bundle: fixture)
+        let output = root.appendingPathComponent("export.gif")
+        try await Exporter.export(bundle: fixture, renderer: renderer, resolution: .p720, fps: 30, format: .gif, to: output)
+        let source = try XCTUnwrap(CGImageSourceCreateWithURL(output as CFURL, nil))
+        XCTAssertEqual(CGImageSourceGetCount(source), 30, "2 s at 15 fps")
+        let first = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 10, nil))
+        try CIContext().writePNGRepresentation(of: CIImage(cgImage: first), to: root.appendingPathComponent("frames/gif-frame.png"),
                                                format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
     }
 

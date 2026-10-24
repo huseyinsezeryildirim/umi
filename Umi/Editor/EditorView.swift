@@ -260,6 +260,7 @@ private struct ExportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("exportResolution") private var resolution = Exporter.Resolution.p1080.rawValue
     @AppStorage("exportFPS") private var fps = 60
+    @AppStorage("exportFormat") private var format = Exporter.Format.mp4.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -273,7 +274,11 @@ private struct ExportSheet: View {
                     Text("30 fps").tag(30)
                     Text("60 fps").tag(60)
                 }
-                LabeledContent("Format", value: "MP4 (H.264)")
+                Picker("Format", selection: $format) {
+                    Text("MP4 (H.264)").tag(Exporter.Format.mp4.rawValue)
+                    Text("MOV (H.264)").tag(Exporter.Format.mov.rawValue)
+                    Text("GIF (15 fps, up to 540p)").tag(Exporter.Format.gif.rawValue)
+                }
             }
 
             if let progress = model.exportProgress {
@@ -291,7 +296,8 @@ private struct ExportSheet: View {
                 Spacer()
                 Button("Close") { dismiss() }
                 Button("Export") {
-                    model.export(resolution: Exporter.Resolution(rawValue: resolution) ?? .p1080, fps: fps)
+                    model.export(resolution: Exporter.Resolution(rawValue: resolution) ?? .p1080, fps: fps,
+                                 format: Exporter.Format(rawValue: format) ?? .mp4)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.exportProgress != nil)

@@ -45,6 +45,8 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
     var music: Music?
     /// Extra videos and images on the Media track (B-roll, logos, screenshots).
     var overlays: [MediaOverlay] = []
+    /// A logo kept in a corner for the whole video.
+    var watermark: Watermark?
 
     init() {}
 
@@ -74,6 +76,7 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
         crossfade = c.value(.crossfade, d.crossfade)
         music = c.value(.music, d.music)
         overlays = c.value(.overlays, d.overlays)
+        watermark = c.value(.watermark, d.watermark)
     }
 
     // MARK: Canvas
@@ -83,6 +86,8 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
         case gradient(GradientPreset)
         /// An image file: a macOS wallpaper path or a file copied into the project.
         case image(String)
+        /// The recording itself, blurred and dimmed, behind the screen card.
+        case blurredScreen
     }
 
     enum GradientPreset: String, Codable, CaseIterable, Sendable {
@@ -157,11 +162,33 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
     // MARK: Cursor, camera, zoom
 
     struct Cursor: Codable, Hashable, Sendable {
+        enum Style: String, Codable, CaseIterable, Sendable { case arrow, dot }
+
         var visible = true
         /// Multiplier on the system cursor size.
         var size = 1.5
         var smoothing = Smoothing.smooth
         var clickRings = true
+        /// The macOS arrow, or a soft dot (touch-style highlight).
+        var style = Style.arrow
+        /// Ghost trail when the cursor moves fast.
+        var motionBlur = true
+        /// Fade the cursor out after it rests for a moment.
+        var hideWhenIdle = false
+
+        init() {}
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            let d = Cursor()
+            visible = c.value(.visible, d.visible)
+            size = c.value(.size, d.size)
+            smoothing = c.value(.smoothing, d.smoothing)
+            clickRings = c.value(.clickRings, d.clickRings)
+            style = c.value(.style, d.style)
+            motionBlur = c.value(.motionBlur, d.motionBlur)
+            hideWhenIdle = c.value(.hideWhenIdle, d.hideWhenIdle)
+        }
     }
 
     enum Smoothing: String, Codable, CaseIterable, Sendable {
@@ -392,6 +419,16 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
         /// Picture-in-picture card: center (normalized canvas, top-left origin) and width.
         var center = CGPoint(x: 0.72, y: 0.3)
         var width = 0.4
+    }
+
+    struct Watermark: Codable, Hashable, Sendable {
+        enum Corner: String, Codable, CaseIterable, Sendable { case topLeft, topRight, bottomLeft, bottomRight }
+        /// Image file inside the project bundle.
+        var file: String
+        var corner = Corner.bottomRight
+        /// Width as a fraction of the canvas width.
+        var size = 0.12
+        var opacity = 0.85
     }
 
     struct Music: Codable, Hashable, Sendable {
