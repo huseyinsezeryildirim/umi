@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import Observation
 import UniformTypeIdentifiers
@@ -11,6 +12,7 @@ enum EditorSelection: Hashable {
     case scene(UUID)
     case text(UUID)
     case move(UUID)
+    case music
 }
 
 /// State of one open editor window: the project, its edits, the preview player and export.
@@ -278,7 +280,7 @@ final class EditorModel {
         case .scene(let id): updateScene(id) { $0.start = start; $0.end = end }
         case .text(let id): updateText(id) { $0.start = start; $0.end = end }
         case .move(let id): updateMove(id) { $0.start = start; $0.end = end }
-        case .clip: break
+        case .clip, .music: break
         }
     }
 
@@ -290,6 +292,7 @@ final class EditorModel {
         case .scene(let id): update { $0.scenes.removeAll { $0.id == id } }
         case .text(let id): update { $0.texts.removeAll { $0.id == id } }
         case .move(let id): update { $0.moves.removeAll { $0.id == id } }
+        case .music: update { $0.music = nil }
         case nil: break
         }
         selection = nil
@@ -325,6 +328,15 @@ final class EditorModel {
     func setMusic(_ url: URL) {
         guard let name = copyIntoBundle(url, as: "music") else { return }
         update { $0.music = EditSettings.Music(file: name) }
+        selection = .music
+    }
+
+    /// Asks for an audio file and uses it as the music bed.
+    func chooseMusic() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.audio]
+        panel.message = "Choose music to play under your video"
+        if panel.runModal() == .OK, let url = panel.url { setMusic(url) }
     }
 
     private func copyIntoBundle(_ url: URL, as base: String) -> String? {

@@ -39,7 +39,13 @@ final class TourController {
         show(.welcome)
     }
 
-    /// Hides the callouts but remembers the step (e.g. the launcher was closed).
+    /// Closing the launcher mid-tour ends it: the tour shows once, not on every open.
+    /// The launcher's ? button starts it again.
+    func endIfActive() {
+        if isActive { finish() }
+    }
+
+    /// Hides the callouts (between steps).
     func suspend() {
         callout?.orderOut(nil)
         callout = nil

@@ -45,6 +45,29 @@ case "key", "cmdkey":
         event?.post(tap: .cghidEventTap)
         usleep(40_000)
     }
+case "type":
+    // Types text as keyboard input (unicode), one character at a time.
+    let text = args.dropFirst().joined(separator: " ")
+    let src = CGEventSource(stateID: .hidSystemState)
+    for scalar in text.utf16 {
+        for down in [true, false] {
+            let event = CGEvent(keyboardEventSource: src, virtualKey: 0, keyDown: down)
+            var unit = scalar
+            event?.keyboardSetUnicodeString(stringLength: 1, unicodeString: &unit)
+            event?.flags = []
+            event?.post(tap: .cghidEventTap)
+            usleep(12_000)
+        }
+    }
+case "cmdshiftkey":
+    let code = CGKeyCode(Int(args.dropFirst().first!)!)
+    let src = CGEventSource(stateID: .hidSystemState)
+    for down in [true, false] {
+        let event = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: down)
+        event?.flags = [.maskCommand, .maskShift]
+        event?.post(tap: .cghidEventTap)
+        usleep(40_000)
+    }
 case "frontmost":
     print(NSWorkspace.shared.frontmostApplication?.localizedName ?? "")
 case "notify":

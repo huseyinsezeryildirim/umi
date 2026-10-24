@@ -98,6 +98,7 @@ private struct SelectionPanel: View {
         case .scene: "Scene"
         case .text: "Text"
         case .move: "3D move"
+        case .music: "Music"
         }
     }
 
@@ -160,6 +161,14 @@ private struct SelectionPanel: View {
                 }
                 .pickerStyle(.segmented)
                 Hint("Drag the dot on the preview to place the text.")
+            }
+        case .music:
+            if let music = model.edit.music {
+                Label(music.file, systemImage: "waveform").lineLimit(1).truncationMode(.middle)
+                Slider2("Volume", value: music.volume, range: 0...1, format: "%.0f%%", percent: true, model: model) { v in model.update { $0.music?.volume = v } }
+                Slider2("Fade out", value: music.fadeOut, range: 0...6, format: "%.1fs", model: model) { v in model.update { $0.music?.fadeOut = v } }
+                Button("Replace…") { model.chooseMusic() }
+                Hint("Music loops to the length of the video and plays under your voice.")
             }
         case .move(let id):
             if let move = model.edit.moves.first(where: { $0.id == id }) {
@@ -501,11 +510,7 @@ private struct AudioSection: View {
                 Slider2("Fade out", value: music.fadeOut, range: 0...6, format: "%.1fs", model: model) { v in model.update { $0.music?.fadeOut = v } }
                 Button("Remove Music", role: .destructive) { model.update { $0.music = nil } }
             } else {
-                Button("Add Audio File…") {
-                    let panel = NSOpenPanel()
-                    panel.allowedContentTypes = [.audio]
-                    if panel.runModal() == .OK, let url = panel.url { model.setMusic(url) }
-                }
+                Button("Add Audio File…") { model.chooseMusic() }
                 Hint("Music plays under your voice and loops to the length of the video.")
             }
         }
