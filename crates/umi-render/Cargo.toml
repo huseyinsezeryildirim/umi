@@ -1,0 +1,24 @@
+[package]
+name = "umi-render"
+description = "GPU compositor (wgpu): one renderer for the editor preview and export on every platform."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+umi-project.workspace = true
+wgpu = "30"
+bytemuck = { version = "1", features = ["derive"] }
+tiny-skia = "0.12"
+cosmic-text = "0.19"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
+thiserror.workspace = true
+uuid.workspace = true
+pollster = "1"
+parking_lot = "0.12"
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true
