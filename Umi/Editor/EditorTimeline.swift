@@ -19,6 +19,7 @@ struct EditorTimeline: View {
                 VStack(alignment: .leading, spacing: 5) {
                     row(title: "", icon: nil) { RulerView(model: model, scale: scale, width: width) }
                     row(title: "Clips", icon: "film") { ClipTrack(model: model, scale: scale) }
+                    mediaRow(scale: scale)
                     track("Zoom", icon: "plus.magnifyingglass", add: { model.addZoom(at: model.currentTime) }, items: zoomItems, scale: scale)
                     track("Scenes", icon: "rectangle.split.2x1", menu: sceneMenu, items: sceneItems, scale: scale)
                     track("Masks", icon: "eye.slash", add: { model.addMask(at: model.currentTime) }, items: maskItems, scale: scale)
@@ -37,6 +38,7 @@ struct EditorTimeline: View {
                     }
                 }
                 .padding(.vertical, 6)
+                .overlay(alignment: .topLeading) { rangeHighlight(scale: scale) }
                 .overlay(alignment: .topLeading) { playhead(scale: scale) }
                 .coordinateSpace(.named("timeline"))
             }
@@ -45,6 +47,36 @@ struct EditorTimeline: View {
         .onDeleteCommand { model.deleteSelection() }
         .focusable()
         .focusEffectDisabled()
+    }
+
+    /// The span selected on the ruler: a yellow band over every track with a Cut button.
+    @ViewBuilder
+    private func rangeHighlight(scale: CGFloat) -> some View {
+        if let range = model.rangeSelection {
+            let x = Self.labelWidth + 8 + range.lowerBound * scale
+            let width = max((range.upperBound - range.lowerBound) * scale, 2)
+            ZStack(alignment: .top) {
+                Rectangle().fill(UmiTheme.trim.opacity(0.16))
+                    .overlay(alignment: .leading) { Rectangle().fill(UmiTheme.trim).frame(width: 2) }
+                    .overlay(alignment: .trailing) { Rectangle().fill(UmiTheme.trim).frame(width: 2) }
+                    .allowsHitTesting(false)
+                Button {
+                    model.cut(range)
+                } label: {
+                    Label(String(format: "Cut %.1fs", range.upperBound - range.lowerBound), systemImage: "scissors")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Capsule().fill(UmiTheme.trim))
+                        .foregroundStyle(Color.black)
+                        .fixedSize()
+                }
+                .buttonStyle(.plain)
+                .offset(y: 22)
+                .help("Remove this part (⌫)")
+            }
+            .frame(width: width)
+            .offset(x: x)
+        }
     }
 
     /// The playhead: a thin line with a grab handle on the ruler. The whole 14 pt strip
@@ -68,6 +100,32 @@ struct EditorTimeline: View {
     }
 
     // MARK: Rows
+
+    /// The Media track: extra videos and images, timed on the output timeline. Files can
+    /// be dropped here from Finder.
+    private func mediaRow(scale: CGFloat) -> some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 4) {
+                label("Media", icon: "photo.on.rectangle")
+                Spacer(minLength: 0)
+                addButton(title: "Media", add: { model.chooseOverlay() }, menu: [])
+            }
+            .foregroundStyle(.secondary)
+            .frame(width: Self.labelWidth - 8, alignment: .leading)
+            .padding(.leading, 8)
+            SegmentTrack(model: model, items: mediaItems, scale: scale,
+                         emptyHint: model.edit.overlays.isEmpty ? "Drop a video or image here, or click +" : nil)
+                .onDrop(of: [.fileURL], isTargeted: nil) { providers, location in
+                    for provider in providers {
+                        _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                            guard let url else { return }
+                            Task { @MainActor in model.addOverlay(url, at: Double(location.x / scale)) }
+                        }
+                    }
+                    return true
+                }
+        }
+    }
 
     private func label(_ title: String, icon: String?) -> some View {
         HStack(spacing: 5) {
@@ -151,6 +209,13 @@ struct EditorTimeline: View {
         }
     }
 
+    private var mediaItems: [SegmentTrack.Item] {
+        model.edit.overlays.map {
+            SegmentTrack.Item(selection: .overlay($0.id), start: $0.start, end: $0.end,
+                              label: ($0.mode == .pictureInPicture ? "PiP · " : "") + $0.file, tint: Color(hex: 0x0CA678), outputTime: true)
+        }
+    }
+
     private var sceneItems: [SegmentTrack.Item] {
         model.edit.scenes.map { SegmentTrack.Item(selection: .scene($0.id), start: $0.start, end: $0.end, label: $0.layout.label, tint: Color(hex: 0x7A5AF8)) }
     }
@@ -202,7 +267,21 @@ private struct RulerView: View {
         }
         .frame(width: width, height: 20)
         .contentShape(Rectangle())
-        .gesture(DragGesture(minimumDistance: 0).onChanged { model.seek(to: $0.location.x / scale) })
+        .gesture(DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                // Dragging along the ruler selects a span to cut; a click just seeks.
+                guard abs(value.translation.width) > 4 else { return }
+                let a = Double(value.startLocation.x / scale), b = Double(value.location.x / scale)
+                model.selection = nil
+                model.rangeSelection = max(0, min(a, b))...min(model.outputDuration, max(a, b))
+            }
+            .onEnded { value in
+                if abs(value.translation.width) <= 4 {
+                    model.rangeSelection = nil
+                    model.seek(to: Double(value.location.x / scale))
+                }
+            })
+        .help("Click to move the playhead. Drag to select a part to cut.")
     }
 }
 
@@ -397,12 +476,15 @@ struct SegmentTrack: View {
         var label: String
         var tint: Color
         var dashed = false
+        /// Timed on the output timeline (Media track) rather than the recording.
+        var outputTime = false
         var id: EditorSelection { selection }
     }
 
     let model: EditorModel
     let items: [Item]
     let scale: CGFloat
+    var emptyHint: String?
     @State private var origin: (start: Double, end: Double)?
 
     var body: some View {
@@ -415,8 +497,16 @@ struct SegmentTrack: View {
                     model.selection = nil
                     model.seek(to: Double(tap.location.x / scale))
                 })
+            if let emptyHint {
+                Text(emptyHint)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .padding(.leading, 8)
+                    .frame(height: EditorTimeline.trackHeight)
+                    .allowsHitTesting(false)
+            }
             ForEach(items) { item in
-                if let range = model.outputRange(start: item.start, end: item.end) {
+                if let range = item.outputTime ? item.start...max(item.start, item.end) : model.outputRange(start: item.start, end: item.end) {
                     chip(item)
                         .frame(width: max((range.upperBound - range.lowerBound) * Double(scale) - 2, 14), height: EditorTimeline.trackHeight)
                         .offset(x: range.lowerBound * Double(scale) + 1)
@@ -464,7 +554,7 @@ struct SegmentTrack: View {
         }
         guard let origin else { return }
         // Points are output time; items live in source time, which runs `speed` times faster.
-        let seconds = Double(delta / scale) * model.speed(atSource: origin.start)
+        let seconds = Double(delta / scale) * (item.outputTime ? 1 : model.speed(atSource: origin.start))
         model.retime(item.selection, start: moveStart ? origin.start + seconds : origin.start, end: moveEnd ? origin.end + seconds : origin.end)
     }
 

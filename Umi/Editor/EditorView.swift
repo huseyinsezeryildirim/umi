@@ -199,13 +199,14 @@ private struct EditorKeys: NSViewRepresentable {
                 guard let window = view?.window, event.window === window else { return event }
                 if window.firstResponder is NSTextView { return event } // typing in a field
                 switch event.keyCode {
-                case 51, 117: // Backspace, forward Delete
-                    guard model.selection != nil else { return event }
+                case 51, 117: // Backspace, forward Delete: the selected item, or the selected span
+                    guard model.selection != nil || model.rangeSelection != nil else { return event }
                     model.deleteSelection()
                     return nil
                 case 53: // Escape
-                    guard model.selection != nil else { return event }
+                    guard model.selection != nil || model.rangeSelection != nil else { return event }
                     model.selection = nil
+                    model.rangeSelection = nil
                     return nil
                 case 49 where event.modifierFlags.intersection([.command, .option, .control]).isEmpty: // Space
                     model.togglePlay()

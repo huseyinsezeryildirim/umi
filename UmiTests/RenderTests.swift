@@ -45,6 +45,37 @@ final class RenderTests: XCTestCase {
         }
     }
 
+    /// Media track: a video filling the screen, then an image as picture-in-picture.
+    @MainActor
+    func testMediaTrackOverlays() async throws {
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: fixture.path), "Run scripts/make-fixture.sh first")
+        let fm = FileManager.default
+        try? fm.removeItem(at: fixture.appendingPathComponent("media-video.mov"))
+        try fm.copyItem(at: fixture.appendingPathComponent(RecordingProject.cameraFile), to: fixture.appendingPathComponent("media-video.mov"))
+        let png = root.appendingPathComponent("frames/frame-0.5.png")
+        try XCTSkipUnless(fm.fileExists(atPath: png.path), "needs testExportProducesComposedMP4 frames")
+        try? fm.removeItem(at: fixture.appendingPathComponent("media-image.png"))
+        try fm.copyItem(at: png, to: fixture.appendingPathComponent("media-image.png"))
+
+        var project = try ProjectStore.read(RecordingProject.self, from: fixture.appendingPathComponent(RecordingProject.fileName))
+        var edit = EditSettings()
+        edit.overlays = [.init(file: "media-video.mov", kind: .video, start: 0.5, end: 2.5, mode: .fill),
+                         .init(file: "media-image.png", kind: .image, start: 3, end: 5, mode: .pictureInPicture)]
+        project.edit = edit
+        let cursor = try ProjectStore.read(CursorData.self, from: fixture.appendingPathComponent(RecordingProject.cursorFile))
+        let renderer = FrameRenderer(project: project, cursorData: cursor, cursorImage: .arrow, bundle: fixture)
+        let output = root.appendingPathComponent("export-media.mp4")
+        try await Exporter.export(bundle: fixture, renderer: renderer, resolution: .p720, fps: 30, to: output)
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: output))
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        for t in [1.5, 4.0] {
+            let (image, _) = try await generator.image(at: CMTime(seconds: t, preferredTimescale: 600))
+            try CIContext().writePNGRepresentation(of: CIImage(cgImage: image), to: root.appendingPathComponent("frames/media-\(t).png"),
+                                                   format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+        }
+    }
+
     func testTrimKeepsOnlySelectedClips() {
         let clips = CompositionBuilder.keptClips([.init(start: 1, end: 2), .init(start: 3, end: 10)], total: 6)
         XCTAssertEqual(clips, [.init(start: 1, end: 2), .init(start: 3, end: 6)])
