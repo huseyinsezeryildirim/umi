@@ -6,3 +6,10 @@ DerivedData/
 *.xcworkspace/xcuserdata/
 # Generated from project.yml by XcodeGen
 Umi.xcodeproj/
+
+# v2
+/target/
+node_modules/
+dist/
+.turbo/
+*.tsbuildinfo
