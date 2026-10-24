@@ -422,6 +422,11 @@ final class EditorModel {
         }
     }
 
+    func setWatermark(_ url: URL) {
+        guard let name = copyIntoBundle(url, as: "logo") else { return }
+        update { $0.watermark = EditSettings.Watermark(file: name) }
+    }
+
     func setMusic(_ url: URL) {
         guard let name = copyIntoBundle(url, as: "music") else { return }
         update { $0.music = EditSettings.Music(file: name) }
@@ -561,7 +566,7 @@ final class EditorModel {
 
     // MARK: Export
 
-    func export(resolution: Exporter.Resolution, fps: Int) {
+    func export(resolution: Exporter.Resolution, fps: Int, format: Exporter.Format = .mp4) {
         guard exportProgress == nil else { return }
         exportProgress = 0
         lastExportURL = nil
@@ -574,8 +579,8 @@ final class EditorModel {
                 let folder = try RecordingsLibrary.folderURL().appendingPathComponent("Exports", isDirectory: true)
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                 let name = bundle.deletingPathExtension().lastPathComponent
-                let destination = folder.appendingPathComponent("\(name) \(resolution.label)").appendingPathExtension("mp4")
-                try await Exporter.export(bundle: bundle, renderer: renderer, resolution: resolution, fps: fps, to: destination) { value in
+                let destination = folder.appendingPathComponent("\(name) \(resolution.label)").appendingPathExtension(format.fileExtension)
+                try await Exporter.export(bundle: bundle, renderer: renderer, resolution: resolution, fps: fps, format: format, to: destination) { value in
                     Task { @MainActor in self.exportProgress = value }
                 }
                 lastExportURL = destination
