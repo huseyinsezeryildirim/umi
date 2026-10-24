@@ -87,6 +87,18 @@ nonisolated enum CompositionBuilder {
             }
         }
 
+        // Media track videos, each on its own track at its output time.
+        var overlayTracks: [UUID: CMPersistentTrackID] = [:]
+        for overlay in settings.overlays where overlay.kind == .video {
+            let asset = AVURLAsset(url: bundle.appendingPathComponent(overlay.file))
+            guard let source = try? await asset.loadTracks(withMediaType: .video).first, let track = newTrack(.video) else { continue }
+            let available = try await source.load(.timeRange)
+            let range = CMTimeRange(start: time(overlay.mediaOffset), duration: time(overlay.end - overlay.start)).intersection(available)
+            guard !range.isEmpty else { continue }
+            try track.insertTimeRange(range, of: source, at: time(overlay.start))
+            overlayTracks[overlay.id] = track.trackID
+        }
+
         // Video instructions: single clips, and two-clip dissolves where they overlap.
         var instructions: [UmiInstruction] = []
         func layer(_ i: Int) -> UmiInstruction.Layer {
@@ -98,12 +110,14 @@ nonisolated enum CompositionBuilder {
         for i in placements.indices {
             let soloEnd = i + 1 < placements.count ? placements[i + 1].outputStart : placements[i].outputEnd
             if soloEnd - cursor > 0.0001 {
-                instructions.append(UmiInstruction(timeRange: CMTimeRange(start: time(cursor), end: time(soloEnd)), layers: [layer(i)], renderer: renderer))
+                instructions.append(UmiInstruction(timeRange: CMTimeRange(start: time(cursor), end: time(soloEnd)), layers: [layer(i)],
+                                                   overlayTracks: overlayTracks, renderer: renderer))
                 cursor = soloEnd
             }
             if i + 1 < placements.count, crossfade > 0 {
                 let end = placements[i].outputEnd
-                instructions.append(UmiInstruction(timeRange: CMTimeRange(start: time(cursor), end: time(end)), layers: [layer(i), layer(i + 1)], renderer: renderer))
+                instructions.append(UmiInstruction(timeRange: CMTimeRange(start: time(cursor), end: time(end)), layers: [layer(i), layer(i + 1)],
+                                                   overlayTracks: overlayTracks, renderer: renderer))
                 cursor = end
             }
         }
@@ -199,13 +213,17 @@ nonisolated final class UmiInstruction: NSObject, AVVideoCompositionInstructionP
     let requiredSourceTrackIDs: [NSValue]?
     let passthroughTrackID = kCMPersistentTrackID_Invalid
     let layers: [Layer]
+    /// Media track videos by overlay id.
+    let overlayTracks: [UUID: CMPersistentTrackID]
     let renderer: FrameRenderer
 
-    init(timeRange: CMTimeRange, layers: [Layer], renderer: FrameRenderer) {
+    init(timeRange: CMTimeRange, layers: [Layer], overlayTracks: [UUID: CMPersistentTrackID] = [:], renderer: FrameRenderer) {
         self.timeRange = timeRange
         self.layers = layers
+        self.overlayTracks = overlayTracks
         self.renderer = renderer
-        requiredSourceTrackIDs = layers.flatMap { [$0.screenTrackID] + ($0.cameraTrackID.map { [$0] } ?? []) }.map { NSNumber(value: $0) }
+        let ids = layers.flatMap { [$0.screenTrackID] + ($0.cameraTrackID.map { [$0] } ?? []) } + overlayTracks.values
+        requiredSourceTrackIDs = ids.map { NSNumber(value: $0) }
     }
 }
 
@@ -230,6 +248,10 @@ nonisolated final class UmiCompositor: NSObject, AVVideoCompositing, @unchecked 
             return
         }
         let t = request.compositionTime.seconds
+        var overlays: [UUID: CVPixelBuffer] = [:]
+        for (id, track) in instruction.overlayTracks {
+            if let frame = request.sourceFrame(byTrackID: track) { overlays[id] = frame }
+        }
         func frames(_ layer: UmiInstruction.Layer) -> (CVPixelBuffer?, CVPixelBuffer?, Double) {
             (request.sourceFrame(byTrackID: layer.screenTrackID), layer.cameraTrackID.flatMap { request.sourceFrame(byTrackID: $0) }, layer.sourceTime(t))
         }
@@ -237,10 +259,11 @@ nonisolated final class UmiCompositor: NSObject, AVVideoCompositing, @unchecked 
             let range = instruction.timeRange
             let progress = (t - range.start.seconds) / max(range.duration.seconds, 0.001)
             let a = frames(first), b = frames(instruction.layers[1])
-            instruction.renderer.renderDissolve(from: (a.0, a.1, a.2), to: (b.0, b.1, b.2), progress: min(max(progress, 0), 1), into: output)
+            instruction.renderer.renderDissolve(from: (a.0, a.1, a.2), to: (b.0, b.1, b.2), progress: min(max(progress, 0), 1),
+                                                outputTime: t, overlays: overlays, into: output)
         } else {
             let a = frames(first)
-            instruction.renderer.render(screen: a.0, camera: a.1, at: a.2, into: output)
+            instruction.renderer.render(screen: a.0, camera: a.1, at: a.2, outputTime: t, overlays: overlays, into: output)
         }
         request.finish(withComposedVideoFrame: output)
     }

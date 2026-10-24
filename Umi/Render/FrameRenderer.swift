@@ -57,25 +57,34 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
 
     var zoomSegments: [EditSettings.ZoomSegment] { zoom.segments }
 
-    func render(screen: CVPixelBuffer?, camera: CVPixelBuffer?, at time: Double, into output: CVPixelBuffer) {
+    func render(screen: CVPixelBuffer?, camera: CVPixelBuffer?, at time: Double, outputTime: Double? = nil,
+                overlays: [UUID: CVPixelBuffer] = [:], into output: CVPixelBuffer) {
         let size = CGSize(width: CVPixelBufferGetWidth(output), height: CVPixelBufferGetHeight(output))
-        let image = compose(screen: screen.map { CIImage(cvPixelBuffer: $0) }, camera: camera.map { CIImage(cvPixelBuffer: $0) }, at: time, size: size)
+        let image = compose(screen: screen.map { CIImage(cvPixelBuffer: $0) }, camera: camera.map { CIImage(cvPixelBuffer: $0) }, at: time, size: size,
+                            outputTime: outputTime, overlays: overlays.mapValues { CIImage(cvPixelBuffer: $0) })
         Self.context.render(image, to: output, bounds: CGRect(origin: .zero, size: size), colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
     }
 
     /// Two moments dissolved together (crossfade between clips).
     func renderDissolve(from a: (screen: CVPixelBuffer?, camera: CVPixelBuffer?, time: Double),
                         to b: (screen: CVPixelBuffer?, camera: CVPixelBuffer?, time: Double),
-                        progress: Double, into output: CVPixelBuffer) {
+                        progress: Double, outputTime: Double? = nil, overlays: [UUID: CVPixelBuffer] = [:], into output: CVPixelBuffer) {
         let size = CGSize(width: CVPixelBufferGetWidth(output), height: CVPixelBufferGetHeight(output))
-        let first = compose(screen: a.screen.map { CIImage(cvPixelBuffer: $0) }, camera: a.camera.map { CIImage(cvPixelBuffer: $0) }, at: a.time, size: size)
-        let second = compose(screen: b.screen.map { CIImage(cvPixelBuffer: $0) }, camera: b.camera.map { CIImage(cvPixelBuffer: $0) }, at: b.time, size: size)
+        let media = overlays.mapValues { CIImage(cvPixelBuffer: $0) }
+        let first = compose(screen: a.screen.map { CIImage(cvPixelBuffer: $0) }, camera: a.camera.map { CIImage(cvPixelBuffer: $0) }, at: a.time, size: size,
+                            outputTime: outputTime, overlays: media)
+        let second = compose(screen: b.screen.map { CIImage(cvPixelBuffer: $0) }, camera: b.camera.map { CIImage(cvPixelBuffer: $0) }, at: b.time, size: size,
+                             outputTime: outputTime, overlays: media)
         let mixed = first.applyingFilter("CIDissolveTransition", parameters: [kCIInputTargetImageKey: second, kCIInputTimeKey: progress])
         Self.context.render(mixed, to: output, bounds: CGRect(origin: .zero, size: size), colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
     }
 
-    func compose(screen: CIImage?, camera: CIImage?, at time: Double, size: CGSize) -> CIImage {
+    func compose(screen: CIImage?, camera: CIImage?, at time: Double, size: CGSize,
+                 outputTime: Double? = nil, overlays: [UUID: CIImage] = [:]) -> CIImage {
         let canvas = CGRect(origin: .zero, size: size)
+        let activeOverlays = outputTime.map { t in settings.overlays.filter { t >= $0.start && t <= $0.end } } ?? []
+        // B-roll in fill mode replaces the screen, so click zoom steps aside meanwhile.
+        let fillAmount = activeOverlays.filter { $0.mode == .fill }.map { Self.overlayFade($0, outputTime ?? 0) }.max() ?? 0
         let short = min(size.width, size.height)
         let scene = scenes.state(at: time, canvas: canvas)
         let move = applyZoomAndMoves ? Effects.movePose(settings.moves, at: time, canvas: canvas) : nil
@@ -98,7 +107,7 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
 
         // Zoom the composed screen (not the camera), keeping the view inside the canvas.
         let (rawScale, focus) = applyZoomAndMoves ? zoom.state(at: time) : (1, CGPoint(x: 0.5, y: 0.5))
-        let scale = 1 + (rawScale - 1) * scene.zoomAllowance
+        let scale = 1 + (rawScale - 1) * scene.zoomAllowance * (1 - fillAmount)
         if scale > 1.001 {
             let content = DeviceFrameGeometry.contentRect(settings.frame, outer: scene.screenRect)
             let viewSize = CGSize(width: size.width / scale, height: size.height / scale)
@@ -111,6 +120,14 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
                 .transformed(by: CGAffineTransform(translationX: -origin.x, y: -origin.y))
                 .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
                 .cropped(to: canvas)
+        }
+
+        for overlay in activeOverlays {
+            let image = overlay.kind == .image ? overlayImage(overlay.file) : overlays[overlay.id]
+            if let image {
+                frame = drawOverlay(overlay, image: image, over: frame, canvas: canvas,
+                                    screenRect: DeviceFrameGeometry.contentRect(settings.frame, outer: scene.screenRect), time: outputTime ?? 0)
+            }
         }
 
         if let camera, scene.cameraAlpha > 0.001 {
@@ -262,6 +279,55 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
         return Effects.blend(image, over: shadow.composited(over: frame), mask: Effects.roundedRect(rect, radius: radius, alpha: alpha))
     }
 
+    // MARK: Media track
+
+    static func overlayFade(_ overlay: EditSettings.MediaOverlay, _ t: Double) -> Double {
+        SceneLayoutEngine.ease(min((t - overlay.start) / 0.25, (overlay.end - t) / 0.25, 1))
+    }
+
+    private let overlayCache = OverlayImageCache()
+
+    private func overlayImage(_ file: String) -> CIImage? {
+        guard let bundle else { return nil }
+        return overlayCache.image(at: bundle.appendingPathComponent(file))
+    }
+
+    /// Fill: covers the screen area (aspect fill, same corners). Picture-in-picture: a card.
+    private func drawOverlay(_ overlay: EditSettings.MediaOverlay, image: CIImage, over frame: CIImage, canvas: CGRect,
+                             screenRect: CGRect, time: Double) -> CIImage {
+        let alpha = Self.overlayFade(overlay, time)
+        guard alpha > 0.001 else { return frame }
+        let ext = image.extent
+        let rect: CGRect, radius: CGFloat
+        switch overlay.mode {
+        case .fill:
+            rect = screenRect
+            radius = settings.cornerRadius * min(rect.width, rect.height)
+        case .pictureInPicture:
+            let w = canvas.width * overlay.width
+            let h = w * ext.height / max(ext.width, 1)
+            rect = CGRect(x: overlay.center.x * canvas.width - w / 2, y: (1 - overlay.center.y) * canvas.height - h / 2, width: w, height: h)
+            radius = min(w, h) * 0.04
+        }
+        // Aspect fill into rect.
+        let s = max(rect.width / ext.width, rect.height / ext.height)
+        let scaled = image.transformed(by: CGAffineTransform(translationX: -ext.minX, y: -ext.minY).concatenating(CGAffineTransform(scaleX: s, y: s)))
+        let placed = scaled.transformed(by: CGAffineTransform(translationX: rect.midX - scaled.extent.width / 2, y: rect.midY - scaled.extent.height / 2))
+        var base = frame
+        if overlay.mode == .pictureInPicture {
+            let short = min(canvas.width, canvas.height)
+            let shadow = Effects.roundedRect(rect, radius: radius, alpha: 1)
+                .applyingFilter("CIColorMatrix", parameters: [
+                    "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+                    "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.45 * alpha),
+                ])
+                .applyingGaussianBlur(sigma: short * 0.02)
+                .transformed(by: CGAffineTransform(translationX: 0, y: -short * 0.01))
+            base = shadow.composited(over: base)
+        }
+        return Effects.blend(placed, over: base, mask: Effects.roundedRect(rect, radius: radius, alpha: alpha))
+    }
+
     // MARK: Helpers
 
     private static func loadBackgroundImage(_ background: EditSettings.Background, bundle: URL?) -> CIImage? {
@@ -298,5 +364,24 @@ extension FrameRenderer.CursorImage {
         var rect = CGRect(origin: .zero, size: CGSize(width: image.size.width * 4, height: image.size.height * 4))
         let cg = image.cgImage(forProposedRect: &rect, context: nil, hints: nil)
         return Self(image: cg.map { CIImage(cgImage: $0) } ?? CIImage.empty(), size: image.size, hotSpot: cursor.hotSpot)
+    }
+}
+
+/// Decoded Media-track images, kept while the renderer lives.
+nonisolated final class OverlayImageCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var images: [URL: CIImage] = [:]
+
+    func image(at url: URL) -> CIImage? {
+        lock.lock(); defer { lock.unlock() }
+        if let image = images[url] { return image }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                                                        kCGImageSourceThumbnailMaxPixelSize: 3000,
+                                                                        kCGImageSourceCreateThumbnailWithTransform: true] as CFDictionary)
+        else { return nil }
+        let image = CIImage(cgImage: cg)
+        images[url] = image
+        return image
     }
 }

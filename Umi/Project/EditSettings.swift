@@ -37,6 +37,8 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
     /// Cross-dissolve between consecutive clips, in seconds (0 = hard cut).
     var crossfade = 0.0
     var music: Music?
+    /// Extra videos and images on the Media track (B-roll, logos, screenshots).
+    var overlays: [MediaOverlay] = []
 
     init() {}
 
@@ -62,6 +64,7 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
         clips = c.value(.clips, d.clips)
         crossfade = c.value(.crossfade, d.crossfade)
         music = c.value(.music, d.music)
+        overlays = c.value(.overlays, d.overlays)
     }
 
     // MARK: Canvas
@@ -327,6 +330,32 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
             end = try c.decode(Double.self, forKey: .end)
             speed = c.value(.speed, 1)
         }
+    }
+
+    /// A video or image placed on the Media track. Unlike other items it is timed on the
+    /// output timeline, so it stays put when the recording underneath is cut.
+    struct MediaOverlay: Codable, Hashable, Sendable, Identifiable {
+        enum Kind: String, Codable, Sendable { case video, image }
+        enum Mode: String, Codable, CaseIterable, Sendable {
+            /// Covers the screen (B-roll); background and camera stay visible.
+            case fill
+            /// A card on top of the screen.
+            case pictureInPicture
+        }
+
+        var id = UUID()
+        /// File name inside the project bundle.
+        var file: String
+        var kind: Kind
+        /// Output time.
+        var start: Double
+        var end: Double
+        /// Where in the overlay video playback starts (trimming its head).
+        var mediaOffset = 0.0
+        var mode = Mode.fill
+        /// Picture-in-picture card: center (normalized canvas, top-left origin) and width.
+        var center = CGPoint(x: 0.72, y: 0.3)
+        var width = 0.4
     }
 
     struct Music: Codable, Hashable, Sendable {

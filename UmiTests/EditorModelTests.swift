@@ -95,6 +95,18 @@ final class EditorModelTests: XCTestCase {
         XCTAssertEqual(model.edit.zoom.segments.first?.focus, CGPoint(x: 0.2, y: 0.3))
     }
 
+    func testCutRemovesSpanAndShiftsMedia() async throws {
+        let model = try await loaded()
+        let overlay = EditSettings.MediaOverlay(file: "x.png", kind: .image, start: 4, end: 5)
+        model.update { $0.overlays = [overlay] }
+        model.cut(1...2)
+        try await settle(model)
+        XCTAssertEqual(model.outputDuration, 5, accuracy: 0.1)
+        XCTAssertEqual(model.placements.map(\.clip.start), [0, 2])
+        XCTAssertEqual(model.edit.overlays.first?.start ?? -1, 3, accuracy: 0.01, "media after the cut moves left with the video")
+        XCTAssertNil(model.rangeSelection)
+    }
+
     func testUndoRestoresEdit() async throws {
         let model = try await loaded()
         let undo = UndoManager()

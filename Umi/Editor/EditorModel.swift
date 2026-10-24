@@ -13,6 +13,7 @@ enum EditorSelection: Hashable {
     case text(UUID)
     case move(UUID)
     case music
+    case overlay(UUID)
 }
 
 /// State of one open editor window: the project, its edits, the preview player and export.
@@ -41,6 +42,8 @@ final class EditorModel {
         return (edit.zoom.segments + generated).sorted { $0.start < $1.start }
     }
     var outputDuration: Double { placements.last?.outputEnd ?? 0 }
+    /// A span of the output timeline selected on the ruler, for Cut.
+    var rangeSelection: ClosedRange<Double>?
     var selection: EditorSelection? {
         didSet { refreshPreviewMode() }
     }
@@ -292,6 +295,7 @@ final class EditorModel {
         case .text(let id): updateText(id) { $0.start = start; $0.end = end }
         case .move(let id): updateMove(id) { $0.start = start; $0.end = end }
         case .clip, .music: break
+        case .overlay(let id): retimeOverlay(id, start: start, end: end)
         }
     }
 
@@ -304,7 +308,10 @@ final class EditorModel {
         case .text(let id): update { $0.texts.removeAll { $0.id == id } }
         case .move(let id): update { $0.moves.removeAll { $0.id == id } }
         case .music: update { $0.music = nil }
-        case nil: break
+        case .overlay(let id): update { $0.overlays.removeAll { $0.id == id } }
+        case nil:
+            if let range = rangeSelection { cut(range) }
+            return
         }
         selection = nil
     }
@@ -322,6 +329,86 @@ final class EditorModel {
     private func clamped(_ start: Double, _ end: Double) -> (Double, Double) {
         let s = max(0, min(start, end - 0.3))
         return (s, min(project.duration, max(end, s + 0.3)))
+    }
+
+    // MARK: Cut
+
+    /// Removes a span of the output timeline from the video (ripple delete). Media-track
+    /// items after it move left with the video.
+    func cut(_ range: ClosedRange<Double>) {
+        let a = max(range.lowerBound, 0), b = min(range.upperBound, outputDuration)
+        guard b - a > 0.05 else { return }
+        var kept: [EditSettings.Clip] = []
+        for p in placements {
+            let src = { (t: Double) in p.clip.start + (t - p.outputStart) * p.clip.speed }
+            if p.outputEnd <= a || p.outputStart >= b { kept.append(p.clip); continue }
+            if p.outputStart < a - 0.05 { kept.append(EditSettings.Clip(start: p.clip.start, end: src(a), speed: p.clip.speed)) }
+            if p.outputEnd > b + 0.05 { kept.append(EditSettings.Clip(start: src(b), end: p.clip.end, speed: p.clip.speed)) }
+        }
+        guard !kept.isEmpty else { return }
+        let length = b - a
+        update { edit in
+            edit.clips = kept
+            edit.overlays = edit.overlays.compactMap { o in
+                var o = o
+                if o.start >= b { o.start -= length; o.end -= length }
+                else if o.end > a {
+                    // Overlapping the cut: keep the parts outside it, joined.
+                    let removed = min(o.end, b) - max(o.start, a)
+                    o.end -= removed
+                    if o.start > a { o.mediaOffset += o.start - a; o.start = a }
+                }
+                return o.end - o.start > 0.1 ? o : nil
+            }
+        }
+        rangeSelection = nil
+        selection = nil
+        seek(to: a)
+    }
+
+    // MARK: Media track
+
+    /// Adds a video or image to the Media track at an output time. Videos keep their
+    /// length (up to the end of the edit); images last 4 s.
+    func addOverlay(_ url: URL, at outputTime: Double) {
+        let isImage = UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) ?? false
+        guard let name = copyIntoBundle(url, as: "media") else { return }
+        let start = min(max(outputTime, 0), max(outputDuration - 0.5, 0))
+        Task {
+            var length = 4.0
+            if !isImage, let duration = try? await AVURLAsset(url: bundle.appendingPathComponent(name)).load(.duration).seconds, duration > 0 {
+                length = duration
+            }
+            let overlay = EditSettings.MediaOverlay(file: name, kind: isImage ? .image : .video, start: start,
+                                                    end: min(start + length, max(outputDuration, start + 0.5)))
+            update { $0.overlays.append(overlay) }
+            selection = .overlay(overlay.id)
+        }
+    }
+
+    func chooseOverlay() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.movie, .image]
+        panel.message = "Add a video or image to the Media track"
+        if panel.runModal() == .OK, let url = panel.url { addOverlay(url, at: currentTime) }
+    }
+
+    func updateOverlay(_ id: UUID, _ change: (inout EditSettings.MediaOverlay) -> Void) {
+        update { edit in
+            guard let i = edit.overlays.firstIndex(where: { $0.id == id }) else { return }
+            change(&edit.overlays[i])
+        }
+    }
+
+    /// Moves/trims a media item on the output timeline. Trimming its start also skips
+    /// into the video, so the content under the playhead doesn't jump.
+    private func retimeOverlay(_ id: UUID, start: Double, end: Double) {
+        updateOverlay(id) { o in
+            let s = max(0, min(start, end - 0.2))
+            if abs((end - start) - (o.end - o.start)) > 0.001, o.kind == .video { o.mediaOffset = max(0, o.mediaOffset + (s - o.start)) }
+            o.start = s
+            o.end = max(end, s + 0.2)
+        }
     }
 
     // MARK: Files

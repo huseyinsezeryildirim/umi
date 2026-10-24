@@ -99,6 +99,7 @@ private struct SelectionPanel: View {
         case .text: "Text"
         case .move: "3D move"
         case .music: "Music"
+        case .overlay: "Media"
         }
     }
 
@@ -161,6 +162,31 @@ private struct SelectionPanel: View {
                 }
                 .pickerStyle(.segmented)
                 Hint("Drag the dot on the preview to place the text.")
+            }
+        case .overlay(let id):
+            if let overlay = model.edit.overlays.first(where: { $0.id == id }) {
+                Label(overlay.file, systemImage: overlay.kind == .video ? "film" : "photo").lineLimit(1).truncationMode(.middle)
+                Picker("Show as", selection: Binding(get: { overlay.mode }, set: { m in model.updateOverlay(id) { $0.mode = m } })) {
+                    Text("Fill screen").tag(EditSettings.MediaOverlay.Mode.fill)
+                    Text("Picture in picture").tag(EditSettings.MediaOverlay.Mode.pictureInPicture)
+                }
+                .pickerStyle(.segmented)
+                if overlay.mode == .pictureInPicture {
+                    Slider2("Size", value: overlay.width, range: 0.15...0.8, format: "%.0f%%", percent: true, model: model) { v in
+                        model.updateOverlay(id) { $0.width = v }
+                    }
+                    HStack {
+                        Text("Position")
+                        Spacer()
+                        ForEach([(CGPoint(x: 0.25, y: 0.28), "arrow.up.left.square"), (CGPoint(x: 0.75, y: 0.28), "arrow.up.right.square"),
+                                 (CGPoint(x: 0.5, y: 0.5), "square.dashed"),
+                                 (CGPoint(x: 0.25, y: 0.72), "arrow.down.left.square"), (CGPoint(x: 0.75, y: 0.72), "arrow.down.right.square")], id: \.1) { center, icon in
+                            Button { model.updateOverlay(id) { $0.center = center } } label: { Image(systemName: icon) }
+                                .buttonStyle(.borderless)
+                        }
+                    }
+                }
+                Hint("Drag it along the Media track to move it, or its yellow edges to trim. It stays in place when you cut the video under it.")
             }
         case .music:
             if let music = model.edit.music {
