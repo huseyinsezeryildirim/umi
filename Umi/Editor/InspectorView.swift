@@ -190,10 +190,13 @@ private struct SelectionPanel: View {
             }
         case .music:
             if let music = model.edit.music {
-                Label(music.file, systemImage: "waveform").lineLimit(1).truncationMode(.middle)
+                Label(music.title ?? music.file, systemImage: "waveform").lineLimit(1).truncationMode(.middle)
                 Slider2("Volume", value: music.volume, range: 0...1, format: "%.0f%%", percent: true, model: model) { v in model.update { $0.music?.volume = v } }
                 Slider2("Fade out", value: music.fadeOut, range: 0...6, format: "%.1fs", model: model) { v in model.update { $0.music?.fadeOut = v } }
-                Button("Replace…") { model.chooseMusic() }
+                HStack {
+                    Button("Library…") { model.showsMusicLibrary = true }
+                    Button("Audio File…") { model.chooseMusic() }
+                }
                 Hint("Music loops to the length of the video and plays under your voice.")
             }
         case .move(let id):
@@ -568,13 +571,17 @@ private struct AudioSection: View {
         }
         Section2("Music", icon: "music.note") {
             if let music = model.edit.music {
-                Label(music.file, systemImage: "waveform").lineLimit(1).truncationMode(.middle)
+                Label(music.title ?? music.file, systemImage: "waveform").lineLimit(1).truncationMode(.middle)
                 Slider2("Volume", value: music.volume, range: 0...1, format: "%.0f%%", percent: true, model: model) { v in model.update { $0.music?.volume = v } }
                 Slider2("Fade out", value: music.fadeOut, range: 0...6, format: "%.1fs", model: model) { v in model.update { $0.music?.fadeOut = v } }
-                Button("Remove Music", role: .destructive) { model.update { $0.music = nil } }
+                HStack {
+                    Button("Change…") { model.showsMusicLibrary = true }
+                    Button("Remove Music", role: .destructive) { model.update { $0.music = nil } }
+                }
             } else {
+                Button { model.showsMusicLibrary = true } label: { Label("Browse Music Library…", systemImage: "music.note.list") }
                 Button("Add Audio File…") { model.chooseMusic() }
-                Hint("Music plays under your voice and loops to the length of the video.")
+                Hint("Music plays under your voice and loops to the length of the video. The library has 50 free tracks you can use anywhere.")
             }
         }
     }

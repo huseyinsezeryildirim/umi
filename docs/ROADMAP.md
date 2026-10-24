@@ -8,8 +8,8 @@ Hedef: **Loom'un hızı + Cap Studio'nun cilası**, native ve ücretsiz. Ayrınt
 - [x] Tüm track'ler tek saat kaynağı (host clock) ile senkron; pause tüm track'leri birlikte kaydırır
 - [x] Mikrofon ve sistem sesi ayrı ses track'leri
 - [x] Çökmeye dayanıklı yazım (fragmented MOV)
-- [ ] Alan (bölge) seçimi, yalnız kamera modu
-- [ ] Varsayılan global kısayollar (başlat/durdur, duraklat, iptal)
+- [x] Alan (bölge) seçimi, yalnız kamera modu
+- [x] Varsayılan global kısayollar (başlat/durdur, duraklat, iptal)
 - [x] Restart
 
 ## M2 — Studio editörü (Cap seviyesi)
@@ -31,7 +31,7 @@ Hedef: **Loom'un hızı + Cap Studio'nun cilası**, native ve ücretsiz. Ayrınt
 - [x] 3D kamera hareketleri: glide, unfold, pull back (odak bulanıklığı)
 - [x] Altyazı: cihazda transkripsiyon (Apple Speech), satır düzenleme, aktif kelime vurgusu, SRT/VTT
 - [x] Klipler: hız (0.25–8x), sıralama, crossfade; müzik (döngü + fade out)
-- [ ] Hazır müzik kütüphanesi (telifsiz parçalar gerekiyor)
+- [x] Hazır müzik kütüphanesi: 50 CC0 parça (FreePD arşivi, archive.org/details/freepd), seçilince indirilir ve önbelleğe alınır
 
 ## M2.6 — Cap ile eşitlik (2026-10-24)
 - [x] Alan seçerek kayıt, yalnız kamera, kalite ayarları (çözünürlük/fps)
@@ -42,7 +42,7 @@ Hedef: **Loom'un hızı + Cap Studio'nun cilası**, native ve ücretsiz. Ayrınt
 - [x] MOV / GIF dışa aktarma, logo (branding), imleç stili/motion blur/idle gizleme, bulanık ekran ve masaüstü duvar kağıdı arka planı
 - [x] Screenshot modu (⌥⇧4): güzelleştir + ok/kutu/yazı/vurgu/blur, kopyala/kaydet/paylaş
 - [ ] Özelleştirilebilir kısayollar, çoklu yazı kanalı, squircle köşe
-- [ ] Hazır müzik kütüphanesi (telifsiz parçalar gerekiyor)
+- [x] Hazır müzik kütüphanesi: 50 CC0 parça (FreePD arşivi, archive.org/details/freepd), seçilince indirilir ve önbelleğe alınır
 
 ## M3 — Paylaşım ve izleyici sayfası (ücretli bulut)
 - [ ] Durdur → yükle → link panoda; yeniden denenebilir/devam ettirilebilir yükleme

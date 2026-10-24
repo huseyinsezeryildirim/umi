@@ -427,13 +427,16 @@ final class EditorModel {
         update { $0.watermark = EditSettings.Watermark(file: name) }
     }
 
-    func setMusic(_ url: URL) {
+    func setMusic(_ url: URL, title: String? = nil) {
         guard let name = copyIntoBundle(url, as: "music") else { return }
-        update { $0.music = EditSettings.Music(file: name) }
+        let title = title ?? url.deletingPathExtension().lastPathComponent
+        update { $0.music = EditSettings.Music(file: name, title: title) }
         selection = .music
     }
 
     /// Asks for an audio file and uses it as the music bed.
+    var showsMusicLibrary = false
+
     func chooseMusic() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.audio]

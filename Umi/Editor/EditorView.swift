@@ -55,6 +55,7 @@ struct EditorView: View {
         }
         .sheet(isPresented: $showExport) { ExportSheet(model: model) }
         .sheet(isPresented: $showCrop) { CropSheet(model: model) }
+        .sheet(isPresented: Binding(get: { model.showsMusicLibrary }, set: { model.showsMusicLibrary = $0 })) { MusicLibrarySheet(model: model) }
         .overlay(alignment: .top) {
             if let error = model.loadError {
                 Text(error)

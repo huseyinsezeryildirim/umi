@@ -434,6 +434,8 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
     struct Music: Codable, Hashable, Sendable {
         /// File name inside the project bundle.
         var file: String
+        /// Display name (library tracks); the file name otherwise.
+        var title: String?
         var volume = 0.35
         /// Fade the music out over the last seconds.
         var fadeOut = 2.0
