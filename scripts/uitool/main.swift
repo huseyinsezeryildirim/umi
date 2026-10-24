@@ -45,6 +45,27 @@ case "key", "cmdkey":
         event?.post(tap: .cghidEventTap)
         usleep(40_000)
     }
+case "down", "move", "up":
+    // Step-by-step drag, so a test can look at the screen mid-gesture.
+    let v = args.dropFirst().compactMap(Double.init)
+    let p = CGPoint(x: v[0], y: v[1])
+    let type: CGEventType = args.first == "down" ? .leftMouseDown : args.first == "up" ? .leftMouseUp : .leftMouseDragged
+    let src = CGEventSource(stateID: .hidSystemState)
+    if args.first == "down" {
+        CGEvent(mouseEventSource: src, mouseType: .mouseMoved, mouseCursorPosition: p, mouseButton: .left)?.post(tap: .cghidEventTap)
+        usleep(60_000)
+    }
+    if args.first == "move", v.count >= 4 {
+        // move fromX fromY toX toY: interpolate in small steps
+        let from = p, to = CGPoint(x: v[2], y: v[3])
+        for i in 1...12 {
+            let t = Double(i) / 12
+            CGEvent(mouseEventSource: src, mouseType: .leftMouseDragged, mouseCursorPosition: CGPoint(x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t), mouseButton: .left)?.post(tap: .cghidEventTap)
+            usleep(25_000)
+        }
+    } else {
+        CGEvent(mouseEventSource: src, mouseType: type, mouseCursorPosition: p, mouseButton: .left)?.post(tap: .cghidEventTap)
+    }
 case "type":
     // Types text as keyboard input (unicode), one character at a time.
     let text = args.dropFirst().joined(separator: " ")
