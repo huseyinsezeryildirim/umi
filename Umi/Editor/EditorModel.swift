@@ -403,6 +403,24 @@ final class EditorModel {
         }
     }
 
+    /// Takes a clip off the main video and lays it over the video at `outputStart` on the
+    /// Video 2 track (it plays inside the screen card, styled like the rest).
+    func moveClipToVideo2(_ index: Int, at outputStart: Double) {
+        guard keptClips.indices.contains(index), keptClips.count > 1 else { return }
+        let clip = keptClips[index]
+        let length = clip.end - clip.start
+        update { edit in
+            var kept = keptClips
+            kept.remove(at: index)
+            edit.clips = kept
+            let remaining = kept.reduce(0) { $0 + ($1.end - $1.start) / $1.speed }
+            let start = min(max(outputStart, 0), max(remaining - 0.5, 0))
+            edit.overlays.append(EditSettings.MediaOverlay(file: RecordingProject.screenFile, kind: .video, start: start,
+                                                           end: start + length, mediaOffset: clip.start, lane: 2))
+        }
+        if let added = edit.overlays.last { selection = .overlay(added.id) }
+    }
+
     func chooseOverlay() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.movie, .image]

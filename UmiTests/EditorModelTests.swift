@@ -107,6 +107,30 @@ final class EditorModelTests: XCTestCase {
         XCTAssertNil(model.rangeSelection)
     }
 
+    func testClipDraggedToVideo2BecomesOverlay() async throws {
+        let model = try await loaded()
+        model.split(at: 2)
+        try await settle(model)
+        model.split(at: 4)
+        try await settle(model)
+        XCTAssertEqual(model.placements.count, 3)
+
+        // Clip 2 (2–4 s) dragged down and dropped at 1 s.
+        model.moveClipToVideo2(1, at: 1)
+        try await settle(model)
+        XCTAssertEqual(model.placements.count, 2)
+        XCTAssertEqual(model.outputDuration, 4, accuracy: 0.1)
+        let overlay = try XCTUnwrap(model.edit.overlays.first)
+        XCTAssertTrue(overlay.isVideo2)
+        XCTAssertEqual(overlay.file, RecordingProject.screenFile)
+        XCTAssertEqual(overlay.mediaOffset, 2, accuracy: 0.05)
+        XCTAssertEqual(overlay.start, 1, accuracy: 0.05)
+        XCTAssertEqual(overlay.end - overlay.start, 2, accuracy: 0.05)
+
+        // The preview still builds with the recording laid over itself.
+        XCTAssertNil(model.loadError)
+    }
+
     func testUndoRestoresEdit() async throws {
         let model = try await loaded()
         let undo = UndoManager()

@@ -3,10 +3,11 @@ import SwiftUI
 
 /// Kinds of tracks that can be shown under the video.
 enum TrackKind: String, CaseIterable, Hashable {
-    case media, zoom, scenes, masks, text, moves, music
+    case video2, media, zoom, scenes, masks, text, moves, music
 
     var title: String {
         switch self {
+        case .video2: "Video 2"
         case .media: "Media"
         case .zoom: "Zoom"
         case .scenes: "Scenes"
@@ -19,6 +20,7 @@ enum TrackKind: String, CaseIterable, Hashable {
 
     var icon: String {
         switch self {
+        case .video2: "film.stack"
         case .media: "photo.on.rectangle"
         case .zoom: "plus.magnifyingglass"
         case .scenes: "rectangle.split.2x1"
@@ -91,7 +93,8 @@ struct EditorTimeline: View {
     private func isVisible(_ kind: TrackKind) -> Bool {
         if model.shownTracks.contains(kind) { return true }
         switch kind {
-        case .media: return !model.edit.overlays.isEmpty
+        case .video2: return model.edit.overlays.contains { $0.isVideo2 }
+        case .media: return model.edit.overlays.contains { !$0.isVideo2 }
         case .zoom: return !model.zoomSegments.isEmpty
         case .scenes: return !model.edit.scenes.isEmpty
         case .masks: return !model.edit.masks.isEmpty
@@ -125,6 +128,7 @@ struct EditorTimeline: View {
     private func add(_ kind: TrackKind) {
         switch kind {
         case .media: model.chooseOverlay()
+        case .video2: break
         case .zoom: model.addZoom(at: model.currentTime)
         case .masks: model.addMask(at: model.currentTime)
         case .music: model.showsMusicLibrary = true
@@ -146,6 +150,7 @@ struct EditorTimeline: View {
         switch kind {
         case .text: SegmentTrack.height(rows: SegmentTrack.rows(for: textItems, model: model).count)
         case .media: SegmentTrack.height(rows: SegmentTrack.rows(for: mediaItems, model: model).count)
+        case .video2: SegmentTrack.height(rows: SegmentTrack.rows(for: video2Items, model: model).count)
         default: Self.trackHeight
         }
     }
@@ -153,9 +158,12 @@ struct EditorTimeline: View {
     @ViewBuilder
     private func content(_ kind: TrackKind, scale: CGFloat) -> some View {
         switch kind {
+        case .video2:
+            SegmentTrack(model: model, items: video2Items, scale: scale,
+                         emptyHint: video2Items.isEmpty ? "Drag a clip down from Video to lay it over the video" : nil, stacks: true)
         case .media:
             SegmentTrack(model: model, items: mediaItems, scale: scale,
-                         emptyHint: model.edit.overlays.isEmpty ? "Drop a video or image here, or click +" : nil, stacks: true)
+                         emptyHint: mediaItems.isEmpty ? "Drop a video or image here, or click +" : nil, stacks: true)
                 .onDrop(of: [.fileURL], isTargeted: nil) { providers, location in
                     for provider in providers {
                         _ = provider.loadObject(ofClass: URL.self) { url, _ in
@@ -304,8 +312,16 @@ struct EditorTimeline: View {
         }
     }
 
+    private var video2Items: [SegmentTrack.Item] {
+        model.edit.overlays.filter(\.isVideo2).map {
+            SegmentTrack.Item(selection: .overlay($0.id), start: $0.start, end: $0.end,
+                              label: "Clip · \($0.mediaOffset.formattedDuration)–\(($0.mediaOffset + $0.end - $0.start).formattedDuration)",
+                              tint: UmiTheme.accent, outputTime: true)
+        }
+    }
+
     private var mediaItems: [SegmentTrack.Item] {
-        model.edit.overlays.map {
+        model.edit.overlays.filter { !$0.isVideo2 }.map {
             SegmentTrack.Item(selection: .overlay($0.id), start: $0.start, end: $0.end,
                               label: ($0.mode == .pictureInPicture ? "PiP · " : "") + $0.file, tint: Color(hex: 0x0CA678), outputTime: true)
         }
@@ -393,6 +409,10 @@ private struct ClipTrack: View {
     let scale: CGFloat
     @State private var trimOrigin: (start: Double, end: Double)?
     @State private var reorder: (index: Int, offset: CGFloat)?
+    @State private var lift: CGFloat = 0
+
+    /// Dragged this far down, a clip goes to the Video 2 track.
+    private static let liftThreshold = EditorTimeline.clipHeight * 0.7
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -407,9 +427,21 @@ private struct ClipTrack: View {
         let offset: CGFloat = reorder?.index == index ? (reorder?.offset ?? 0) : 0
         let width: CGFloat = max(CGFloat(placement.outputDuration) * scale - 2, 6)
         let x: CGFloat = CGFloat(placement.outputStart) * scale + 1 + offset
+        let lifted = reorder?.index == index ? lift : 0
         return clipBody(index, placement)
             .frame(width: width, height: EditorTimeline.clipHeight)
-            .offset(x: x)
+            .overlay(alignment: .bottom) {
+                if lifted > Self.liftThreshold {
+                    Label("Drop on Video 2", systemImage: "square.3.layers.3d.down.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Capsule().fill(UmiTheme.trim))
+                        .offset(y: 14)
+                }
+            }
+            .opacity(lifted > Self.liftThreshold ? 0.85 : 1)
+            .offset(x: x, y: max(lifted, 0))
             .zIndex(reorder?.index == index ? 1 : 0)
             .onTapGesture { model.selection = .clip(index) }
             .gesture(reorderGesture(index, placement))
@@ -439,9 +471,16 @@ private struct ClipTrack: View {
         DragGesture(minimumDistance: 6)
             .onChanged { value in
                 reorder = (index, value.translation.width)
+                lift = model.placements.count > 1 ? value.translation.height : 0
                 model.selection = .clip(index)
             }
             .onEnded { value in
+                defer { lift = 0 }
+                if lift > Self.liftThreshold {
+                    reorder = nil
+                    model.moveClipToVideo2(index, at: placement.outputStart + Double(value.translation.width / scale))
+                    return
+                }
                 let center = placement.outputStart + placement.outputDuration / 2 + Double(value.translation.width / scale)
                 let target = model.placements.lastIndex { $0.outputStart <= center } ?? 0
                 reorder = nil
