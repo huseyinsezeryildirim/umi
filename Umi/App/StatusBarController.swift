@@ -265,6 +265,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
             }
             menu.addItem(.separator())
         }
+        menu.addItem(withTitle: "Take Screenshot", action: #selector(takeScreenshot), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Open Library", action: #selector(openLibrary), keyEquivalent: "").target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Umi", action: #selector(quit), keyEquivalent: "q").target = self
@@ -288,6 +289,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
 
     @objc private func discard() { model.recorder.cancel() }
     @objc private func openLibrary() { model.openLibrary() }
+    @objc private func takeScreenshot() { ScreenshotEditor.captureArea() }
     @objc private func openRecording(_ sender: NSMenuItem) {
         if let url = sender.representedObject as? URL { model.openEditor(url) }
     }

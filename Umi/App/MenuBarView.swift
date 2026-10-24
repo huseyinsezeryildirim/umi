@@ -76,6 +76,8 @@ struct MenuBarView: View {
                 .buttonStyle(GlassIconButtonStyle())
                 .help("Library")
             Menu {
+                Button("Take Screenshot  \(HotKeys.Action.screenshot.display)") { ScreenshotEditor.captureArea() }
+                Divider()
                 Toggle("3-second countdown", isOn: Binding(get: { recorder.settings.countdown }, set: { recorder.settings.countdown = $0 }))
                 Picker("Resolution", selection: Binding(get: { recorder.settings.quality.resolution }, set: { recorder.settings.quality.resolution = $0 })) {
                     ForEach(RecordingQuality.Resolution.allCases, id: \.self) { Text($0.label).tag($0) }
