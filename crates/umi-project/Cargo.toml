@@ -1,0 +1,16 @@
+[package]
+name = "umi-project"
+description = "The .umi project format and timeline editing operations (pure, no platform dependencies)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
