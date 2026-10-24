@@ -440,15 +440,32 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
 
     // MARK: Helpers
 
+    private final class CachedBackground: @unchecked Sendable {
+        let image: CIImage
+        init(_ image: CIImage) { self.image = image }
+    }
+
+    /// Decoded wallpapers by path: renderers are rebuilt on every edit, and decoding a 6K
+    /// wallpaper each time was most of the editor's CPU.
+    nonisolated(unsafe) private static let backgroundCache: NSCache<NSString, CachedBackground> = {
+        let cache = NSCache<NSString, CachedBackground>()
+        cache.countLimit = 6
+        return cache
+    }()
+
     private static func loadBackgroundImage(_ background: EditSettings.Background, bundle: URL?) -> CIImage? {
         guard case .image(let path) = background else { return nil }
         let url = path.hasPrefix("/") ? URL(fileURLWithPath: path) : bundle?.appendingPathComponent(path)
-        guard let url, let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        guard let url else { return nil }
+        if let cached = backgroundCache.object(forKey: url.path as NSString) { return cached.image }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         // Downsample big wallpapers; 2560 px is plenty for 4K output with padding.
         let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: 3200,
                                         kCGImageSourceCreateThumbnailWithTransform: true]
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
-        return CIImage(cgImage: image)
+        let result = CIImage(cgImage: image)
+        backgroundCache.setObject(CachedBackground(result), forKey: url.path as NSString)
+        return result
     }
 
     private static func makeRing() -> CIImage {

@@ -9,7 +9,9 @@ struct EditorView: View {
     @Environment(\.undoManager) private var undoManager
 
     init(bundle: URL) {
-        _model = State(initialValue: EditorModel(bundle: bundle))
+        // SwiftUI re-runs this init whenever the app's scene body updates. Building a model
+        // each time (renderer, waveform, preview) kept the CPU busy, so reuse the window's.
+        _model = State(initialValue: EditorModel.open(bundle))
     }
 
     var body: some View {
@@ -77,7 +79,7 @@ struct EditorView: View {
         }
         .onAppear { model.undoManager = undoManager }
         .onChange(of: undoManager) { _, manager in model.undoManager = manager }
-        .onDisappear { model.player.pause() }
+        .onDisappear { EditorModel.close(model.bundle) }
     }
 }
 
@@ -168,8 +170,14 @@ private struct TransportBar: View {
                     .font(.system(size: 13, weight: .medium).monospacedDigit())
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button { model.split(at: model.currentTime) } label: { Image(systemName: "scissors") }
-                    .help("Split at the playhead (S). Drag on the ruler to select a part to cut.")
+                Button { model.bladeMode.toggle() } label: {
+                    Image(systemName: "scissors")
+                        .foregroundStyle(model.bladeMode ? Color.black : Color.primary)
+                        .frame(width: 28, height: 24)
+                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(model.bladeMode ? UmiTheme.trim : .clear))
+                }
+                .buttonStyle(.plain)
+                .help(model.bladeMode ? "Cutting: click the timeline where you want to cut. Esc to stop." : "Cut tool (B): click anywhere on the timeline to cut there. S splits at the playhead.")
                 Divider().frame(height: 18)
                 Button { model.timelineZoom = max(1, model.timelineZoom / 1.5) } label: { Image(systemName: "minus.magnifyingglass") }
                     .help("Zoom the timeline out")
@@ -363,6 +371,7 @@ private struct EditorKeys: NSViewRepresentable {
                     model.deleteSelection()
                     return nil
                 case 53: // Escape
+                    if model.bladeMode { model.bladeMode = false; return nil }
                     guard model.selection != nil || model.rangeSelection != nil else { return event }
                     model.selection = nil
                     model.rangeSelection = nil
@@ -372,6 +381,9 @@ private struct EditorKeys: NSViewRepresentable {
                     return nil
                 case 1 where event.modifierFlags.intersection([.command, .option, .control]).isEmpty: // S
                     model.split(at: model.currentTime)
+                    return nil
+                case 11 where event.modifierFlags.intersection([.command, .option, .control]).isEmpty: // B
+                    model.bladeMode.toggle()
                     return nil
                 case 6 where event.modifierFlags.intersection([.command, .option, .control]).isEmpty: // Z
                     model.addZoom(at: model.currentTime)

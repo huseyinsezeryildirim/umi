@@ -72,6 +72,7 @@ struct EditorTimeline: View {
                         .padding(.vertical, 6)
                         .overlay(alignment: .topLeading) { rangeHighlight(scale: scale) }
                         .overlay(alignment: .topLeading) { playhead(scale: scale) }
+                        .overlay(alignment: .topLeading) { if model.bladeMode { BladeLayer(model: model, scale: scale) } }
                         .coordinateSpace(.named("timeline"))
                     }
                     .scrollIndicators(model.timelineZoom > 1 ? .visible : .hidden)
@@ -768,5 +769,50 @@ private struct ClipWaveform: View {
             }
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// The cut tool: a line follows the pointer over the timeline and a click cuts the video
+/// there. Stays on for more cuts until Escape or the scissors button.
+private struct BladeLayer: View {
+    let model: EditorModel
+    let scale: CGFloat
+    @State private var x: CGFloat?
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .topLeading) {
+                Color.white.opacity(0.001)
+                if let x {
+                    let t = min(max(Double(x / scale), 0), model.outputDuration)
+                    Rectangle()
+                        .fill(UmiTheme.trim)
+                        .frame(width: 2, height: geo.size.height)
+                        .shadow(color: UmiTheme.trim.opacity(0.6), radius: 4)
+                        .offset(x: x - 1)
+                    Label(t.formattedPrecise, systemImage: "scissors")
+                        .font(.system(size: 10, weight: .bold).monospacedDigit())
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(UmiTheme.trim))
+                        .fixedSize()
+                        .offset(x: min(x + 6, geo.size.width - 90), y: 2)
+                }
+            }
+            .contentShape(Rectangle())
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let point): x = point.x
+                case .ended: x = nil
+                }
+            }
+            .onTapGesture { location in
+                model.split(at: Double(location.x / scale))
+            }
+            .onHover { inside in
+                if inside { NSCursor.crosshair.push() } else { NSCursor.pop() }
+            }
+        }
     }
 }
