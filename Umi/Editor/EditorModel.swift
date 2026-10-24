@@ -94,6 +94,24 @@ final class EditorModel {
         Task { waveform = await Waveform.load(screen, preferredTrack: mic) }
     }
 
+    // MARK: Open models
+
+    private static var openModels: [URL: EditorModel] = [:]
+
+    /// The model for a recording's editor window, created once.
+    static func open(_ bundle: URL) -> EditorModel {
+        if let model = openModels[bundle] { return model }
+        let model = EditorModel(bundle: bundle)
+        openModels[bundle] = model
+        return model
+    }
+
+    /// Called when the editor window closes, so reopening starts fresh.
+    static func close(_ bundle: URL) {
+        openModels[bundle]?.player.pause()
+        openModels[bundle] = nil
+    }
+
     // MARK: Editing
 
     /// Applies a change with undo. During a slider drag, wrap calls in begin/endGesture
@@ -549,6 +567,8 @@ final class EditorModel {
 
     /// Horizontal zoom of the timeline (1 = whole video fits).
     var timelineZoom = 1.0
+    /// Blade tool: clicking the timeline cuts there (scissors button, B; Escape leaves it).
+    var bladeMode = false
     /// Voice loudness for the clip track (`Waveform.samplesPerSecond` per second of recording).
     private(set) var waveform: [Float] = []
 
