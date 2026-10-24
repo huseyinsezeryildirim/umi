@@ -12,7 +12,7 @@ struct PreviewOverlay: View {
             let video = Self.fit(model.previewSize, in: geo.size)
             ZStack(alignment: .topLeading) {
                 Color.clear
-                switch model.selection {
+                switch model.isPlaying ? nil : model.selection {
                 case .mask(let id):
                     if let mask = model.edit.masks.first(where: { $0.id == id }), let content = contentRect(in: video) {
                         maskBox(mask, content: content)

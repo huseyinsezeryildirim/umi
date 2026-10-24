@@ -72,5 +72,15 @@ $tool key 53; sleep 0.3; zooms=$(edit "len(e.get('zoom',{}).get('segments',[]))"
 $tool key 6; sleep 1.2; $tool key 6; sleep 1.2
 check "Z twice doesn't stack zooms" "$(python3 -c "print($(edit "len(e['zoom']['segments'])") <= $zooms + 1)")" "True"
 
+front
+# Resizing a zoom from its edge updates while the mouse is still down.
+$tool key 53; sleep 0.3
+first_end=$(edit "min(z['end'] for z in e['zoom']['segments'])")
+ex=$(python3 -c "print(int($x0 + $first_end * $scale - 3))")
+$tool down $ex $row_zoom; sleep 0.2; $tool move $ex $row_zoom $((ex+60)) $row_zoom; sleep 0.9
+mid_end=$(edit "min(z['end'] for z in e['zoom']['segments'])")
+$tool up $((ex+60)) $row_zoom; sleep 1
+check "zoom edge updates mid-drag" "$(python3 -c "print($mid_end > $first_end + 0.2)")" "True"
+
 pkill -x Umi
 echo; [[ $fails == 0 ]] && echo "ALL PASSED" || { echo "$fails FAILED"; exit 1; }

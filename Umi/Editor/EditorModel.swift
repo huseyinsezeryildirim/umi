@@ -28,10 +28,21 @@ final class EditorModel {
     private(set) var isPlaying = false
     /// Clips laid out on the output timeline (after cuts, speed and crossfades).
     private(set) var placements: [CompositionBuilder.Placement] = []
-    private(set) var zoomSegments: [EditSettings.ZoomSegment] = []
+    /// Generated (from clicks) and manual zooms, computed from the edit right away so the
+    /// timeline follows a drag live instead of waiting for the preview to rebuild.
+    var zoomSegments: [EditSettings.ZoomSegment] {
+        zoomSegments(in: edit)
+    }
+
+    /// Zooms for a given edit. Takes the edit as a value so code that is mutating `edit`
+    /// (inside `update`) can call it without overlapping access to `self.edit`.
+    private func zoomSegments(in edit: EditSettings) -> [EditSettings.ZoomSegment] {
+        let generated = edit.zoom.auto ? ZoomTrack.autoSegments(from: cursorData.clicks, scale: edit.zoom.scale, duration: project.duration) : []
+        return (edit.zoom.segments + generated).sorted { $0.start < $1.start }
+    }
     var outputDuration: Double { placements.last?.outputEnd ?? 0 }
     var selection: EditorSelection? {
-        didSet { if editingOnPreview != (oldValue.map(Self.needsFlatPreview) ?? false) { rebuild(keepTime: true) } }
+        didSet { refreshPreviewMode() }
     }
 
     private(set) var exportProgress: Double?
@@ -215,7 +226,7 @@ final class EditorModel {
     /// be moved and deleted individually.
     private func materializeAutoZoom(_ edit: inout EditSettings) {
         guard edit.zoom.auto else { return }
-        edit.zoom.segments = zoomSegments
+        edit.zoom.segments = zoomSegments(in: edit)
         edit.zoom.auto = false
     }
 
@@ -439,6 +450,7 @@ final class EditorModel {
             player.play()
         }
         isPlaying = player.rate != 0
+        refreshPreviewMode()
     }
 
     func seek(to time: Double) {
@@ -476,18 +488,34 @@ final class EditorModel {
 
     // MARK: Private
 
-    /// Masks and fixed zoom focus are placed on the preview, so it's shown flat (no zoom
-    /// or 3D move) while one is selected.
-    var editingOnPreview: Bool { selection.map(Self.needsFlatPreview) ?? false }
-
-    private static func needsFlatPreview(_ selection: EditorSelection) -> Bool {
+    /// While paused with a mask or a fixed-focus zoom selected, the preview is shown flat
+    /// (no zoom or 3D move) so the handles line up with the screen. Playing always shows
+    /// every effect.
+    var editingOnPreview: Bool {
+        guard player.rate == 0, let selection else { return false }
         switch selection {
-        case .mask, .zoom: true
-        default: false
+        case .mask: return true
+        case .zoom(let id): return zoomSegments.first { $0.id == id }?.focus != nil
+        default: return false
         }
     }
 
+    /// Rebuilds when the preview should switch between flat and full effects.
+    private func refreshPreviewMode() {
+        guard let renderer, renderer.applyZoomAndMoves == editingOnPreview else { return }
+        rebuild(keepTime: true)
+    }
+
+    private var rebuildPending = false
+    private var rebuildToken = UUID()
+
     private func rebuild(keepTime: Bool) {
+        // During a drag, let the running rebuild finish and queue one more instead of
+        // cancelling: the preview then keeps updating while the mouse moves.
+        if gestureSnapshot != nil, rebuildTask != nil {
+            rebuildPending = true
+            return
+        }
         rebuildTask?.cancel()
         var project = project
         project.edit = edit
@@ -497,16 +525,23 @@ final class EditorModel {
         let bundle = bundle
         let wasPlaying = player.rate != 0
 
-        let throttle = gestureSnapshot != nil
+        let token = UUID()
+        rebuildToken = token
         rebuildTask = Task {
-            // While dragging, coalesce updates so the preview keeps up with the mouse.
-            if throttle { try? await Task.sleep(for: .milliseconds(60)) }
-            guard !Task.isCancelled else { return }
+            defer {
+                // Only the latest rebuild clears the slot (a cancelled one may finish later).
+                if rebuildToken == token {
+                    rebuildTask = nil
+                    if rebuildPending {
+                        rebuildPending = false
+                        rebuild(keepTime: true)
+                    }
+                }
+            }
             do {
                 let built = try await CompositionBuilder.build(bundle: bundle, renderer: renderer, renderSize: size)
                 guard !Task.isCancelled else { return }
                 placements = built.placements
-                zoomSegments = renderer.zoomSegments
                 self.renderer = renderer
                 let item = AVPlayerItem(asset: built.composition)
                 item.videoComposition = built.videoComposition
