@@ -239,15 +239,19 @@ private struct ClipTrack: View {
         let selected = model.selection == .clip(index)
         let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
         let screen = model.bundle.appendingPathComponent(RecordingProject.screenFile)
-        let border: Color = selected ? UmiTheme.accent : Color.white.opacity(0.15)
+        let border: Color = selected ? UmiTheme.trim : Color.white.opacity(0.15)
         return shape
             .fill(UmiTheme.ink)
             .overlay { Filmstrip(screenURL: screen, clip: placement.clip).clipShape(shape) }
             .overlay(shape.fill(UmiTheme.ink.opacity(selected ? 0.25 : 0.45)))
-            .overlay(shape.strokeBorder(border, lineWidth: selected ? 2 : 1))
-            .overlay(alignment: .leading) { title(index, placement) }
-            .overlay(alignment: .leading) { handle { trim(index, startDelta: $0) } }
-            .overlay(alignment: .trailing) { handle { trim(index, endDelta: $0) } }
+            .overlay(shape.strokeBorder(border, lineWidth: selected ? 2.5 : 1))
+            .overlay(alignment: .leading) { title(index, placement).padding(.leading, 4) }
+            .overlay(alignment: .leading) {
+                TrimHandle(leading: true, selected: selected, height: EditorTimeline.clipHeight) { trim(index, startDelta: $0.map(Double.init)) }
+            }
+            .overlay(alignment: .trailing) {
+                TrimHandle(leading: false, selected: selected, height: EditorTimeline.clipHeight) { trim(index, endDelta: $0.map(Double.init)) }
+            }
     }
 
     private func reorderGesture(_ index: Int, _ placement: CompositionBuilder.Placement) -> some Gesture {
@@ -277,19 +281,6 @@ private struct ClipTrack: View {
         .foregroundStyle(.white)
         .padding(.leading, 12)
         .lineLimit(1)
-    }
-
-    private func handle(onDrag: @escaping (Double?) -> Void) -> some View {
-        RoundedRectangle(cornerRadius: 2)
-            .fill(Color.white.opacity(0.85))
-            .frame(width: 3, height: EditorTimeline.clipHeight - 16)
-            .padding(.horizontal, 3)
-            .frame(maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
-            .highPriorityGesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                .onChanged { onDrag($0.translation.width) }
-                .onEnded { _ in onDrag(nil) })
     }
 
     /// `delta` in points; nil ends the drag.
@@ -439,18 +430,18 @@ struct SegmentTrack: View {
         let selected = model.selection == item.selection
         let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
         let fillOpacity = item.dashed ? 0.18 : selected ? 0.42 : 0.28
-        let stroke = StrokeStyle(lineWidth: selected ? 2 : 1, dash: item.dashed ? [4, 3] : [])
+        let stroke = StrokeStyle(lineWidth: selected ? 2.5 : 1, dash: item.dashed && !selected ? [4, 3] : [])
         return shape
             .fill(item.tint.opacity(fillOpacity))
-            .overlay(shape.strokeBorder(item.tint.opacity(selected ? 1 : 0.55), style: stroke))
+            .overlay(shape.strokeBorder(selected ? UmiTheme.trim : item.tint.opacity(0.55), style: stroke))
             .overlay(alignment: .leading) {
                 Text(item.label)
                     .font(.system(size: 10, weight: .semibold))
                     .lineLimit(1)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, 12)
             }
-            .overlay(alignment: .leading) { edge(item, leading: true) }
-            .overlay(alignment: .trailing) { edge(item, leading: false) }
+            .overlay(alignment: .leading) { edge(item, leading: true, selected: selected) }
+            .overlay(alignment: .trailing) { edge(item, leading: false, selected: selected) }
             .contentShape(shape)
             .onTapGesture { model.selection = item.selection }
             .gesture(DragGesture(minimumDistance: 3, coordinateSpace: .global)
@@ -459,14 +450,10 @@ struct SegmentTrack: View {
             .help(item.dashed ? "Auto zoom from a click. Drag, resize or delete to edit." : item.label)
     }
 
-    private func edge(_ item: Item, leading: Bool) -> some View {
-        Color.clear
-            .frame(width: 7)
-            .contentShape(Rectangle())
-            .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
-            .highPriorityGesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                .onChanged { value in drag(item, delta: value.translation.width, moveStart: leading, moveEnd: !leading) }
-                .onEnded { _ in endDrag() })
+    private func edge(_ item: Item, leading: Bool, selected: Bool) -> some View {
+        TrimHandle(leading: leading, selected: selected, height: EditorTimeline.trackHeight) { delta in
+            if let delta { drag(item, delta: delta, moveStart: leading, moveEnd: !leading) } else { endDrag() }
+        }
     }
 
     private func drag(_ item: Item, delta: CGFloat, moveStart: Bool, moveEnd: Bool) {
@@ -484,5 +471,47 @@ struct SegmentTrack: View {
     private func endDrag() {
         origin = nil
         model.endGesture()
+    }
+}
+
+/// A trim handle on a timeline item's edge, like other video editors: a yellow bar with a
+/// grip that shows on hover, on the selected item and while dragging (when it glows).
+private struct TrimHandle: View {
+    let leading: Bool
+    let selected: Bool
+    let height: CGFloat
+    /// Drag distance in points; nil when the drag ends.
+    let onDrag: (CGFloat?) -> Void
+    @State private var hovering = false
+    @State private var dragging = false
+
+    var body: some View {
+        let visible = selected || hovering || dragging
+        let shape = UnevenRoundedRectangle(topLeadingRadius: leading ? 6 : 0, bottomLeadingRadius: leading ? 6 : 0,
+                                           bottomTrailingRadius: leading ? 0 : 6, topTrailingRadius: leading ? 0 : 6, style: .continuous)
+        ZStack {
+            shape.fill(UmiTheme.trim)
+            Capsule().fill(Color.black.opacity(0.55)).frame(width: 2, height: height * 0.42)
+        }
+        .frame(width: dragging || hovering ? 11 : 9)
+        .opacity(visible ? 1 : 0)
+        .shadow(color: UmiTheme.trim.opacity(dragging ? 0.9 : 0), radius: 6)
+        .animation(.easeOut(duration: 0.12), value: visible)
+        .animation(.easeOut(duration: 0.12), value: dragging)
+        .contentShape(Rectangle())
+        .onHover { inside in
+            hovering = inside
+            if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+        }
+        .highPriorityGesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
+            .onChanged { value in
+                dragging = true
+                onDrag(value.translation.width)
+            }
+            .onEnded { _ in
+                dragging = false
+                onDrag(nil)
+            })
+        .help("Drag to trim")
     }
 }

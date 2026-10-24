@@ -36,6 +36,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installOpenWindowBridge()
         statusBar = StatusBarController(model: .shared)
         observeFinishedRecordings()
+        observeWindows()
+    }
+
+    /// Clicking the Dock icon with no window open brings back the library.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { AppModel.shared.openLibrary() }
+        return true
+    }
+
+    // MARK: Dock icon
+
+    /// Umi lives in the menu bar, but while an editor or the library is open it also shows
+    /// in the Dock and ⌘Tab, so those windows are easy to get back to.
+    private func observeWindows() {
+        let center = NotificationCenter.default
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didBecomeMainNotification, NSWindow.willCloseNotification] {
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                let closing = name == NSWindow.willCloseNotification ? note.object as? NSWindow : nil
+                MainActor.assumeIsolated { self?.updateActivationPolicy(ignoring: closing) }
+            }
+        }
+    }
+
+    private func updateActivationPolicy(ignoring closing: NSWindow?) {
+        let hasDocumentWindow = NSApp.windows.contains { window in
+            window !== closing && window.isVisible && window.styleMask.contains(.titled) && !(window is NSPanel)
+        }
+        let policy: NSApplication.ActivationPolicy = hasDocumentWindow ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
+        if hasDocumentWindow { NSApp.activate() }
     }
 
     /// `openWindow` only exists inside SwiftUI views, so keep one tiny invisible view
@@ -199,6 +230,20 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
             break
         }
         menu.addItem(.separator())
+        model.library.reload()
+        let recent = model.library.recordings.prefix(5)
+        if !recent.isEmpty {
+            let header = NSMenuItem(title: "Recent Recordings", action: nil, keyEquivalent: "")
+            header.isEnabled = false
+            menu.addItem(header)
+            for recording in recent {
+                let item = NSMenuItem(title: recording.title, action: #selector(openRecording(_:)), keyEquivalent: "")
+                item.representedObject = recording.url
+                item.target = self
+                menu.addItem(item)
+            }
+            menu.addItem(.separator())
+        }
         menu.addItem(withTitle: "Open Library", action: #selector(openLibrary), keyEquivalent: "").target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Umi", action: #selector(quit), keyEquivalent: "q").target = self
@@ -222,6 +267,9 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
 
     @objc private func discard() { model.recorder.cancel() }
     @objc private func openLibrary() { model.openLibrary() }
+    @objc private func openRecording(_ sender: NSMenuItem) {
+        if let url = sender.representedObject as? URL { model.openEditor(url) }
+    }
     @objc private func quit() { NSApp.terminate(nil) }
 
     // MARK: Button

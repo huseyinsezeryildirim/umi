@@ -22,6 +22,8 @@ enum UmiTheme {
     static let accent = Color(hex: 0x116FF5)
     static let accentLight = Color(hex: 0x6FB5EF)
     static let record = Color(hex: 0xF0443A)
+    /// Selection and trim handles on the timeline (the yellow other editors use).
+    static let trim = Color(hex: 0xFFC83D)
 
     // Dark glass (recording controls)
     static let night = Color(hex: 0x0E111E)
