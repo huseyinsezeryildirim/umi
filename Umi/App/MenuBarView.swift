@@ -117,6 +117,8 @@ struct MenuBarView: View {
             }
         }
 
+        FlowPicker(flow: Binding(get: { recorder.settings.flow }, set: { recorder.settings.flow = $0 }))
+
         Button {
             closeLauncher()
             recorder.start()
@@ -449,6 +451,42 @@ private struct ToggleRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Instant (share right after stopping) or Studio (edit first).
+private struct FlowPicker: View {
+    @Binding var flow: RecordingFlow
+
+    var body: some View {
+        HStack(spacing: 8) {
+            option(.instant, icon: "bolt.fill", title: "Instant", caption: "Stop → ready to paste")
+            option(.studio, icon: "slider.horizontal.3", title: "Studio", caption: "Stop → open the editor")
+        }
+    }
+
+    private func option(_ value: RecordingFlow, icon: String, title: String, caption: String) -> some View {
+        let selected = flow == value
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        return Button { flow = value } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                Label(title, systemImage: icon)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(selected ? UmiTheme.ink : UmiTheme.secondary)
+                Text(caption)
+                    .font(.system(size: 11))
+                    .foregroundStyle(UmiTheme.tertiary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(shape.fill(.white).shadow(color: .black.opacity(selected ? 0.08 : 0.03), radius: selected ? 4 : 1.5, y: 1))
+            .overlay(shape.strokeBorder(selected ? UmiTheme.ink : UmiTheme.cardBorder, lineWidth: selected ? 1.5 : 1))
+            .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .help(value == .instant ? "When you stop, Umi polishes and exports the video and copies it to the clipboard."
+                                : "When you stop, the recording opens in the editor.")
     }
 }
 

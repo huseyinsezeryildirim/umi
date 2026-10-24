@@ -9,6 +9,7 @@ final class AppModel {
 
     let recorder = RecordingController()
     let library = RecordingsLibrary()
+    let instantShare = InstantShareController()
     /// SwiftUI's openWindow, captured from a view so AppKit code can open scenes.
     var openWindow: OpenWindowAction?
     var closeLauncher: () -> Void = {}
@@ -90,7 +91,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             _ = model.recorder.lastFinishedURL
         } onChange: {
             Task { @MainActor [weak self] in
-                if let url = model.recorder.lastFinishedURL { model.openEditor(url) }
+                if let url = model.recorder.lastFinishedURL {
+                    switch model.recorder.settings.flow {
+                    case .instant: model.instantShare.run(bundle: url)
+                    case .studio: model.openEditor(url)
+                    }
+                }
                 self?.observeFinishedRecordings()
             }
         }

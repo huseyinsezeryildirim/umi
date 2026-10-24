@@ -69,7 +69,7 @@ final class EditorModel {
         let project = (try? ProjectStore.read(RecordingProject.self, from: bundle.appendingPathComponent(RecordingProject.fileName)))
             ?? RecordingProject(createdAt: .now, duration: 0, screen: .init(pixelWidth: 1920, pixelHeight: 1080, captureRect: .zero, fps: 60), audio: .init())
         self.project = project
-        edit = project.edit ?? Self.defaults(for: project)
+        edit = project.edit ?? project.defaultEdit
         previewSize = CompositionBuilder.renderSize(for: project, maxHeight: 1080)
         cursorData = (try? ProjectStore.read(CursorData.self, from: bundle.appendingPathComponent(RecordingProject.cursorFile))) ?? CursorData()
 
@@ -82,17 +82,6 @@ final class EditorModel {
             }
         }
         rebuild(keepTime: false)
-    }
-
-    /// First-open defaults: show the camera the way the bubble looked while recording.
-    private static func defaults(for project: RecordingProject) -> EditSettings {
-        var edit = EditSettings()
-        if let bubble = project.camera?.bubble {
-            edit.camera = bubble
-        } else if let center = project.camera?.bubbleCenter {
-            edit.camera.position = CGPoint(x: min(max(center.x, 0.08), 0.92), y: min(max(center.y, 0.1), 0.9))
-        }
-        return edit
     }
 
     // MARK: Editing

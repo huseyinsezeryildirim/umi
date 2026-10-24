@@ -78,3 +78,17 @@ nonisolated enum ProjectStore {
         return try decoder.decode(type, from: Data(contentsOf: url))
     }
 }
+
+nonisolated extension RecordingProject {
+    /// The edit a recording starts with (editor first open, Instant mode): Umi's default
+    /// look, with the camera where and how the bubble was while recording.
+    var defaultEdit: EditSettings {
+        var edit = EditSettings()
+        if let bubble = camera?.bubble {
+            edit.camera = bubble
+        } else if let center = camera?.bubbleCenter {
+            edit.camera.position = CGPoint(x: min(max(center.x, 0.08), 0.92), y: min(max(center.y, 0.1), 0.9))
+        }
+        return edit
+    }
+}

@@ -76,6 +76,16 @@ final class RenderTests: XCTestCase {
         }
     }
 
+    /// Instant mode's export: default look applied, an MP4 lands in the folder.
+    @MainActor
+    func testInstantExport() async throws {
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: fixture.path), "Run scripts/make-fixture.sh first")
+        let folder = root.appendingPathComponent("instant")
+        let url = try await InstantShareController.exportPolished(fixture, to: folder) { _ in }
+        let duration = try await AVURLAsset(url: url).load(.duration).seconds
+        XCTAssertEqual(duration, 6, accuracy: 0.2)
+    }
+
     func testTrimKeepsOnlySelectedClips() {
         let clips = CompositionBuilder.keptClips([.init(start: 1, end: 2), .init(start: 3, end: 10)], total: 6)
         XCTAssertEqual(clips, [.init(start: 1, end: 2), .init(start: 3, end: 6)])
