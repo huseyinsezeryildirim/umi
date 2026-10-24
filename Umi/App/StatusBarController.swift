@@ -272,7 +272,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     func popoverDidClose(_ notification: Notification) {
         stopDismissMonitors()
         fallbackAnchor.orderOut(nil)
-        tour.suspend()
+        tour.endIfActive()
         if keepCameraOnClose {
             keepCameraOnClose = false
         } else {

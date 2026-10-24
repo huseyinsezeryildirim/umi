@@ -24,6 +24,17 @@ struct EditorTimeline: View {
                     track("Masks", icon: "eye.slash", add: { model.addMask(at: model.currentTime) }, items: maskItems, scale: scale)
                     track("Text", icon: "textformat", menu: textMenu, items: textItems, scale: scale)
                     track("3D", icon: "cube", menu: moveMenu, items: moveItems, scale: scale)
+                    HStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            label("Music", icon: "music.note")
+                            Spacer(minLength: 0)
+                            addButton(title: "Music", add: { model.chooseMusic() }, menu: [])
+                        }
+                        .foregroundStyle(.secondary)
+                        .frame(width: Self.labelWidth - 8, alignment: .leading)
+                        .padding(.leading, 8)
+                        MusicTrack(model: model, scale: scale)
+                    }
                 }
                 .padding(.vertical, 6)
                 .overlay(alignment: .topLeading) { playhead(scale: scale) }
@@ -339,6 +350,47 @@ private struct Filmstrip: View {
             if Task.isCancelled { return }
         }
         images = result
+    }
+}
+
+/// The music bed: one chip under the whole video (it loops to fit).
+private struct MusicTrack: View {
+    let model: EditorModel
+    let scale: CGFloat
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        ZStack(alignment: .topLeading) {
+            shape.fill(Color.secondary.opacity(0.07))
+                .frame(height: EditorTimeline.trackHeight)
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) { model.chooseMusic() }
+            if let music = model.edit.music {
+                let selected = model.selection == .music
+                let tint = Color(hex: 0xD6336C)
+                shape.fill(tint.opacity(selected ? 0.42 : 0.28))
+                    .overlay(shape.strokeBorder(tint.opacity(selected ? 1 : 0.55), lineWidth: selected ? 2 : 1))
+                    .overlay(alignment: .leading) {
+                        Label("\(music.file) · \(Int(music.volume * 100))%", systemImage: "waveform")
+                            .font(.system(size: 10, weight: .semibold))
+                            .lineLimit(1)
+                            .padding(.horizontal, 8)
+                    }
+                    .frame(width: max(model.outputDuration * Double(scale) - 2, 14), height: EditorTimeline.trackHeight)
+                    .offset(x: 1)
+                    .contentShape(shape)
+                    .onTapGesture { model.selection = .music }
+                    .help("Music. Select to change volume, Delete to remove.")
+            } else {
+                Text("Click + to add music")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .padding(.leading, 8)
+                    .frame(height: EditorTimeline.trackHeight)
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(height: EditorTimeline.trackHeight, alignment: .topLeading)
     }
 }
 
