@@ -428,6 +428,11 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
         /// Picture-in-picture card: center (normalized canvas, top-left origin) and width.
         var center = CGPoint(x: 0.72, y: 0.3)
         var width = 0.4
+        /// 2 = the Video 2 track (parts of this recording laid over the main video);
+        /// nil = the Media track.
+        var lane: Int?
+
+        var isVideo2: Bool { lane == 2 }
     }
 
     struct Watermark: Codable, Hashable, Sendable {
