@@ -64,6 +64,10 @@ final class RecordingController {
             guard let self else { return }
             if phase == .recording { pause() } else if phase == .paused { resume() }
         }
+        hotKeys.register(.screenshot) { [weak self] in
+            guard self?.phase == .idle else { return }
+            ScreenshotEditor.captureArea()
+        }
         hotKeys.register(.launcher) { [weak self] in
             self?.onOpenLauncher()
         }

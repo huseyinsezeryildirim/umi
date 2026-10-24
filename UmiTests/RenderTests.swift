@@ -137,6 +137,27 @@ final class RenderTests: XCTestCase {
                                                format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
     }
 
+    /// Screenshot mode: dress a still, add an arrow, a box, text and a blur, render.
+    @MainActor
+    func testScreenshotRender() throws {
+        let still = root.appendingPathComponent("frames/frame-0.5.png")
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: still.path))
+        let source = try XCTUnwrap(CGImageSourceCreateWithURL(still as CFURL, nil))
+        let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        let doc = ScreenshotDocument(image: image)
+        doc.style.frame = .browser
+        doc.annotations = [
+            Annotation(kind: .arrow, from: CGPoint(x: 0.2, y: 0.25), to: CGPoint(x: 0.45, y: 0.45), color: .red),
+            Annotation(kind: .box, from: CGPoint(x: 0.55, y: 0.3), to: CGPoint(x: 0.8, y: 0.55), color: .yellow),
+            Annotation(kind: .text, from: CGPoint(x: 0.2, y: 0.7), to: CGPoint(x: 0.2, y: 0.7), text: "Click here", color: .blue),
+            Annotation(kind: .blur, from: CGPoint(x: 0.3, y: 0.6), to: CGPoint(x: 0.6, y: 0.8)),
+        ]
+        let out = try XCTUnwrap(doc.renderFinal())
+        XCTAssertGreaterThan(out.width, 0)
+        try CIContext().writePNGRepresentation(of: CIImage(cgImage: out), to: root.appendingPathComponent("frames/screenshot.png"),
+                                               format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+    }
+
     func testCameraOnlyRecordingStartsAsCameraOnlyScene() {
         let project = RecordingProject(createdAt: .now, duration: 12, screen: .init(pixelWidth: 640, pixelHeight: 360, captureRect: .zero, fps: 15),
                                        camera: .init(), audio: .init(), cameraOnly: true)
