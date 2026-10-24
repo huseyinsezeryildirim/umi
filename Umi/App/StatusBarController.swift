@@ -226,6 +226,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
                 popover.show(relativeTo: fallbackAnchor.contentView!.bounds, of: fallbackAnchor.contentView!, preferredEdge: .minY)
             }
             popover.contentViewController?.view.window?.makeKey()
+            model.recorder.launcherDidOpen()
             startDismissMonitors()
             NSApp.activate()
             // Let the popover finish laying out before placing callouts next to it.

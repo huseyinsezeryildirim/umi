@@ -8,7 +8,6 @@ struct MenuBarView: View {
     @State private var mic = MicLevelMonitor()
     @State private var microphones: [AVCaptureDevice] = []
     @AppStorage("onboardingStep") private var onboardingStep = 0
-    @State private var showCameraSettings = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -19,8 +18,8 @@ struct MenuBarView: View {
             }
 
             switch recorder.phase {
-            case .idle where showCameraSettings:
-                CameraSettingsView(recorder: recorder) { withAnimation(.smooth(duration: 0.25)) { showCameraSettings = false } }
+            case .idle where recorder.launcherShowsCameraSettings:
+                CameraSettingsView(recorder: recorder) { withAnimation(.smooth(duration: 0.25)) { recorder.launcherShowsCameraSettings = false } }
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             case .idle:
                 setup
@@ -50,11 +49,11 @@ struct MenuBarView: View {
             microphones = CaptureDevices.microphones
         }
         .onAppear {
-            recorder.launcherDidOpen()
             if recorder.settings.captureMicrophone { mic.start(deviceID: recorder.settings.microphoneID) }
         }
         .onDisappear {
-            recorder.launcherDidClose()
+            // The status bar controller tells the recorder (it knows whether the camera
+            // should stay on), so only stop the meter here.
             mic.stop()
         }
     }
@@ -190,7 +189,7 @@ struct MenuBarView: View {
             cameraToggle
             if recorder.settings.showCamera {
                 Button {
-                    withAnimation(.smooth(duration: 0.25)) { showCameraSettings = true }
+                    withAnimation(.smooth(duration: 0.25)) { recorder.launcherShowsCameraSettings = true }
                 } label: {
                     Image(systemName: "slider.horizontal.3")
                         .font(.system(size: 15, weight: .medium))

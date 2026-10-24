@@ -30,8 +30,11 @@ final class TourController {
 
     /// Starts on the first launcher open, or resumes where the user left off.
     func showIfNeeded() {
-        if step == 0 { step = OnboardingStep.welcome.rawValue }
-        if let current = OnboardingStep(rawValue: step) { show(current) }
+        // Only the very first launcher open starts it. A tour cut short (app quit mid-way)
+        // doesn't come back on its own; the ? button restarts it.
+        guard step == 0 else { return }
+        step = OnboardingStep.welcome.rawValue
+        show(.welcome)
     }
 
     func restart() {

@@ -82,8 +82,13 @@ final class RecordingController {
 
     /// The camera bubble is visible while the launcher is open (to frame yourself)
     /// and during a recording, never otherwise.
+    /// The launcher's camera page is open (instead of the main setup page).
+    var launcherShowsCameraSettings = false
+
+    /// Called by the status bar controller each time the launcher opens.
     func launcherDidOpen() {
         launcherOpen = true
+        launcherShowsCameraSettings = false
         readyBar.hide()
         if phase == .idle, settings.showCamera { camera.show() }
     }
