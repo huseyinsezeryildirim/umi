@@ -12,6 +12,7 @@ nonisolated struct StylePreset: Codable, Hashable, Identifiable, Sendable {
     var aspect: EditSettings.AspectRatio
     var padding: Double
     var cornerRadius: Double
+    var cornerStyle: EditSettings.CornerStyle?
     var shadow: Double
     var border: Double?
     var cursor: EditSettings.Cursor
@@ -29,6 +30,7 @@ nonisolated struct StylePreset: Codable, Hashable, Identifiable, Sendable {
         aspect = edit.aspect
         padding = edit.padding
         cornerRadius = edit.cornerRadius
+        cornerStyle = edit.cornerStyle
         shadow = edit.shadow
         border = edit.border
         cursor = edit.cursor
@@ -46,6 +48,7 @@ nonisolated struct StylePreset: Codable, Hashable, Identifiable, Sendable {
         edit.aspect = aspect
         edit.padding = padding
         edit.cornerRadius = cornerRadius
+        edit.cornerStyle = cornerStyle ?? .rounded
         edit.shadow = shadow
         edit.border = border ?? 0
         edit.cursor = cursor

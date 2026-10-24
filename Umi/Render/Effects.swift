@@ -1,3 +1,4 @@
+import SwiftUI
 import CoreImage
 import CoreImage.CIFilterBuiltins
 
@@ -166,6 +167,42 @@ nonisolated enum Effects {
         filter.color = CIColor(red: 1, green: 1, blue: 1, alpha: alpha)
         return filter.outputImage ?? CIImage.empty()
     }
+
+    /// A rect with Apple's continuous (squircle) corners: the curve eases into the straight
+    /// edges instead of meeting them at a hard tangent. Masks are cached by size.
+    static func continuousRect(_ rect: CGRect, radius: CGFloat, alpha: Double) -> CIImage {
+        let w = Int(rect.width.rounded(.up)), h = Int(rect.height.rounded(.up))
+        guard w > 0, h > 0 else { return .empty() }
+        let key = "\(w)x\(h)r\(Int(radius * 4))a\(Int(alpha * 100))" as NSString
+        let mask: CIImage
+        if let cached = squircleCache.object(forKey: key) {
+            mask = cached.image
+        } else {
+            guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return .empty() }
+            let bounds = CGRect(x: 0, y: 0, width: w, height: h)
+            let path = RoundedRectangle(cornerRadius: min(radius, CGFloat(min(w, h)) / 2), style: .continuous).path(in: bounds).cgPath
+            ctx.setFillColor(gray: alpha, alpha: 1)
+            ctx.addPath(path)
+            ctx.fillPath()
+            guard let image = ctx.makeImage() else { return .empty() }
+            // Gray → white with alpha, like the rounded-rect generator's output.
+            mask = CIImage(cgImage: image).applyingFilter("CIMaskToAlpha")
+            squircleCache.setObject(CachedImage(image: mask), forKey: key)
+        }
+        return mask.transformed(by: CGAffineTransform(translationX: rect.minX, y: rect.minY))
+    }
+
+    private final class CachedImage: @unchecked Sendable {
+        let image: CIImage
+        init(image: CIImage) { self.image = image }
+    }
+
+    nonisolated(unsafe) private static let squircleCache: NSCache<NSString, CachedImage> = {
+        let cache = NSCache<NSString, CachedImage>()
+        cache.countLimit = 24
+        return cache
+    }()
 
     static func blend(_ top: CIImage, over bottom: CIImage, mask: CIImage) -> CIImage {
         top.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: bottom, kCIInputMaskImageKey: mask])

@@ -169,7 +169,9 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
             // The MacBook's shadow follows the lid and base; others follow the card.
             let shadowRect = outer
             let shadowRadius = settings.frame == .none ? radius : min(outer.width, outer.height) * 0.02
-            card = Effects.roundedRect(shadowRect, radius: shadowRadius, alpha: 1)
+            card = (settings.cornerStyle == .squircle && settings.frame == .none
+                    ? Effects.continuousRect(shadowRect, radius: shadowRadius * 1.25, alpha: 1)
+                    : Effects.roundedRect(shadowRect, radius: shadowRadius, alpha: 1))
                 .applyingFilter("CIColorMatrix", parameters: [
                     "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
                     "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.55 * settings.shadow),
@@ -183,7 +185,10 @@ nonisolated final class FrameRenderer: @unchecked Sendable {
             .transformed(by: CGAffineTransform(scaleX: content.width / screen.extent.width, y: content.height / screen.extent.height))
             .transformed(by: CGAffineTransform(translationX: content.minX - screen.extent.minX * content.width / screen.extent.width,
                                                y: content.minY - screen.extent.minY * content.height / screen.extent.height))
-        card = Effects.blend(placed, over: card, mask: Effects.roundedRect(content, radius: radius, alpha: 1))
+        let squircle = settings.cornerStyle == .squircle && chromeRadius == nil
+        // Continuous corners need a slightly larger radius to look as round as circular ones.
+        let mask = squircle ? Effects.continuousRect(content, radius: radius * 1.25, alpha: 1) : Effects.roundedRect(content, radius: radius, alpha: 1)
+        card = Effects.blend(placed, over: card, mask: mask)
         if settings.border > 0, settings.frame == .none {
             let width = max(1, settings.border * min(content.width, content.height))
             let stroke = CIFilter(name: "CIRoundedRectangleStrokeGenerator", parameters: [

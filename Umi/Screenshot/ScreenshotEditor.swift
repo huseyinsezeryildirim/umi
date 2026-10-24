@@ -171,6 +171,11 @@ struct ScreenshotEditorView: View {
                     }
                     labeled("Padding", value: Binding(get: { document.style.padding }, set: { document.style.padding = $0 }), range: 0...0.4)
                     labeled("Corners", value: Binding(get: { document.style.cornerRadius }, set: { document.style.cornerRadius = $0 }), range: 0...0.08)
+                    Picker("Corners", selection: Binding(get: { document.style.cornerStyle }, set: { document.style.cornerStyle = $0 })) {
+                        ForEach(EditSettings.CornerStyle.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                     labeled("Shadow", value: Binding(get: { document.style.shadow }, set: { document.style.shadow = $0 }), range: 0...1)
 
                     if let id = document.selected, let i = document.annotations.firstIndex(where: { $0.id == id }), document.annotations[i].kind == .text {

@@ -41,7 +41,7 @@ Hedef: **Loom'un hızı + Cap Studio'nun cilası**, native ve ücretsiz. Ayrınt
 - [x] Media kanalı (B-roll fill / PiP, sürükle-bırak), aralık Cut
 - [x] MOV / GIF dışa aktarma, logo (branding), imleç stili/motion blur/idle gizleme, bulanık ekran ve masaüstü duvar kağıdı arka planı
 - [x] Screenshot modu (⌥⇧4): güzelleştir + ok/kutu/yazı/vurgu/blur, kopyala/kaydet/paylaş
-- [ ] Özelleştirilebilir kısayollar, çoklu yazı kanalı, squircle köşe
+- [x] Özelleştirilebilir kısayollar, çoklu yazı kanalı, squircle köşe
 - [x] Hazır müzik kütüphanesi: 50 CC0 parça (FreePD arşivi, archive.org/details/freepd), seçilince indirilir ve önbelleğe alınır
 
 ## M3 — Paylaşım ve izleyici sayfası (ücretli bulut)

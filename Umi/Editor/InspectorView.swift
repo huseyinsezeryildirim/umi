@@ -305,6 +305,11 @@ private struct CanvasSection: View {
             }
             Slider2("Padding", value: model.edit.padding, range: 0...0.4, format: "%.0f%%", percent: true, model: model) { v in model.update { $0.padding = v } }
             Slider2("Corners", value: model.edit.cornerRadius, range: 0...0.08, format: "%.0f%%", percent: true, model: model) { v in model.update { $0.cornerRadius = v } }
+            Picker("Corner style", selection: Binding(get: { model.edit.cornerStyle }, set: { v in model.update { $0.cornerStyle = v } })) {
+                ForEach(EditSettings.CornerStyle.allCases, id: \.self) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
             Slider2("Shadow", value: model.edit.shadow, range: 0...1, format: "%.0f%%", percent: true, model: model) { v in model.update { $0.shadow = v } }
             Slider2("Border", value: model.edit.border, range: 0...0.02, format: "%.0f%%", percent: true, model: model) { v in model.update { $0.border = v } }
         }
