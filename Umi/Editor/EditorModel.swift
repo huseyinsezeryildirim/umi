@@ -669,6 +669,13 @@ final class EditorModel {
         }
     }
 
+    /// Writes pending edits now (before something else reads project.json, like sharing).
+    func saveNow() {
+        saveTask?.cancel()
+        project.edit = edit
+        try? ProjectStore.write(project, to: bundle.appendingPathComponent(RecordingProject.fileName))
+    }
+
     private func scheduleSave() {
         saveTask?.cancel()
         saveTask = Task {
