@@ -206,16 +206,17 @@ struct GlassSwitch: View {
     }
 }
 
-/// Umi's mark: an ink squircle with a white record dot.
+/// Umi's mark: the dot ring logo in ink.
 struct UmiMark: View {
     var size: CGFloat = 28
 
     var body: some View {
-        RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-            .fill(UmiTheme.ink)
+        Image("Logo")
+            .resizable()
+            .renderingMode(.template)
+            .aspectRatio(contentMode: .fit)
+            .foregroundStyle(UmiTheme.ink)
             .frame(width: size, height: size)
-            .overlay(Circle().fill(.white).frame(width: size * 0.36, height: size * 0.36))
-            .overlay(Circle().fill(UmiTheme.record).frame(width: size * 0.14, height: size * 0.14))
     }
 }
 

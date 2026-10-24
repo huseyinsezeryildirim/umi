@@ -41,6 +41,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cam.umi.app
         PRODUCT_NAME: Umi
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_HARDENED_RUNTIME: YES
         # A stable signing identity keeps macOS privacy permissions (screen recording,
         # camera, mic) across rebuilds; ad-hoc signatures change every build.
