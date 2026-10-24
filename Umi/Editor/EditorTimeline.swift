@@ -126,7 +126,7 @@ struct EditorTimeline: View {
         case .media: model.chooseOverlay()
         case .zoom: model.addZoom(at: model.currentTime)
         case .masks: model.addMask(at: model.currentTime)
-        case .music: model.chooseMusic()
+        case .music: model.showsMusicLibrary = true
         case .scenes, .text, .moves: break
         }
     }
@@ -531,14 +531,14 @@ private struct MusicTrack: View {
             shape.fill(Color.secondary.opacity(0.07))
                 .frame(height: EditorTimeline.trackHeight)
                 .contentShape(Rectangle())
-                .onTapGesture(count: 2) { model.chooseMusic() }
+                .onTapGesture(count: 2) { model.showsMusicLibrary = true }
             if let music = model.edit.music {
                 let selected = model.selection == .music
                 let tint = Color(hex: 0xD6336C)
                 shape.fill(tint.opacity(selected ? 0.42 : 0.28))
                     .overlay(shape.strokeBorder(tint.opacity(selected ? 1 : 0.55), lineWidth: selected ? 2 : 1))
                     .overlay(alignment: .leading) {
-                        Label("\(music.file) · \(Int(music.volume * 100))%", systemImage: "waveform")
+                        Label("\(music.title ?? music.file) · \(Int(music.volume * 100))%", systemImage: "waveform")
                             .font(.system(size: 10, weight: .semibold))
                             .lineLimit(1)
                             .padding(.horizontal, 8)
