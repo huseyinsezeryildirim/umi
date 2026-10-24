@@ -26,7 +26,7 @@ final class RecordingController {
     private let countdown = CountdownOverlay()
     private let controlBar = ControlBarController()
     private let readyBar = ReadyBarController()
-    private let hotKeys = HotKeys()
+    private let hotKeys = HotKeys.shared
     /// Whether the launcher is showing (the popover keeps its view alive, so views can't
     /// rely on onAppear/onDisappear for this).
     private(set) var launcherOpen = false

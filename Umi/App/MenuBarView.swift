@@ -87,10 +87,7 @@ struct MenuBarView: View {
                     Text("30 fps").tag(30)
                 }
                 Divider()
-                Text("Start / Stop  \(HotKeys.Action.startStop.display)")
-                Text("Pause / Resume  \(HotKeys.Action.pauseResume.display)")
-                Text("Cancel  \(HotKeys.Action.cancel.display)")
-                Text("Open Umi  \(HotKeys.Action.launcher.display)")
+                Button("Keyboard Shortcuts…") { ShortcutsWindow.show() }
                 Divider()
                 Button("Quit Umi") { NSApp.terminate(nil) }
             } label: {
