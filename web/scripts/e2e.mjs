@@ -60,7 +60,7 @@ async function api(method, path, body, token = args.token) {
 }
 
 /** The flow the macOS app follows: create → PUT parts (+thumbnail) → complete. */
-async function upload(bytes, thumbBytes, meta) {
+async function upload(bytes, thumbBytes, meta, gifBytes = null) {
   const created = await api("POST", "/api/videos", { sizeBytes: bytes.length, contentType: "video/mp4", ...meta });
   if (created.status !== 201) throw new Error(`create failed: ${created.status} ${JSON.stringify(created.data)}`);
   const { video, upload: plan } = created.data;
@@ -76,9 +76,26 @@ async function upload(bytes, thumbBytes, meta) {
     const res = await fetch(plan.thumbnailUrl, { method: "PUT", body: thumbBytes, headers: { "content-type": "image/jpeg" } });
     if (!res.ok) throw new Error(`thumbnail failed: ${res.status}`);
   }
+  if (gifBytes) {
+    const res = await fetch(plan.gifUrl, { method: "PUT", body: gifBytes, headers: { "content-type": "image/gif" } });
+    if (!res.ok) throw new Error(`gif failed: ${res.status}`);
+  }
   const done = await api("POST", `/api/videos/${video.id}/complete`, { parts });
   if (done.status !== 200) throw new Error(`complete failed: ${done.status} ${JSON.stringify(done.data)}`);
   return { video: done.data.video, plan };
+}
+
+// Smallest valid GIF (1×1), stands in for the app's animated preview.
+const GIF = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
+
+/** Viewer-side JSON call (no bearer token; optional unlock cookie). */
+async function viewer(method, path, body, cookie) {
+  const res = await fetch(BASE + path, {
+    method,
+    headers: { ...(body !== undefined ? { "content-type": "application/json" } : {}), ...(cookie ? { cookie } : {}) },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  return { status: res.status, data: await res.json().catch(() => null), headers: res.headers };
 }
 
 const sha = (buf) => createHash("sha256").update(buf).digest("hex");
@@ -104,10 +121,12 @@ async function main() {
     width: 1280,
     height: 720,
     allowDownload: true,
-  });
+  }, GIF);
   check(plan.partCount >= 2, `multipart with ${plan.partCount} parts of ${plan.partSize} bytes`);
   check(video.status === "ready" && video.sizeBytes === bytes.length, "complete → ready, size matches");
   check(video.thumbnailUrl !== null, "thumbnail stored");
+  check(typeof plan.gifUrl === "string" && video.previewGifUrl === `${video.url}/preview.gif`, "GIF preview stored (gifUrl slot)");
+  check(video.allowComments === true && video.embedUrl.endsWith(`/e/${video.id}`), "allowComments defaults to true, embedUrl");
   const refreshed = await api("POST", `/api/videos/${video.id}/upload-urls`);
   check(refreshed.status === 409, "upload-urls after completion → 409");
   check((await api("GET", `/api/videos/${video.id}`)).data?.video?.id === video.id, "GET /api/videos/:id");
@@ -130,6 +149,88 @@ async function main() {
   check(/attachment/.test(full.headers.get("content-disposition") ?? ""), "Content-Disposition: attachment");
   check((await get(`${pagePath}/thumbnail.jpg`)).headers.get("content-type") === "image/jpeg", "thumbnail served");
 
+  check(html.includes('type="application/json+oembed"') && html.includes("/oembed?url="), "oEmbed discovery link in <head>");
+  check(html.includes('class="react"') && html.includes('data-emoji="🎉"') && html.includes('id="cform"'), "reaction bar + comment form rendered");
+  check(html.includes('id="copyat"'), "copy-at-current-time button");
+  check(html.includes("parseT(new URLSearchParams(location.search).get(\"t\"))"), "?t= start time handled");
+  check((await get(pagePath)).headers.get("x-frame-options") === "DENY", "/v/ still sends X-Frame-Options: DENY");
+
+  console.log("\nGIF preview");
+  const gif = await get(`${pagePath}/preview.gif`);
+  check(gif.status === 200 && gif.headers.get("content-type") === "image/gif", "preview.gif served as image/gif");
+  check(Buffer.from(await gif.arrayBuffer()).equals(GIF), "preview.gif bytes identical");
+  check(/^public, max-age=\d+/.test(gif.headers.get("cache-control") ?? "") && !!gif.headers.get("etag"), "preview.gif cacheable (public + ETag)");
+  check((await get(`${pagePath}/preview.gif`, { headers: { "if-none-match": gif.headers.get("etag") } })).status === 304, "If-None-Match → 304");
+
+  console.log("\nComments");
+  const cPath = `${pagePath}/comments`;
+  const c1 = await viewer("POST", cPath, { authorName: "  Ada  ", body: "Great walkthrough!" });
+  check(c1.status === 201 && c1.data?.comment?.authorName === "Ada" && c1.data.comment.timeMs === null, "post comment → 201 (trimmed, no time)");
+  const c2 = await viewer("POST", cPath, { authorName: "Linus", body: "Bug shows up here\nsecond line", timeMs: 4200 });
+  check(c2.status === 201 && c2.data?.comment?.timeMs === 4200, "comment pinned at 0:04 (timeMs 4200)");
+  const xss = '<img src=x onerror=alert(1)></script><script>alert(2)</script>';
+  const c3 = await viewer("POST", cPath, { authorName: "<b>Mallory</b>", body: xss, timeMs: 1000 });
+  check(c3.status === 201 && c3.data?.comment?.body === xss, "HTML stored verbatim as text");
+  check((await viewer("POST", cPath, { authorName: "Ada", body: "   " })).status === 400, "empty body → 400");
+  check((await viewer("POST", cPath, { authorName: "", body: "hi" })).status === 400, "empty name → 400");
+  check((await viewer("POST", cPath, { authorName: "x".repeat(61), body: "hi" })).status === 400, "name > 60 chars → 400");
+  check((await viewer("POST", cPath, { authorName: "Ada", body: "x".repeat(2001) })).status === 400, "body > 2000 chars → 400");
+  check((await viewer("POST", cPath, { authorName: "Ada", body: "hi", timeMs: 999_999_999 })).status === 400, "timeMs past the end → 400");
+  const textPlain = await fetch(BASE + cPath, { method: "POST", headers: { "content-type": "text/plain" }, body: JSON.stringify({ authorName: "A", body: "b" }) });
+  check(textPlain.status === 415, "non-JSON content type → 415 (CSRF guard)");
+  const list = await viewer("GET", cPath);
+  const ids = list.data?.comments?.map((c) => c.id) ?? [];
+  check(list.status === 200 && list.data.allowComments === true && ids.join() === [c1, c2, c3].map((c) => c.data.comment.id).join(), "list comments, oldest first");
+  html = await (await get(pagePath)).text();
+  check(!html.includes("<img src=x") && !html.includes("<script>alert(2)") && html.includes("\\u003cimg src=x"), "page inlines comments without HTML injection");
+  const owner = await api("GET", `/api/videos/${video.id}/comments`);
+  check(owner.status === 200 && owner.data?.comments?.length === 3, "owner GET /api/videos/:id/comments");
+  check((await api("DELETE", `/api/videos/${video.id}/comments/${c3.data.comment.id}`, undefined, args["free-token"])).status === 404, "other account can't delete → 404");
+  check((await viewer("DELETE", `/api/videos/${video.id}/comments/${c3.data.comment.id}`)).status === 401, "delete without token → 401");
+  check((await api("DELETE", `/api/videos/${video.id}/comments/${c3.data.comment.id}`)).status === 200, "owner deletes comment → 200");
+  check((await api("DELETE", `/api/videos/${video.id}/comments/${c3.data.comment.id}`)).status === 404, "delete again → 404");
+  check(!(await viewer("GET", cPath)).data?.comments?.some((c) => c.id === c3.data.comment.id), "deleted comment no longer listed");
+  const off = await api("PATCH", `/api/videos/${video.id}`, { allowComments: false });
+  check(off.data?.video?.allowComments === false, "PATCH allowComments: false");
+  check((await api("PATCH", `/api/videos/${video.id}`, { allowComments: "no" })).status === 400, "allowComments must be boolean");
+  const disabled = await viewer("POST", cPath, { authorName: "Ada", body: "hello?" });
+  check(disabled.status === 403 && disabled.data?.error?.code === "comments_disabled", "comments disabled → 403");
+  const offList = await viewer("GET", cPath);
+  check(offList.data?.allowComments === false && offList.data.comments.length === 0, "disabled → list hidden");
+  check(!(await (await get(pagePath)).text()).includes('id="cform"'), "disabled → no comment form on page");
+  await api("PATCH", `/api/videos/${video.id}`, { allowComments: true });
+
+  console.log("\nReactions");
+  const rPath = `${pagePath}/reactions`;
+  const r1 = await viewer("POST", rPath, { emoji: "👍", timeMs: 1500 });
+  check(r1.status === 201 && r1.data?.reaction?.emoji === "👍" && r1.data.counts["👍"] === 1, "👍 reaction → 201 + counts");
+  check((await viewer("POST", rPath, { emoji: "❤️", timeMs: 8000 })).status === 201, "❤️ reaction → 201");
+  check((await viewer("POST", rPath, { emoji: "👍", timeMs: 9000 })).status === 201, "second 👍 → 201");
+  check((await viewer("POST", rPath, { emoji: "💩", timeMs: 1000 })).status === 400, "emoji outside the allowed set → 400");
+  check((await viewer("POST", rPath, { emoji: "<b>", timeMs: 1000 })).status === 400, "arbitrary string emoji → 400");
+  check((await viewer("POST", rPath, { emoji: "🎉" })).status === 400, "missing timeMs → 400");
+  const rs = await viewer("GET", rPath);
+  check(rs.data?.counts?.["👍"] === 2 && rs.data.counts["❤️"] === 1 && rs.data.counts["😂"] === 0, "reaction counts per emoji");
+  check(rs.data?.reactions?.length === 3 && rs.data.reactions.some((r) => r.emoji === "❤️" && r.timeMs === 8000), "reaction markers with times");
+
+  console.log("\nEmbed & oEmbed");
+  const embed = await get(`/e/${video.id}?t=5`);
+  const embedHtml = await embed.text();
+  check(embed.status === 200 && embedHtml.includes(`<video id="video" src="/v/${video.id}/video.mp4"`) && embedHtml.includes(`poster="/v/${video.id}/thumbnail.jpg"`), "/e/:id renders player with poster");
+  check(!embedHtml.includes('class="top"') && !embedHtml.includes('class="foot"'), "embed is chrome-less");
+  check(embed.headers.get("x-frame-options") === null, "embed has no X-Frame-Options");
+  const embedCsp = embed.headers.get("content-security-policy") ?? "";
+  check(!embedCsp.includes("frame-ancestors 'none'") && embedCsp.includes("frame-ancestors *"), "embed CSP allows framing");
+  const oe = await get(`/oembed?url=${encodeURIComponent(video.url)}&format=json`);
+  const oj = await oe.json().catch(() => null);
+  check(oe.status === 200 && oj?.type === "video" && oj.version === "1.0" && oj.provider_name === "Umi", "oEmbed JSON (type video)");
+  check(oj?.width === 1280 && oj.height === 720 && oj.html?.includes(`src="${BASE}/e/${video.id}"`) && oj.html.includes("<iframe"), "oEmbed iframe html + video dimensions");
+  check(oj?.thumbnail_url === `${video.url}/thumbnail.jpg`, "oEmbed thumbnail_url");
+  const oeSmall = await (await get(`/oembed?url=${encodeURIComponent(video.url + "?t=12")}&maxwidth=640`)).json();
+  check(oeSmall.width === 640 && oeSmall.height === 360 && oeSmall.html.includes(`/e/${video.id}?t=12`), "oEmbed maxwidth + ?t= passthrough");
+  check((await get(`/oembed?url=${encodeURIComponent(video.url)}&format=xml`)).status === 501, "oEmbed format=xml → 501");
+  check((await get(`/oembed?url=${encodeURIComponent("https://evil.example/v/" + video.id)}`)).status === 404, "oEmbed foreign URL → 404");
+
   console.log("\nDownload toggle");
   await api("PATCH", `/api/videos/${video.id}`, { allowDownload: false });
   check((await get(`${pagePath}/video.mp4?download=1`)).status === 403, "download disabled → 403");
@@ -143,12 +244,31 @@ async function main() {
   check(!html.includes('property="og:image"'), "no thumbnail in unfurl while locked");
   check((await get(`${pagePath}/video.mp4`)).status === 401, "video locked → 401");
   check((await get(`${pagePath}/thumbnail.jpg`)).status === 401, "thumbnail locked → 401");
+  check((await get(`${pagePath}/preview.gif`)).status === 404, "preview.gif locked → 404");
+  check((await viewer("POST", `${pagePath}/comments`, { authorName: "Eve", body: "hi" })).status === 401, "comment without unlock → 401");
+  check((await viewer("GET", `${pagePath}/comments`)).status === 401, "list comments without unlock → 401");
+  check((await viewer("POST", `${pagePath}/reactions`, { emoji: "👍", timeMs: 0 })).status === 401, "reaction without unlock → 401");
+  const lockedEmbed = await (await get(`/e/${video.id}`)).text();
+  check(lockedEmbed.includes('name="password"') && lockedEmbed.includes('name="embed" value="1"') && !lockedEmbed.includes("<video"), "embed shows unlock form");
+  const lockedOe = await (await get(`/oembed?url=${encodeURIComponent(video.url)}`)).json();
+  check(lockedOe.title === "Password-protected video" && !("thumbnail_url" in lockedOe), "oEmbed of locked video is anonymous");
   const form = (p) => ({ method: "POST", body: new URLSearchParams({ password: p, t: "5" }) });
   check((await get(`${pagePath}/unlock`, form("wrong"))).status === 401, "wrong password → 401");
   const ok = await get(`${pagePath}/unlock`, form("hunter22"));
   const cookie = ok.headers.get("set-cookie")?.split(";")[0] ?? "";
   check(ok.status === 303 && ok.headers.get("location") === `${pagePath}?t=5` && cookie.startsWith("umi_unlock_"), "right password → 303 + cookie, keeps ?t=");
   check((await get(`${pagePath}/video.mp4`, { headers: { cookie, range: "bytes=0-9" } })).status === 206, "video plays with cookie");
+  check((await viewer("POST", `${pagePath}/comments`, { authorName: "Bob", body: "unlocked!" }, cookie)).status === 201, "comment with unlock cookie → 201");
+  check((await get(`${pagePath}/preview.gif`, { headers: { cookie } })).status === 200, "preview.gif with unlock cookie → 200");
+  const embedForm = { method: "POST", body: new URLSearchParams({ password: "hunter22", t: "5", embed: "1" }) };
+  const eok = await get(`${pagePath}/unlock`, embedForm);
+  const ecookie = eok.headers.get("set-cookie") ?? "";
+  check(eok.status === 303 && eok.headers.get("location") === `/e/${video.id}?t=5` && /Path=\//.test(ecookie), "embed unlock → 303 back to /e/ with Path=/ cookie");
+  const ecv = ecookie.split(";")[0];
+  check((await (await get(`/e/${video.id}`, { headers: { cookie: ecv } })).text()).includes("<video"), "embed plays after unlock");
+  check((await get(`${pagePath}/video.mp4`, { headers: { cookie: ecv, range: "bytes=0-9" } })).status === 206, "embed cookie unlocks media");
+  const wrongEmbed = await get(`${pagePath}/unlock`, { method: "POST", body: new URLSearchParams({ password: "nope", embed: "1" }) });
+  check(wrongEmbed.status === 401 && (await wrongEmbed.text()).includes('name="embed"'), "wrong password in embed → 401 embed form");
   await api("PATCH", `/api/videos/${video.id}`, { password: "changed!" });
   check((await get(`${pagePath}/video.mp4`, { headers: { cookie } })).status === 401, "changing password invalidates cookie");
   await api("PATCH", `/api/videos/${video.id}`, { password: null, allowDownload: true });
@@ -161,18 +281,36 @@ async function main() {
   const expired = await get(pagePath);
   check(expired.status === 410 && (await expired.text()).includes("expired"), "after expiry → 410 expired page");
   check((await get(`${pagePath}/video.mp4`)).status === 410, "video after expiry → 410");
+  check((await viewer("POST", `${pagePath}/comments`, { authorName: "Ada", body: "late" })).status === 410, "comment after expiry → 410");
+  check((await get(`/e/${video.id}`)).status === 410, "embed after expiry → 410");
   check((await api("GET", `/api/videos/${video.id}`)).data?.video?.expired === true, "API reports expired");
   await api("PATCH", `/api/videos/${video.id}`, { expiresAt: null });
   check((await get(pagePath)).status === 200, "clearing expiry restores the link");
 
   console.log("\nRevoke (second upload)");
   const small = bytes.subarray(0, Math.min(bytes.length, 1024 * 1024));
-  const { video: doomed } = await upload(small, null, { title: "to be deleted" });
+  const { video: doomed, plan: doomedPlan } = await upload(small, null, { title: "to be deleted", allowComments: false });
+  check(doomed.allowComments === false && doomed.previewGifUrl === null, "create with allowComments: false, no GIF");
+  check((await fetch(doomedPlan.gifUrl, { method: "PUT", body: "not a gif" })).status === 409, "GIF upload after completion → 409");
+  const pending = await api("POST", "/api/videos", { sizeBytes: 1024, title: "bad gif" });
+  check((await fetch(pending.data.upload.gifUrl, { method: "PUT", body: "definitely not a gif" })).status === 400, "non-GIF bytes → 400 invalid_gif");
+  check((await fetch(pending.data.upload.gifUrl + "x", { method: "PUT", body: GIF })).status === 403, "tampered GIF URL → 403");
+  await api("DELETE", `/api/videos/${pending.data.video.id}`);
+
   check((await api("DELETE", `/api/videos/${doomed.id}`)).status === 200, "DELETE → 200");
   check((await get(`/v/${doomed.id}`)).status === 410, "revoked page → 410");
   check((await get(`/v/${doomed.id}/video.mp4`)).status === 410, "revoked video → 410");
   check((await api("GET", `/api/videos/${doomed.id}`)).status === 404, "revoked video gone from API");
   check((await get(`/v/doesNotExist1`)).status === 404, "unknown id → 404");
+  console.log("\nRate limit (separate video)");
+  const { video: spam } = await upload(small, null, { title: "rate limit" });
+  let limited = 0, accepted = 0;
+  for (let i = 0; i < 12; i++) {
+    limited = (await viewer("POST", `/v/${spam.id}/comments`, { authorName: "Spammer", body: `spam ${i}` })).status;
+    if (limited === 201) accepted++;
+  }
+  check(accepted === 10 && limited === 429, "per-IP comment rate limit: 10 accepted, then 429");
+  await api("DELETE", `/api/videos/${spam.id}`);
 
   console.log(failures ? `\n${failures} check(s) failed` : "\nAll checks passed");
   console.log(`\nViewer: ${video.url}\n        ${video.url}?t=12`);

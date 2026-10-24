@@ -30,20 +30,38 @@ export async function resolveAccess(request: Request, env: AppEnv, id: string): 
 async function hasUnlockCookie(request: Request, env: AppEnv, video: VideoRow): Promise<boolean> {
   const cookies = request.headers.get("cookie") ?? "";
   const name = cookieName(video.id);
-  const raw = cookies
+  // There can be two cookies with this name (Path=/v/:id from the page, Path=/ from an embed unlock).
+  const values = cookies
     .split(/;\s*/)
-    .find((c) => c.startsWith(`${name}=`))
-    ?.slice(name.length + 1);
-  if (!raw) return false;
-  const [expStr, sig] = raw.split(".");
-  const exp = Number(expStr);
-  if (!exp || exp < Date.now() || !sig) return false;
-  return hmacVerify(env.SIGNING_SECRET, unlockMessage(video, exp), sig);
+    .filter((c) => c.startsWith(`${name}=`))
+    .map((c) => c.slice(name.length + 1));
+  for (const raw of values) {
+    const [expStr, sig] = raw.split(".");
+    const exp = Number(expStr);
+    if (!exp || exp < Date.now() || !sig) continue;
+    if (await hmacVerify(env.SIGNING_SECRET, unlockMessage(video, exp), sig)) return true;
+  }
+  return false;
 }
 
-export async function unlockCookie(request: Request, env: AppEnv, video: VideoRow): Promise<string> {
+/**
+ * Page unlocks are scoped to /v/:id (page, media, comments, reactions all live there).
+ * Embed unlocks (`embed: true`) happen inside a third-party iframe, so the cookie must cover /e/:id and
+ * /v/:id/* (Path=/) and, on HTTPS, be `SameSite=None; Secure; Partitioned` (CHIPS) so browsers that block
+ * third-party cookies still keep it — partitioned to the embedding site.
+ */
+export async function unlockCookie(
+  request: Request,
+  env: AppEnv,
+  video: VideoRow,
+  opts: { embed?: boolean } = {},
+): Promise<string> {
   const exp = Date.now() + UNLOCK_TTL_MS;
   const sig = await hmacSign(env.SIGNING_SECRET, unlockMessage(video, exp));
-  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return `${cookieName(video.id)}=${exp}.${sig}; Path=/v/${video.id}; Max-Age=${UNLOCK_TTL_MS / 1000}; HttpOnly; SameSite=Lax${secure}`;
+  const https = new URL(request.url).protocol === "https:";
+  const base = `${cookieName(video.id)}=${exp}.${sig}; Max-Age=${UNLOCK_TTL_MS / 1000}; HttpOnly`;
+  if (opts.embed) {
+    return `${base}; Path=/; ${https ? "SameSite=None; Secure; Partitioned" : "SameSite=Lax"}`;
+  }
+  return `${base}; Path=/v/${video.id}; SameSite=Lax${https ? "; Secure" : ""}`;
 }

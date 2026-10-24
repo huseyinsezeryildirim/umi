@@ -1,5 +1,15 @@
 import { AwsClient } from "aws4fetch";
-import { type AppEnv, MAX_THUMBNAIL_BYTES, UPLOAD_URL_TTL_MS, baseUrl, partSize, thumbnailKey, videoKey } from "./env";
+import {
+  type AppEnv,
+  MAX_GIF_BYTES,
+  MAX_THUMBNAIL_BYTES,
+  UPLOAD_URL_TTL_MS,
+  baseUrl,
+  gifKey,
+  partSize,
+  thumbnailKey,
+  videoKey,
+} from "./env";
 import { hmacSign, hmacVerify } from "./crypto";
 import { HttpError } from "./http";
 import { type VideoRow, getVideo } from "./videos";
@@ -13,6 +23,8 @@ export interface UploadPlan {
   parts: { partNumber: number; url: string }[];
   /** PUT the JPEG bytes here (optional). */
   thumbnailUrl: string;
+  /** PUT an animated GIF preview here (optional; used by embeds/email). */
+  gifUrl: string;
   /** All URLs stop working after this; call POST /api/videos/:id/upload-urls for fresh ones. */
   urlsExpireAt: string;
 }
@@ -52,6 +64,9 @@ export async function buildUploadPlan(
   const thumbnailUrl = s3
     ? await presignS3(env, s3, thumbnailKey(video.id), exp, {})
     : await signProxyUrl(env, request, `/api/uploads/${video.id}/thumbnail`, exp, {});
+  const gifUrl = s3
+    ? await presignS3(env, s3, gifKey(video.id), exp, {})
+    : await signProxyUrl(env, request, `/api/uploads/${video.id}/gif`, exp, {});
 
   return {
     uploadId: video.upload_id,
@@ -59,6 +74,7 @@ export async function buildUploadPlan(
     partCount,
     parts,
     thumbnailUrl,
+    gifUrl,
     urlsExpireAt: new Date(exp).toISOString(),
   };
 }
@@ -142,13 +158,28 @@ export async function handlePartUpload(request: Request, env: AppEnv, id: string
   return new Response(null, { status: 200, headers: { etag: `"${part.etag}"`, "cache-control": "no-store" } });
 }
 
-/** PUT /api/uploads/:id/thumbnail — proxied thumbnail upload. */
-export async function handleThumbnailUpload(request: Request, env: AppEnv, id: string): Promise<Response> {
+const ASSETS = {
+  thumbnail: { key: thumbnailKey, max: MAX_THUMBNAIL_BYTES, contentType: "image/jpeg", label: "Thumbnail" },
+  gif: { key: gifKey, max: MAX_GIF_BYTES, contentType: "image/gif", label: "GIF preview" },
+} as const;
+
+/** PUT /api/uploads/:id/thumbnail | /api/uploads/:id/gif — proxied poster / animated preview upload. */
+export async function handleAssetUpload(
+  request: Request,
+  env: AppEnv,
+  id: string,
+  kind: keyof typeof ASSETS,
+): Promise<Response> {
+  const asset = ASSETS[kind];
   await verifyProxyUrl(env, new URL(request.url), {});
   await uploadingVideo(env, id);
   const body = await request.arrayBuffer();
-  if (body.byteLength === 0) throw new HttpError(400, "empty_body", "Thumbnail body is empty.");
-  if (body.byteLength > MAX_THUMBNAIL_BYTES) throw new HttpError(413, "too_large", "Thumbnail is too large.");
-  const obj = await env.VIDEOS.put(thumbnailKey(id), body, { httpMetadata: { contentType: "image/jpeg" } });
+  if (body.byteLength === 0) throw new HttpError(400, "empty_body", `${asset.label} body is empty.`);
+  if (body.byteLength > asset.max) throw new HttpError(413, "too_large", `${asset.label} is too large.`);
+  if (kind === "gif") {
+    const magic = new TextDecoder().decode(new Uint8Array(body, 0, Math.min(6, body.byteLength)));
+    if (magic !== "GIF87a" && magic !== "GIF89a") throw new HttpError(400, "invalid_gif", "Body is not a GIF image.");
+  }
+  const obj = await env.VIDEOS.put(asset.key(id), body, { httpMetadata: { contentType: asset.contentType } });
   return new Response(null, { status: 200, headers: { etag: obj.httpEtag, "cache-control": "no-store" } });
 }

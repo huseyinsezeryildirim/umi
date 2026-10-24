@@ -1,5 +1,5 @@
 import type { AppEnv } from "./env";
-import { thumbnailKey, videoKey } from "./env";
+import { gifKey, thumbnailKey, videoKey } from "./env";
 import { resolveAccess } from "./access";
 
 function denied(state: string): Response {
@@ -94,4 +94,27 @@ export async function serveThumbnail(request: Request, env: AppEnv, id: string):
       "cache-control": cacheControl(access.video.expires_at, access.video.password_hash !== null),
     },
   });
+}
+
+/**
+ * GET /v/:id/preview.gif — animated preview for embeds and email. Unlike the poster, a password-protected
+ * video answers 404 without a valid unlock cookie, so mail clients and unfurlers never learn it exists.
+ */
+export async function servePreviewGif(request: Request, env: AppEnv, id: string): Promise<Response> {
+  const access = await resolveAccess(request, env, id);
+  if (access.state === "locked") return new Response("not found", { status: 404, headers: { "cache-control": "no-store" } });
+  if (access.state !== "ok") return denied(access.state);
+  if (access.video.has_gif !== 1) return new Response("no preview", { status: 404, headers: { "cache-control": "no-store" } });
+  const etagHeader = request.headers.get("if-none-match");
+  const object = await env.VIDEOS.get(gifKey(id), etagHeader ? { onlyIf: { etagDoesNotMatch: etagHeader.replace(/^W\//, "").replace(/"/g, "") } } : {});
+  if (!object) return new Response("no preview", { status: 404, headers: { "cache-control": "no-store" } });
+  const headers = new Headers({
+    "content-type": "image/gif",
+    etag: object.httpEtag,
+    "cache-control": cacheControl(access.video.expires_at, access.video.password_hash !== null),
+    "x-content-type-options": "nosniff",
+  });
+  if (!("body" in object)) return new Response(null, { status: 304, headers });
+  headers.set("content-length", String(object.size));
+  return new Response(object.body, { headers });
 }

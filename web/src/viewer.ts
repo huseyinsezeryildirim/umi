@@ -1,120 +1,62 @@
 import { type AppEnv, baseUrl } from "./env";
 import { resolveAccess, unlockCookie } from "./access";
 import { verifyPassword } from "./crypto";
+import { handleEmbed } from "./embed";
+import {
+  CHAT,
+  CLOCK,
+  CLOCK_LINK,
+  DOWNLOAD,
+  EXPAND,
+  LINK,
+  MISSING,
+  PARSE_T_JS,
+  esc,
+  formatDate,
+  formatDuration,
+  messageCard,
+  newNonce,
+  page,
+  passwordCard,
+  safeJson,
+} from "./page";
+import { MAX_AUTHOR_NAME, MAX_COMMENT_BODY, REACTION_EMOJIS, type ReactionSummary, socialState } from "./social";
 import type { VideoRow } from "./videos";
 
-const esc = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+type Social = Awaited<ReturnType<typeof socialState>>;
 
-function formatDuration(ms: number | null): string {
-  if (!ms) return "";
-  const total = Math.round(ms / 1000);
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = String(total % 60).padStart(2, "0");
-  return h ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+function reactionBar(reactions: ReactionSummary): string {
+  return REACTION_EMOJIS.map(
+    (e) =>
+      `<button type="button" class="rx" data-emoji="${e}" aria-label="React with ${e}"><span class="e" aria-hidden="true">${e}</span><span class="n">${reactions.counts[e] ?? 0}</span></button>`,
+  ).join("");
 }
 
-const formatDate = (ms: number) =>
-  new Date(ms).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
-
-interface PageOptions {
-  status: number;
-  title: string;
-  description: string;
-  canonical: string;
-  body: string;
-  nonce: string;
-  og?: { image?: string; video?: { url: string; width: number | null; height: number | null } };
-  headers?: Record<string, string>;
-}
-
-function page(o: PageOptions): Response {
-  const meta = [
-    `<meta property="og:site_name" content="Umi">`,
-    `<meta property="og:title" content="${esc(o.title)}">`,
-    `<meta property="og:description" content="${esc(o.description)}">`,
-    `<meta property="og:url" content="${esc(o.canonical)}">`,
-    `<meta property="og:type" content="${o.og?.video ? "video.other" : "website"}">`,
-    `<meta name="twitter:title" content="${esc(o.title)}">`,
-    `<meta name="twitter:description" content="${esc(o.description)}">`,
-    `<meta name="twitter:card" content="${o.og?.image ? "summary_large_image" : "summary"}">`,
-  ];
-  if (o.og?.image) {
-    meta.push(
-      `<meta property="og:image" content="${esc(o.og.image)}">`,
-      `<meta property="og:image:alt" content="${esc(o.title)}">`,
-      `<meta name="twitter:image" content="${esc(o.og.image)}">`,
-    );
+function commentsSection(social: Social): string {
+  if (!social.allowComments) {
+    return `<section class="card comments off" id="comments">${CHAT}<span>Comments are turned off for this video.</span></section>`;
   }
-  if (o.og?.video) {
-    const v = o.og.video;
-    meta.push(
-      `<meta property="og:video" content="${esc(v.url)}">`,
-      `<meta property="og:video:secure_url" content="${esc(v.url)}">`,
-      `<meta property="og:video:type" content="video/mp4">`,
-    );
-    if (v.width && v.height) {
-      meta.push(`<meta property="og:video:width" content="${v.width}">`, `<meta property="og:video:height" content="${v.height}">`);
-    }
-  }
-
-  const html = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${esc(o.title)} · Umi</title>
-<meta name="description" content="${esc(o.description)}">
-<meta name="robots" content="noindex, nofollow">
-<meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f6f6f4" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)">
-<link rel="canonical" href="${esc(o.canonical)}">
-<link rel="icon" href="data:image/svg+xml,${encodeURIComponent(ICON)}">
-${meta.join("\n")}
-<style nonce="${o.nonce}">${CSS}</style>
-</head>
-<body>
-<header class="top"><a class="brand" href="https://umi.cam" rel="noopener">${LOGO}<span>Umi</span></a></header>
-<main>${o.body}</main>
-<footer class="foot">Recorded with <a href="https://umi.cam" rel="noopener">Umi</a> — the free screen recorder for Mac</footer>
-</body>
-</html>`;
-  return new Response(html, {
-    status: o.status,
-    headers: {
-      "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store",
-      "referrer-policy": "strict-origin-when-cross-origin",
-      "x-content-type-options": "nosniff",
-      "x-frame-options": "DENY",
-      "content-security-policy": `default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'nonce-${o.nonce}'; script-src 'nonce-${o.nonce}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`,
-      ...o.headers,
-    },
-  });
-}
-
-function messageCard(icon: string, heading: string, text: string): string {
-  return `<section class="card message"><div class="icon">${icon}</div><h1>${esc(heading)}</h1><p>${esc(text)}</p></section>`;
-}
-
-function passwordCard(id: string, t: string | null, error: boolean): string {
-  return `<section class="card message">
-  <div class="icon">${LOCK}</div>
-  <h1>This video is password-protected</h1>
-  <p>Enter the password the sender shared with you.</p>
-  <form method="post" action="/v/${id}/unlock" class="unlock">
-    ${t ? `<input type="hidden" name="t" value="${esc(t)}">` : ""}
-    <input type="password" name="password" placeholder="Password" autocomplete="current-password" required autofocus
-      aria-label="Password"${error ? ' aria-invalid="true" aria-describedby="pw-err"' : ""}>
-    <button type="submit">Watch</button>
+  return `<section class="card comments" id="comments" aria-labelledby="c-h">
+  <h2 id="c-h">Comments <span class="ccount" id="ccount"></span></h2>
+  <ol class="clist" id="clist"></ol>
+  <p class="empty" id="cempty">No comments yet. Be the first to say something.</p>
+  <form class="cform" id="cform" novalidate>
+    <label class="sr" for="cname">Your name</label>
+    <input id="cname" name="authorName" maxlength="${MAX_AUTHOR_NAME}" placeholder="Your name" autocomplete="name" required>
+    <label class="sr" for="cbody">Comment</label>
+    <textarea id="cbody" name="body" maxlength="${MAX_COMMENT_BODY}" rows="2" placeholder="Add a comment…" required></textarea>
+    <div class="crow">
+      <button type="button" class="chip" id="cat" aria-pressed="true" title="Pin this comment to the current time">at 0:00</button>
+      <span class="grow"></span>
+      <span class="len" id="clen" aria-live="polite"></span>
+      <button type="submit" class="primary" id="cpost">Post</button>
+    </div>
+    <p class="error" id="cerr" role="alert" hidden></p>
   </form>
-  ${error ? `<p id="pw-err" class="error" role="alert">Wrong password. Try again.</p>` : ""}
 </section>`;
 }
 
-function playerBody(video: VideoRow, nonce: string): string {
+function playerBody(video: VideoRow, nonce: string, social: Social): string {
   const ratio = video.width && video.height ? `${video.width} / ${video.height}` : "16 / 9";
   const poster = video.has_thumbnail ? ` poster="/v/${video.id}/thumbnail.jpg"` : "";
   const meta = [formatDate(video.created_at), formatDuration(video.duration_ms)].filter(Boolean).join(" · ");
@@ -124,10 +66,13 @@ function playerBody(video: VideoRow, nonce: string): string {
   const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
     .map((s) => `<option value="${s}"${s === 1 ? " selected" : ""}>${s}×</option>`)
     .join("");
-  return `<style nonce="${nonce}">.stage{--ratio:${ratio}}</style>
+  const data = { id: video.id, durationMs: video.duration_ms, emojis: REACTION_EMOJIS, ...social };
+  return `<style nonce="${nonce}">.stage,.timeline{--ratio:${ratio}}</style>
 <div class="stage" id="stage">
   <video id="video" src="/v/${video.id}/video.mp4" controls playsinline preload="metadata"${poster}></video>
+  <div class="floats" id="floats" aria-hidden="true"></div>
 </div>
+<div class="timeline"><div class="track" id="track" title="Reactions and comments"><div class="played" id="played"></div><div id="markers"></div></div></div>
 <section class="info">
   <div class="titles">
     <h1>${esc(video.title)}</h1>
@@ -137,18 +82,23 @@ function playerBody(video: VideoRow, nonce: string): string {
     <label class="speed" title="Playback speed (&lt; / &gt;)"><span class="sr">Playback speed</span>
       <select id="speed">${speeds}</select>
     </label>
-    <button type="button" id="copy" title="Copy link at current time">${LINK}<span>Copy link</span></button>
+    <button type="button" id="copy" title="Copy link">${LINK}<span>Copy link</span></button>
+    <button type="button" id="copyat" title="Copy link at current time">${CLOCK_LINK}<span id="copyat-l" class="tnum">Copy at 0:00</span></button>
     <button type="button" id="fs" title="Fullscreen (F)">${EXPAND}<span class="sr">Fullscreen</span></button>
     ${video.allow_download ? `<a class="button" href="/v/${video.id}/video.mp4?download=1" download>${DOWNLOAD}<span>Download</span></a>` : ""}
   </div>
 </section>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>`;
+<section class="react" aria-label="Reactions">${reactionBar(social.reactions)}</section>
+${commentsSection(social)}
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script type="application/json" id="umi-data">${safeJson(data)}</script>`;
 }
 
 export async function handleViewer(request: Request, env: AppEnv, id: string, wrongPassword = false): Promise<Response> {
   const url = new URL(request.url);
-  const canonical = `${baseUrl(env, request)}/v/${id}`;
-  const nonce = crypto.randomUUID().replace(/-/g, "");
+  const origin = baseUrl(env, request);
+  const canonical = `${origin}/v/${id}`;
+  const nonce = newNonce();
   const access = await resolveAccess(request, env, id);
   const base = { canonical, nonce };
 
@@ -173,6 +123,7 @@ export async function handleViewer(request: Request, env: AppEnv, id: string, wr
     case "ok": {
       const v = access.video;
       const isPublic = v.password_hash === null;
+      const social = await socialState(env, v);
       return page({
         ...base,
         status: 200,
@@ -184,105 +135,49 @@ export async function handleViewer(request: Request, env: AppEnv, id: string, wr
               video: { url: `${canonical}/video.mp4`, width: v.width, height: v.height },
             }
           : undefined,
-        body: `${playerBody(v, nonce)}<script nonce="${nonce}">${SCRIPT}</script>`,
+        oembed: isPublic ? `${origin}/oembed?url=${encodeURIComponent(canonical)}&format=json` : undefined,
+        body: `${playerBody(v, nonce, social)}<script nonce="${nonce}">${SCRIPT}</script>`,
       });
     }
   }
 }
 
-/** POST /v/:id/unlock */
+/** POST /v/:id/unlock — from the viewer page, or from the embed when the form carries `embed=1`. */
 export async function handleUnlock(request: Request, env: AppEnv, id: string): Promise<Response> {
   const access = await resolveAccess(request, env, id);
-  if (access.state !== "locked") return Response.redirect(new URL(`/v/${id}`, request.url).toString(), 303);
   const form = await request.formData().catch(() => null);
-  const password = form?.get("password");
+  const embed = form?.get("embed") === "1";
+  const target = new URL(`/${embed ? "e" : "v"}/${id}`, request.url);
   const t = form?.get("t");
-  const target = new URL(`/v/${id}`, request.url);
   if (typeof t === "string" && t) target.searchParams.set("t", t);
+  if (access.state !== "locked") return Response.redirect(target.toString(), 303);
+  const password = form?.get("password");
 
   if (typeof password === "string" && (await verifyPassword(password, access.video.password_hash!))) {
     return new Response(null, {
       status: 303,
-      headers: { location: target.pathname + target.search, "set-cookie": await unlockCookie(request, env, access.video) },
+      headers: {
+        location: target.pathname + target.search,
+        "set-cookie": await unlockCookie(request, env, access.video, { embed }),
+      },
     });
   }
   // TODO(abuse): rate-limit attempts per video/IP (e.g. Workers Rate Limiting binding).
-  return handleViewer(new Request(target, { headers: request.headers }), env, id, true);
+  const retry = new Request(target, { headers: request.headers });
+  return embed ? handleEmbed(retry, env, id, true) : handleViewer(retry, env, id, true);
 }
 
-// ---------------------------------------------------------------- assets
-
-const ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="9" fill="#ff5a36"/><circle cx="16" cy="16" r="6" fill="#fff"/></svg>`;
-const LOGO = `<svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--accent)"/><circle cx="16" cy="16" r="6" fill="#fff"/></svg>`;
-const svg = (d: string) =>
-  `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
-const LINK = svg(`<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>`);
-const EXPAND = svg(`<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>`);
-const DOWNLOAD = svg(`<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>`);
-const LOCK = svg(`<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>`);
-const CLOCK = svg(`<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>`);
-const MISSING = svg(`<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>`);
-
-const CSS = `
-:root{--bg:#f6f6f4;--surface:#fff;--text:#18181b;--muted:#6b6b72;--border:#e4e4e0;--accent:#ff5a36;--accent-text:#fff;--stage:#000;--radius:14px;
-  color-scheme:light;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#111113;--surface:#1b1b1e;--text:#f2f2f3;--muted:#9a9aa2;--border:#2c2c31;--accent:#ff6a48;color-scheme:dark}}
-*{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
-body{min-height:100dvh;display:flex;flex-direction:column}
-a{color:inherit}
-.top{padding:14px max(16px,env(safe-area-inset-left));display:flex;align-items:center}
-.brand{display:inline-flex;align-items:center;gap:8px;text-decoration:none;font-weight:650;letter-spacing:-.01em}
-main{flex:1;width:100%;max-width:1120px;margin:0 auto;padding:0 16px}
-.stage{background:var(--stage);border-radius:var(--radius);overflow:hidden;aspect-ratio:var(--ratio);max-height:calc(100dvh - 210px);margin:0 auto;
-  width:min(100%, calc((100dvh - 210px) * (var(--ratio))));box-shadow:0 1px 2px rgba(0,0,0,.06),0 12px 40px rgba(0,0,0,.12)}
-.stage:fullscreen{border-radius:0;max-height:none;width:100%;height:100%;aspect-ratio:auto}
-video{display:block;width:100%;height:100%;background:#000;object-fit:contain}
-.info{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-start;justify-content:space-between;padding:18px 2px 8px}
-.titles{min-width:0;flex:1 1 320px}
-h1{font-size:clamp(18px,2.4vw,22px);line-height:1.25;margin:0 0 4px;font-weight:650;letter-spacing:-.015em;overflow-wrap:anywhere}
-.meta{margin:0;color:var(--muted);font-size:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.pill{border:1px solid var(--border);border-radius:999px;padding:1px 8px;font-size:12px}
-.actions{display:flex;gap:8px;flex-wrap:wrap}
-button,.button,select{font:inherit;font-size:14px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:10px;
-  height:38px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;text-decoration:none;transition:background .15s,border-color .15s}
-button:hover,.button:hover,select:hover{border-color:var(--muted)}
-button:focus-visible,.button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-select{appearance:none;-webkit-appearance:none;padding-right:12px;font-variant-numeric:tabular-nums}
-.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
-.message{max-width:420px;margin:12vh auto 0;padding:32px 28px;text-align:center}
-.message .icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;margin:0 auto 14px;background:var(--bg);color:var(--muted)}
-.message .icon svg{width:22px;height:22px}
-.message p{color:var(--muted);margin:6px 0 0;line-height:1.5}
-.unlock{display:flex;gap:8px;margin-top:20px}
-.unlock input{flex:1;min-width:0;font:inherit;font-size:16px;height:42px;padding:0 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text)}
-.unlock input[aria-invalid=true]{border-color:#e5484d}
-.unlock button{height:42px;background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-weight:600}
-.error{color:#e5484d !important;font-size:14px}
-.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:8px 14px;border-radius:10px;
-  font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
-.toast.show{opacity:1;transform:translate(-50%,0)}
-.foot{text-align:center;color:var(--muted);font-size:13px;padding:28px 16px calc(20px + env(safe-area-inset-bottom))}
-@media (max-width:640px){main{padding:0}.stage{border-radius:0;max-height:none;width:100%;box-shadow:none}.info{padding:14px 16px 4px}
-  .actions{width:100%}.actions>*{flex:1;justify-content:center}.message{margin:8vh 16px 0}}
-@media (prefers-reduced-motion:reduce){*{transition:none !important}}
-`;
-
+// User content (names, comment bodies) is only ever inserted with textContent / DOM properties.
 const SCRIPT = `(() => {
-  const v = document.getElementById("video"), stage = document.getElementById("stage");
-  const speed = document.getElementById("speed"), toast = document.getElementById("toast");
+  const $ = (id) => document.getElementById(id);
+  const v = $("video"), stage = $("stage"), speed = $("speed"), toast = $("toast");
+  const data = JSON.parse($("umi-data").textContent);
   const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } },
                   set(k, x) { try { localStorage.setItem(k, x); } catch {} } };
+  const fmt = (sec) => { sec = Math.max(0, Math.floor(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = String(sec % 60).padStart(2, "0");
+    return h ? h + ":" + String(m).padStart(2, "0") + ":" + s : m + ":" + s; };
 
-  // ?t=90 | 1:30 | 1m30s | 1h2m3s
-  function parseT(s) {
-    if (!s) return 0;
-    if (/^\\d+(\\.\\d+)?$/.test(s)) return parseFloat(s);
-    if (/^[\\d:]+$/.test(s)) return s.split(":").reduce((a, n) => a * 60 + (+n || 0), 0);
-    const m = /^(?:(\\d+)h)?(?:(\\d+)m)?(?:(\\d+)s)?$/.exec(s);
-    return m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : 0;
-  }
+  ${PARSE_T_JS}
   const start = parseT(new URLSearchParams(location.search).get("t"));
   if (start > 0) v.addEventListener("loadedmetadata", () => { v.currentTime = Math.min(start, v.duration || start); }, { once: true });
 
@@ -298,17 +193,161 @@ const SCRIPT = `(() => {
     if (stage.requestFullscreen) return stage.requestFullscreen().catch(() => v.webkitEnterFullscreen && v.webkitEnterFullscreen());
     if (v.webkitEnterFullscreen) v.webkitEnterFullscreen(); // iOS Safari
   }
-  document.getElementById("fs").addEventListener("click", fullscreen);
+  $("fs").addEventListener("click", fullscreen);
 
   let toastTimer;
-  function show(msg) { toast.textContent = msg; toast.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove("show"), 1800); }
-  document.getElementById("copy").addEventListener("click", async () => {
-    const u = new URL(location.href); u.search = "";
+  function show(msg) { toast.textContent = msg; toast.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove("show"), 2000); }
+  async function copyLink(atTime) {
+    const u = new URL(location.href); u.search = ""; u.hash = "";
     const t = Math.floor(v.currentTime);
-    if (t > 0) u.searchParams.set("t", String(t));
-    try { await navigator.clipboard.writeText(u.toString()); show(t > 0 ? "Link copied at " + Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0") : "Link copied"); }
+    if (atTime && t > 0) u.searchParams.set("t", String(t));
+    try { await navigator.clipboard.writeText(u.toString()); show(atTime && t > 0 ? "Link copied at " + fmt(t) : "Link copied"); }
     catch { prompt("Copy this link", u.toString()); }
+  }
+  $("copy").addEventListener("click", () => copyLink(false));
+  $("copyat").addEventListener("click", () => copyLink(true));
+  const copyAtLabel = $("copyat-l");
+
+  function seek(sec) { v.currentTime = sec; if (v.paused) v.play().catch(() => {}); }
+
+  // ---- timeline: progress + reaction/comment markers
+  const track = $("track"), played = $("played"), markers = $("markers");
+  const duration = () => (isFinite(v.duration) && v.duration > 0 ? v.duration : (data.durationMs || 0) / 1000);
+  const hue = (s) => { let h = 0; for (const ch of s) h = (h * 31 + ch.codePointAt(0)) % 360; return h; };
+  function drawMarkers() {
+    const d = duration();
+    markers.replaceChildren();
+    if (!d) return;
+    const add = (sec, el, label) => {
+      el.style.left = Math.min(100, Math.max(0, sec / d * 100)) + "%";
+      el.title = label;
+      el.addEventListener("click", (e) => { e.stopPropagation(); seek(sec); });
+      markers.append(el);
+    };
+    for (const r of data.reactions.reactions) {
+      const el = document.createElement("span"); el.className = "mk rx"; el.textContent = r.emoji;
+      add(r.timeMs / 1000, el, r.emoji + " at " + fmt(r.timeMs / 1000));
+    }
+    for (const c of data.comments) {
+      if (c.timeMs == null) continue;
+      const el = document.createElement("span"); el.className = "mk cm";
+      el.textContent = [...c.authorName][0].toUpperCase();
+      el.style.background = "hsl(" + hue(c.authorName) + " 65% 48%)";
+      add(c.timeMs / 1000, el, c.authorName + " at " + fmt(c.timeMs / 1000) + ": " + c.body.slice(0, 120));
+    }
+  }
+  track.addEventListener("click", (e) => {
+    const d = duration(); if (!d) return;
+    const rect = track.getBoundingClientRect();
+    seek(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) * d);
   });
+  v.addEventListener("loadedmetadata", drawMarkers);
+  v.addEventListener("timeupdate", () => {
+    const d = duration();
+    played.style.width = d ? Math.min(100, v.currentTime / d * 100) + "%" : "0";
+    copyAtLabel.textContent = "Copy at " + fmt(v.currentTime);
+    if (cat && pinnedAt == null) cat.textContent = "at " + fmt(v.currentTime);
+  });
+
+  // ---- reactions
+  const rxButtons = [...document.querySelectorAll(".react .rx")];
+  function drawCounts() { for (const b of rxButtons) b.querySelector(".n").textContent = data.reactions.counts[b.dataset.emoji] || 0; }
+  function floatEmoji(emoji) {
+    const el = document.createElement("span"); el.className = "fl"; el.textContent = emoji;
+    el.style.left = (8 + Math.random() * 80) + "%";
+    $("floats").append(el); setTimeout(() => el.remove(), 1800);
+  }
+  async function api(path, body) {
+    const res = await fetch(path, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {});
+    const json = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(json && json.error ? json.error.message : "Something went wrong.");
+    return json;
+  }
+  for (const b of rxButtons) b.addEventListener("click", async () => {
+    const emoji = b.dataset.emoji, timeMs = Math.round(v.currentTime * 1000);
+    floatEmoji(emoji);
+    data.reactions.counts[emoji] = (data.reactions.counts[emoji] || 0) + 1;
+    data.reactions.reactions.push({ emoji, timeMs });
+    b.classList.add("mine"); drawCounts(); drawMarkers();
+    try { const r = await api("/v/" + data.id + "/reactions", { emoji, timeMs }); data.reactions.counts = r.counts; drawCounts(); }
+    catch (err) {
+      data.reactions.counts[emoji]--; data.reactions.reactions.pop(); drawCounts(); drawMarkers(); show(err.message);
+    }
+  });
+
+  // ---- comments
+  const list = $("clist"), form = $("cform");
+  const cat = $("cat"), cname = $("cname"), cbody = $("cbody"), cerr = $("cerr"), clen = $("clen");
+  let pinnedAt = null; // seconds captured when the viewer starts typing
+  function rel(iso) {
+    const s = (Date.now() - Date.parse(iso)) / 1000;
+    if (s < 45) return "just now";
+    if (s < 3600) return Math.round(s / 60) + "m ago";
+    if (s < 86400) return Math.round(s / 3600) + "h ago";
+    if (s < 7 * 86400) return Math.round(s / 86400) + "d ago";
+    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+  function renderComment(c) {
+    const li = document.createElement("li"); li.className = "c"; li.id = "c-" + c.id;
+    const av = document.createElement("div"); av.className = "av"; av.setAttribute("aria-hidden", "true");
+    av.textContent = [...c.authorName][0].toUpperCase(); av.style.background = "hsl(" + hue(c.authorName) + " 65% 48%)";
+    const cb = document.createElement("div"); cb.className = "cb";
+    const ch = document.createElement("div"); ch.className = "ch";
+    const name = document.createElement("strong"); name.textContent = c.authorName; ch.append(name);
+    if (c.timeMs != null) {
+      const t = document.createElement("button"); t.type = "button"; t.className = "chip"; t.textContent = fmt(c.timeMs / 1000);
+      t.title = "Jump to " + fmt(c.timeMs / 1000); t.addEventListener("click", () => seek(c.timeMs / 1000)); ch.append(t);
+    }
+    const time = document.createElement("time"); time.dateTime = c.createdAt; time.title = new Date(c.createdAt).toLocaleString();
+    time.textContent = rel(c.createdAt); ch.append(time);
+    const p = document.createElement("p"); p.textContent = c.body;
+    cb.append(ch, p); li.append(av, cb); return li;
+  }
+  function drawComments() {
+    if (!list) return;
+    list.replaceChildren(...data.comments.map(renderComment));
+    $("cempty").hidden = data.comments.length > 0;
+    $("ccount").textContent = data.comments.length ? String(data.comments.length) : "";
+  }
+  if (form) {
+    cname.value = store.get("umi.name") || "";
+    const updateLen = () => { const n = [...cbody.value].length; clen.textContent = n > ${MAX_COMMENT_BODY} - 200 ? n + " / ${MAX_COMMENT_BODY}" : ""; };
+    cbody.addEventListener("input", updateLen);
+    cbody.addEventListener("focus", () => { if (pinnedAt == null && cat.getAttribute("aria-pressed") === "true") { pinnedAt = v.currentTime; cat.textContent = "at " + fmt(pinnedAt); } });
+    cat.addEventListener("click", () => {
+      const on = cat.getAttribute("aria-pressed") !== "true";
+      cat.setAttribute("aria-pressed", String(on));
+      if (!on) pinnedAt = null; else { pinnedAt = v.currentTime; cat.textContent = "at " + fmt(pinnedAt); }
+    });
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault(); cerr.hidden = true;
+      const authorName = cname.value.trim(), body = cbody.value.trim();
+      if (!authorName) { cerr.textContent = "Please enter your name."; cerr.hidden = false; return cname.focus(); }
+      if (!body) { cerr.textContent = "Write a comment first."; cerr.hidden = false; return cbody.focus(); }
+      const pinned = cat.getAttribute("aria-pressed") === "true";
+      const timeMs = pinned ? Math.round((pinnedAt ?? v.currentTime) * 1000) : null;
+      const btn = $("cpost"); btn.disabled = true;
+      try {
+        const r = await api("/v/" + data.id + "/comments", { authorName, body, timeMs });
+        store.set("umi.name", authorName);
+        data.comments.push(r.comment); drawComments(); drawMarkers();
+        cbody.value = ""; updateLen(); pinnedAt = null;
+        document.getElementById("c-" + r.comment.id).scrollIntoView({ block: "nearest", behavior: "smooth" });
+      } catch (err) { cerr.textContent = err.message; cerr.hidden = false; }
+      finally { btn.disabled = false; }
+    });
+  }
+  drawComments(); drawMarkers();
+
+  // Pick up other viewers' comments and reactions while the page is open.
+  setInterval(async () => {
+    if (document.hidden) return;
+    try {
+      const [c, r] = await Promise.all([api("/v/" + data.id + "/comments"), api("/v/" + data.id + "/reactions")]);
+      data.comments = c.comments; data.reactions = r; drawComments(); drawCounts(); drawMarkers();
+    } catch {}
+  }, 30000);
+  setInterval(() => { for (const t of document.querySelectorAll(".ch time")) t.textContent = rel(t.dateTime); }, 60000);
 
   document.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey || /^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(e.target.tagName)) return;

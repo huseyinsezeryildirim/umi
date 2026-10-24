@@ -19,6 +19,7 @@ export function maxUploadBytes(env: AppEnv): number {
 
 export const videoKey = (id: string) => `videos/${id}/video.mp4`;
 export const thumbnailKey = (id: string) => `videos/${id}/thumbnail.jpg`;
+export const gifKey = (id: string) => `videos/${id}/preview.gif`;
 
 /** Upload URLs are valid this long; clients can re-request fresh ones to resume. */
 export const UPLOAD_URL_TTL_MS = 6 * 60 * 60 * 1000;
@@ -27,3 +28,4 @@ export const STALE_UPLOAD_MS = 24 * 60 * 60 * 1000;
 /** Expired videos keep their files this long so the owner can still extend the link. */
 export const EXPIRED_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024;
+export const MAX_GIF_BYTES = 10 * 1024 * 1024;

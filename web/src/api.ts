@@ -1,7 +1,8 @@
 import { type Account, authenticate, requirePaid } from "./auth";
-import { type AppEnv, maxUploadBytes, thumbnailKey, videoKey } from "./env";
+import { type AppEnv, gifKey, maxUploadBytes, thumbnailKey, videoKey } from "./env";
 import { hashPassword, randomId } from "./crypto";
 import { HttpError, json, readJson } from "./http";
+import { deleteSocialData, ownerDeleteComment, ownerListComments } from "./social";
 import { buildUploadPlan } from "./uploads";
 import { type VideoRow, getVideo, toJson } from "./videos";
 
@@ -15,6 +16,7 @@ interface CreateVideoBody {
   password?: string | null;
   expiresAt?: string | null;
   allowDownload?: boolean;
+  allowComments?: boolean;
 }
 
 interface UpdateVideoBody {
@@ -22,6 +24,7 @@ interface UpdateVideoBody {
   password?: string | null;
   expiresAt?: string | null;
   allowDownload?: boolean;
+  allowComments?: boolean;
 }
 
 interface CompleteBody {
@@ -96,8 +99,8 @@ async function createVideo(request: Request, env: AppEnv, account: Account): Pro
 
   await env.DB.prepare(
     `INSERT INTO videos (id, account_id, title, status, upload_id, content_type, size_bytes, duration_ms, width, height,
-       password_hash, expires_at, allow_download, created_at, updated_at)
-     VALUES (?, ?, ?, 'uploading', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       password_hash, expires_at, allow_download, allow_comments, created_at, updated_at)
+     VALUES (?, ?, ?, 'uploading', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -112,6 +115,7 @@ async function createVideo(request: Request, env: AppEnv, account: Account): Pro
       passwordHash,
       expiresAt,
       body.allowDownload === true ? 1 : 0,
+      body.allowComments === false ? 0 : 1,
       now,
       now,
     )
@@ -154,14 +158,31 @@ async function completeVideo(request: Request, env: AppEnv, account: Account, id
     throw new HttpError(400, "complete_failed", `Could not complete upload: ${(err as Error).message}`);
   }
 
-  const [object, thumb] = await Promise.all([env.VIDEOS.head(videoKey(id)), env.VIDEOS.head(thumbnailKey(id))]);
+  const [object, thumb, gif] = await Promise.all([
+    env.VIDEOS.head(videoKey(id)),
+    env.VIDEOS.head(thumbnailKey(id)),
+    hasValidGif(env, id),
+  ]);
   if (!object) throw new HttpError(500, "complete_failed", "Upload completed but object is missing.");
   await env.DB.prepare(
-    "UPDATE videos SET status = 'ready', upload_id = NULL, size_bytes = ?, has_thumbnail = ?, updated_at = ? WHERE id = ?",
+    "UPDATE videos SET status = 'ready', upload_id = NULL, size_bytes = ?, has_thumbnail = ?, has_gif = ?, updated_at = ? WHERE id = ?",
   )
-    .bind(object.size, thumb ? 1 : 0, Date.now(), id)
+    .bind(object.size, thumb ? 1 : 0, gif ? 1 : 0, Date.now(), id)
     .run();
   return json({ video: toJson((await getVideo(env, id))!, env, request) });
+}
+
+/**
+ * The proxied upload route checks the GIF magic bytes itself; direct-to-R2 uploads can't be inspected on the
+ * way in, so check the first bytes here and drop anything that isn't a GIF.
+ */
+async function hasValidGif(env: AppEnv, id: string): Promise<boolean> {
+  const obj = await env.VIDEOS.get(gifKey(id), { range: { offset: 0, length: 6 } });
+  if (!obj) return false;
+  const magic = new TextDecoder().decode(await obj.arrayBuffer());
+  if (magic === "GIF87a" || magic === "GIF89a") return true;
+  await env.VIDEOS.delete(gifKey(id));
+  return false;
 }
 
 /** PATCH /api/videos/:id */
@@ -174,6 +195,10 @@ async function updateVideo(request: Request, env: AppEnv, account: Account, id: 
   if (body.allowDownload !== undefined) {
     if (typeof body.allowDownload !== "boolean") throw new HttpError(400, "invalid_field", "allowDownload must be boolean.");
     sets.push("allow_download = ?"), values.push(body.allowDownload ? 1 : 0);
+  }
+  if (body.allowComments !== undefined) {
+    if (typeof body.allowComments !== "boolean") throw new HttpError(400, "invalid_field", "allowComments must be boolean.");
+    sets.push("allow_comments = ?"), values.push(body.allowComments ? 1 : 0);
   }
   const expiresAt = parseExpiresAt(body.expiresAt);
   if (expiresAt !== undefined) sets.push("expires_at = ?"), values.push(expiresAt);
@@ -197,6 +222,7 @@ async function deleteVideo(env: AppEnv, account: Account, id: string): Promise<R
   )
     .bind(now, now, id)
     .run();
+  await deleteSocialData(env, id);
   return json({ ok: true });
 }
 
@@ -206,7 +232,7 @@ export async function purgeVideoFiles(env: AppEnv, video: VideoRow): Promise<voi
       .abort()
       .catch(() => {});
   }
-  await env.VIDEOS.delete([videoKey(video.id), thumbnailKey(video.id)]);
+  await env.VIDEOS.delete([videoKey(video.id), thumbnailKey(video.id), gifKey(video.id)]);
 }
 
 /** GET /api/videos — the account's videos, newest first. */
@@ -226,6 +252,12 @@ export async function handleApi(request: Request, env: AppEnv, path: string): Pr
   if (path === "/api/videos") {
     if (method === "POST") return createVideo(request, env, account);
     if (method === "GET") return listVideos(request, env, account);
+  }
+  const c = /^\/api\/videos\/([0-9A-Za-z]+)\/comments(?:\/([0-9A-Za-z]+))?$/.exec(path);
+  if (c) {
+    const video = await ownedVideo(env, account, c[1]!);
+    if (method === "GET" && !c[2]) return ownerListComments(env, video);
+    if (method === "DELETE" && c[2]) return ownerDeleteComment(env, video, c[2]);
   }
   const m = /^\/api\/videos\/([0-9A-Za-z]+)(\/complete|\/upload-urls)?$/.exec(path);
   if (m) {

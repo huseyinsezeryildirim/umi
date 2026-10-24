@@ -2,8 +2,10 @@ import type { AppEnv } from "./env";
 import { handleApi } from "./api";
 import { cleanup } from "./cleanup";
 import { HttpError, errorResponse, json } from "./http";
-import { serveThumbnail, serveVideo } from "./media";
-import { handlePartUpload, handleThumbnailUpload } from "./uploads";
+import { handleEmbed, handleOembed } from "./embed";
+import { servePreviewGif, serveThumbnail, serveVideo } from "./media";
+import { getComments, getReactions, postComment, postReaction } from "./social";
+import { handleAssetUpload, handlePartUpload } from "./uploads";
 import { handleUnlock, handleViewer } from "./viewer";
 
 async function route(request: Request, env: AppEnv): Promise<Response> {
@@ -22,13 +24,26 @@ async function route(request: Request, env: AppEnv): Promise<Response> {
   if ((m = /^\/v\/([0-9A-Za-z]+)\/thumbnail\.jpg$/.exec(pathname)) && method === "GET") {
     return serveThumbnail(request, env, m[1]!);
   }
+  if ((m = /^\/v\/([0-9A-Za-z]+)\/preview\.gif$/.exec(pathname)) && method === "GET") {
+    return servePreviewGif(request, env, m[1]!);
+  }
+  if ((m = /^\/v\/([0-9A-Za-z]+)\/comments$/.exec(pathname))) {
+    if (method === "GET") return getComments(request, env, m[1]!);
+    if (method === "POST") return postComment(request, env, m[1]!);
+  }
+  if ((m = /^\/v\/([0-9A-Za-z]+)\/reactions$/.exec(pathname))) {
+    if (method === "GET") return getReactions(request, env, m[1]!);
+    if (method === "POST") return postReaction(request, env, m[1]!);
+  }
+  if ((m = /^\/e\/([0-9A-Za-z]+)\/?$/.exec(pathname)) && method === "GET") return handleEmbed(request, env, m[1]!);
+  if (pathname === "/oembed" && method === "GET") return handleOembed(request, env);
 
   // Proxied upload targets (authorized by URL signature, not bearer token).
   if ((m = /^\/api\/uploads\/([0-9A-Za-z]+)\/parts\/(\d+)$/.exec(pathname)) && method === "PUT") {
     return handlePartUpload(request, env, m[1]!, Number(m[2]));
   }
-  if ((m = /^\/api\/uploads\/([0-9A-Za-z]+)\/thumbnail$/.exec(pathname)) && method === "PUT") {
-    return handleThumbnailUpload(request, env, m[1]!);
+  if ((m = /^\/api\/uploads\/([0-9A-Za-z]+)\/(thumbnail|gif)$/.exec(pathname)) && method === "PUT") {
+    return handleAssetUpload(request, env, m[1]!, m[2] as "thumbnail" | "gif");
   }
   if (pathname.startsWith("/api/")) return handleApi(request, env, pathname);
 

@@ -14,6 +14,8 @@ export interface VideoRow {
   width: number | null;
   height: number | null;
   has_thumbnail: number;
+  has_gif: number;
+  allow_comments: number;
   password_hash: string | null;
   expires_at: number | null;
   allow_download: number;
@@ -34,7 +36,10 @@ export interface VideoJson {
   width: number | null;
   height: number | null;
   thumbnailUrl: string | null;
+  previewGifUrl: string | null;
+  embedUrl: string;
   allowDownload: boolean;
+  allowComments: boolean;
   hasPassword: boolean;
   expiresAt: string | null;
   expired: boolean;
@@ -64,7 +69,10 @@ export function toJson(video: VideoRow, env: AppEnv, request: Request): VideoJso
     width: video.width,
     height: video.height,
     thumbnailUrl: video.has_thumbnail ? `${base}/v/${video.id}/thumbnail.jpg` : null,
+    previewGifUrl: video.has_gif ? `${base}/v/${video.id}/preview.gif` : null,
+    embedUrl: `${base}/e/${video.id}`,
     allowDownload: video.allow_download === 1,
+    allowComments: video.allow_comments === 1,
     hasPassword: video.password_hash !== null,
     expiresAt: video.expires_at === null ? null : new Date(video.expires_at).toISOString(),
     expired: isExpired(video),

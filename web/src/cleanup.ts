@@ -1,5 +1,6 @@
 import { type AppEnv, EXPIRED_GRACE_MS, STALE_UPLOAD_MS } from "./env";
 import { purgeVideoFiles } from "./api";
+import { deleteSocialData } from "./social";
 import type { VideoRow } from "./videos";
 
 /**
@@ -25,6 +26,7 @@ export async function cleanup(env: AppEnv): Promise<{ purged: number }> {
     )
       .bind(now, now, video.id)
       .run();
+    await deleteSocialData(env, video.id);
   }
   return { purged: results.length };
 }
