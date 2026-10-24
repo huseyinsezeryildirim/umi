@@ -23,6 +23,8 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
     var padding = 0.08
     /// Screen corner radius, as a fraction of the screen's shorter side.
     var cornerRadius = 0.025
+    /// Circular arcs, or Apple-style continuous (squircle) corners.
+    var cornerStyle = CornerStyle.rounded
     /// 0…1
     var shadow = 0.6
     /// Border around the screen, as a fraction of the screen's shorter side (0 = none).
@@ -61,6 +63,7 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
         crop = c.value(.crop, d.crop)
         padding = c.value(.padding, d.padding)
         cornerRadius = c.value(.cornerRadius, d.cornerRadius)
+        cornerStyle = c.value(.cornerStyle, d.cornerStyle)
         shadow = c.value(.shadow, d.shadow)
         border = c.value(.border, d.border)
         cursor = c.value(.cursor, d.cursor)
@@ -80,6 +83,12 @@ nonisolated struct EditSettings: Codable, Hashable, Sendable {
     }
 
     // MARK: Canvas
+
+    enum CornerStyle: String, Codable, CaseIterable, Sendable {
+        case rounded, squircle
+
+        var label: String { self == .rounded ? "Rounded" : "Squircle" }
+    }
 
     enum Background: Codable, Hashable, Sendable {
         case color(RGBA)
