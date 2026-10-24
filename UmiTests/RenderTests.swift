@@ -86,6 +86,13 @@ final class RenderTests: XCTestCase {
         XCTAssertEqual(duration, 6, accuracy: 0.2)
     }
 
+    func testCameraOnlyRecordingStartsAsCameraOnlyScene() {
+        let project = RecordingProject(createdAt: .now, duration: 12, screen: .init(pixelWidth: 640, pixelHeight: 360, captureRect: .zero, fps: 15),
+                                       camera: .init(), audio: .init(), cameraOnly: true)
+        XCTAssertEqual(project.defaultEdit.scenes.first?.layout, .cameraOnly)
+        XCTAssertEqual(project.defaultEdit.scenes.first?.end, 12)
+    }
+
     func testTrimKeepsOnlySelectedClips() {
         let clips = CompositionBuilder.keptClips([.init(start: 1, end: 2), .init(start: 3, end: 10)], total: 6)
         XCTAssertEqual(clips, [.init(start: 1, end: 2), .init(start: 3, end: 6)])

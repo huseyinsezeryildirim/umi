@@ -10,6 +10,21 @@ final class AppModel {
     let recorder = RecordingController()
     let library = RecordingsLibrary()
     let instantShare = InstantShareController()
+    let areaSelector = AreaSelector()
+
+    /// Closes the launcher, lets the user drag out an area, then reopens the launcher with it.
+    func pickArea() {
+        closeLauncher()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [self] in
+            areaSelector.pick(initial: recorder.settings.areaRect) { [self] rect in
+                if let rect {
+                    recorder.settings.areaRect = rect
+                    recorder.settings.mode = .area
+                }
+                recorder.onOpenLauncher()
+            }
+        }
+    }
     /// SwiftUI's openWindow, captured from a view so AppKit code can open scenes.
     var openWindow: OpenWindowAction?
     var closeLauncher: () -> Void = {}
