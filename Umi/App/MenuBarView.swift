@@ -48,13 +48,14 @@ struct MenuBarView: View {
             await recorder.refreshSources()
             microphones = CaptureDevices.microphones
         }
-        .onAppear {
-            if recorder.settings.captureMicrophone { mic.start(deviceID: recorder.settings.microphoneID) }
-        }
-        .onDisappear {
-            // The status bar controller tells the recorder (it knows whether the camera
-            // should stay on), so only stop the meter here.
-            mic.stop()
+        // The meter runs only while the launcher is open; otherwise it keeps the mic and
+        // CPU busy in the background.
+        .onChange(of: recorder.launcherOpen, initial: true) { _, open in
+            if open, recorder.settings.captureMicrophone {
+                mic.start(deviceID: recorder.settings.microphoneID)
+            } else {
+                mic.stop()
+            }
         }
     }
 
