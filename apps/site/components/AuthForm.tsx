@@ -107,7 +107,15 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   return (
     <Shell title={signup ? "Create your account" : "Welcome back"} lead={signup ? "Record in your browser and share with a link." : "Sign in to record and edit."}>
       <form onSubmit={submit} className="mt-8 grid gap-3">
-        <Field label="Email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.currentTarget.value)} />
+        <Field
+          label="Email"
+          type={signup ? "email" : "text"}
+          inputMode="email"
+          autoCapitalize="none"
+          autoComplete={signup ? "email" : "username"}
+          value={email}
+          onChange={(e) => setEmail(e.currentTarget.value)}
+        />
         <Field
           label="Password"
           hint={
