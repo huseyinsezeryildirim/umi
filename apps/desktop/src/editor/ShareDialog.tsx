@@ -244,6 +244,10 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
                 </Show>
                 </Show>
                 <div class="umi-field-label">Password</div>
+                <Show when={v().keptByUpgrade}>
+                  <div class="umi-section__hint">Passwords on links are part of Umi Pro.</div>
+                </Show>
+                <Show when={!v().keptByUpgrade}>
                 <div class="ed-share__row">
                   <TextField value={password()} placeholder={v().hasPassword ? "Password set · type to change" : "No password"} onInput={(e) => setPassword(e.currentTarget.value)} type="password" />
                   <Button onClick={() => void update({ password: password() }).then(() => setPassword(""))} disabled={!password()}>
@@ -253,6 +257,7 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
                     <Button variant="ghost" onClick={() => void update({ password: "" })}>Remove</Button>
                   </Show>
                 </div>
+                </Show>
                 <div class="umi-field-label">Embed</div>
                 <Segmented
                   value={embedKind()}

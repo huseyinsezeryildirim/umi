@@ -76,7 +76,9 @@ function withCors(request: Request, env: AppEnv, response: Response): Response {
   const headers = new Headers(response.headers);
   headers.set("access-control-allow-origin", origin);
   headers.set("access-control-allow-headers", "authorization, content-type");
-  headers.set("access-control-allow-methods", "GET, POST, PATCH, DELETE, OPTIONS");
+  headers.set("access-control-allow-methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  // The web editor uploads parts and needs each part's ETag to complete the upload.
+  headers.set("access-control-expose-headers", "etag");
   headers.set("access-control-max-age", "86400");
   headers.append("vary", "origin");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
