@@ -415,6 +415,43 @@
 }
 
 /* Renaming a title in place (library cards, the editor's top bar). */
+/* A title with its rename pencil beside it. */
+.editable-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.editable-title__pencil {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--umi-text-3);
+  cursor: pointer;
+  transition: background-color 120ms, color 120ms, opacity 120ms;
+}
+.editable-title__pencil:hover {
+  background: var(--umi-hover, rgba(0, 0, 0, 0.06));
+  color: var(--umi-text);
+}
+.editable-title__pencil:focus-visible {
+  outline: 2px solid var(--umi-accent, #116ff5);
+  outline-offset: 1px;
+}
+/* On a card: only while the pointer is over the card (or the pencil has focus). */
+.editable-title[data-pencil="hover"] .editable-title__pencil {
+  opacity: 0;
+}
+.lib__card:hover .editable-title[data-pencil="hover"] .editable-title__pencil,
+.editable-title[data-pencil="hover"] .editable-title__pencil:focus-visible {
+  opacity: 1;
+}
+
 .title-input {
   width: 100%;
   min-width: 0;

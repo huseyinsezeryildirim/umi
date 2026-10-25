@@ -3,6 +3,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { createEffect, createSignal, Match, on, Show, Switch } from "solid-js";
 import { Button, Dialog, Progress, Segmented } from "@umi/ui";
 import { CheckCircle2, FolderOpen } from "lucide-solid";
+import { onWeb, revealLabel } from "../platform";
 import type { Editor } from "./store";
 
 type Format = "mp4" | "mov" | "gif";
@@ -127,7 +128,7 @@ export function ExportDialog(props: { editor: Editor; open: boolean; onClose: ()
             </div>
             <div class="ed-export__actions">
               <Button onClick={() => void invoke("recording_reveal", { path: (phase() as { path: string }).path })}>
-                <FolderOpen size={15} /> Show in Finder
+                <FolderOpen size={15} /> {onWeb ? "Download again" : revealLabel}
               </Button>
               <Button variant="ink" onClick={props.onClose}>
                 Done
