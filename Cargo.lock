@@ -6128,6 +6128,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "umi-recorder"
+version = "0.2.0"
+dependencies = [
+ "chrono",
+ "crossbeam-channel",
+ "parking_lot",
+ "serde",
+ "thiserror 2.0.21",
+ "umi-capture",
+ "umi-media",
+ "umi-project",
+]
+
+[[package]]
 name = "umi-render"
 version = "0.2.0"
 dependencies = [

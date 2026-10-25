@@ -1,0 +1,422 @@
+//! A recording in progress. Sources capture on their own threads; one writer thread per
+//! file encodes, so a slow encode never stalls capture. The bundle is written as it goes
+//! (fragmented MOV), so a crash loses at most a second, and [`recover`] finishes it later.
+//!
+//! ```text
+//! Umi 2026-10-25 at 10.41.07.umi/
+//!   screen.mov    video + system sound (track 0) + microphone (track 1, or 0 alone)
+//!   camera.mov    camera, if on
+//!   cursor.json   pointer, clicks, keys
+//!   project.json  written at the end
+//! ```
+
+use crossbeam_channel::{Receiver, Sender, bounded};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::thread::JoinHandle;
+use umi_capture::input::{Area, InputRecorder};
+use umi_capture::screen::{self, ScreenOptions, ScreenSession};
+use umi_capture::{AudioSink, CaptureError, Clock, Frame, Target, VideoSink};
+use umi_media::{Pixels, StreamWriter, VideoCodec, WriterSettings};
+use umi_project::edit::Camera as CameraStyle;
+use umi_project::project::{AudioInfo, CameraInfo, ScreenInfo};
+use umi_project::{Bundle, Rect, RecordingProject};
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Options {
+    pub target: Target,
+    pub fps: u32,
+    /// Longest side in pixels (0 = native).
+    pub max_size: u32,
+    pub system_audio: bool,
+    /// Microphone id (`None` = off; empty string = the default microphone).
+    pub microphone: Option<String>,
+    /// Camera id (`None` = off; empty string = the first camera).
+    pub camera: Option<String>,
+    /// How the camera bubble looked when recording started (shape, size, position).
+    pub camera_style: Option<CameraStyle>,
+    /// Record only the camera (the screen is still captured for context but starts hidden).
+    #[serde(default)]
+    pub camera_only: bool,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum RecordError {
+    #[error(transparent)]
+    Capture(#[from] CaptureError),
+    #[error("couldn't write the recording: {0}")]
+    Write(String),
+}
+
+impl From<umi_media::MediaError> for RecordError {
+    fn from(e: umi_media::MediaError) -> Self {
+        RecordError::Write(e.to_string())
+    }
+}
+
+impl From<std::io::Error> for RecordError {
+    fn from(e: std::io::Error) -> Self {
+        RecordError::Write(e.to_string())
+    }
+}
+
+/// Owned copy of a frame, sent to a writer thread.
+enum Job {
+    Video { data: Vec<u8>, planes: FramePlanes, t: f64 },
+    Audio { track: usize, samples: Vec<f32>, t: f64 },
+}
+
+#[derive(Clone, Copy)]
+enum FramePlanes {
+    Nv12 { y_len: usize, y_stride: usize, uv_stride: usize },
+    Bgra { stride: usize },
+    Rgba { stride: usize },
+}
+
+fn to_job(frame: Frame, t: f64) -> Job {
+    match frame {
+        Frame::Nv12 { y, y_stride, uv, uv_stride, .. } => {
+            let mut data = Vec::with_capacity(y.len() + uv.len());
+            data.extend_from_slice(y);
+            data.extend_from_slice(uv);
+            Job::Video { planes: FramePlanes::Nv12 { y_len: y.len(), y_stride, uv_stride }, data, t }
+        }
+        Frame::Bgra { data, stride, .. } => Job::Video { data: data.to_vec(), planes: FramePlanes::Bgra { stride }, t },
+        Frame::Rgba { data, stride, .. } => Job::Video { data: data.to_vec(), planes: FramePlanes::Rgba { stride }, t },
+    }
+}
+
+/// Feeds one file's writer from capture threads. Frames are dropped (not queued without
+/// bound) if encoding falls behind; audio is never dropped.
+struct Feed {
+    tx: Sender<Job>,
+    dropped: std::sync::atomic::AtomicU64,
+    /// Frames seen (warming up counts too) and whether they're kept yet.
+    seen: std::sync::atomic::AtomicU64,
+    open: std::sync::atomic::AtomicBool,
+}
+
+impl Feed {
+    fn new(tx: Sender<Job>) -> Self {
+        Self { tx, dropped: Default::default(), seen: Default::default(), open: Default::default() }
+    }
+}
+
+impl VideoSink for Feed {
+    fn frame(&self, frame: Frame, t: f64) {
+        use std::sync::atomic::Ordering::Relaxed;
+        self.seen.fetch_add(1, Relaxed);
+        if !self.open.load(Relaxed) {
+            return;
+        }
+        if self.tx.len() >= 6 {
+            self.dropped.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            return;
+        }
+        let _ = self.tx.send(to_job(frame, t));
+    }
+}
+
+/// An audio source's track in a feed.
+struct Track(Arc<Feed>, usize);
+
+impl AudioSink for Track {
+    fn audio(&self, samples: &[f32], t: f64) {
+        if !self.0.open.load(std::sync::atomic::Ordering::Relaxed) {
+            return;
+        }
+        let _ = self.0.tx.send(Job::Audio { track: self.1, samples: samples.to_vec(), t });
+    }
+}
+
+/// Writes jobs to a file; the writer is made on the first frame when the size isn't known
+/// up front (cameras).
+fn writer_thread(path: PathBuf, settings: Option<WriterSettings>, fps: u32, rx: Receiver<Job>) -> JoinHandle<Result<u64, String>> {
+    std::thread::Builder::new()
+        .name("umi-writer".into())
+        .spawn(move || {
+            let mut writer: Option<StreamWriter> = match settings {
+                Some(s) => Some(StreamWriter::create(&path, &s).map_err(|e| e.to_string())?),
+                None => None,
+            };
+            for job in rx {
+                match job {
+                    Job::Video { data, planes, t } => {
+                        if writer.is_none() {
+                            // Camera: the size comes with the first frame.
+                            let (w, h) = match planes {
+                                FramePlanes::Rgba { stride } | FramePlanes::Bgra { stride } => (stride as u32 / 4, (data.len() / stride) as u32),
+                                FramePlanes::Nv12 { y_len, y_stride, .. } => (y_stride as u32, (y_len / y_stride) as u32),
+                            };
+                            let settings = WriterSettings { width: w & !1, height: h & !1, fps, codec: VideoCodec::H264, bit_rate: 0, audio_tracks: 0, fragmented: true, hardware: true };
+                            writer = Some(StreamWriter::create(&path, &settings).map_err(|e| e.to_string())?);
+                        }
+                        let Some(w) = writer.as_mut() else { continue };
+                        let pixels = match planes {
+                            FramePlanes::Nv12 { y_len, y_stride, uv_stride } => Pixels::Nv12 { y: &data[..y_len], y_stride, uv: &data[y_len..], uv_stride },
+                            FramePlanes::Bgra { stride } => Pixels::Bgra { data: &data, stride },
+                            FramePlanes::Rgba { stride } => Pixels::Rgba { data: &data, stride },
+                        };
+                        w.push_video(pixels, t).map_err(|e| e.to_string())?;
+                    }
+                    Job::Audio { track, samples, t } => {
+                        if let Some(w) = writer.as_mut() {
+                            w.push_audio(track, &samples, t).map_err(|e| e.to_string())?;
+                        }
+                    }
+                }
+            }
+            let frames = writer.as_ref().map_or(0, |w| w.frames_written());
+            if let Some(w) = writer {
+                w.finish().map_err(|e| e.to_string())?;
+            }
+            Ok(frames)
+        })
+        .expect("spawn writer")
+}
+
+/// A recording in progress.
+pub struct Recording {
+    pub bundle: PathBuf,
+    clock: Clock,
+    options: Options,
+    started: chrono::DateTime<chrono::Utc>,
+    screen: Option<Box<dyn ScreenSession>>,
+    mic: Option<umi_capture::audio::MicSession>,
+    camera: Option<umi_capture::camera::CameraSession>,
+    input: parking_lot::Mutex<Option<InputRecorder>>,
+    screen_feed: Option<Arc<Feed>>,
+    camera_feed: Option<Arc<Feed>>,
+    writers: Vec<JoinHandle<Result<u64, String>>>,
+    size: (u32, u32),
+    capture_rect: (f64, f64, f64, f64),
+    audio: AudioInfo,
+}
+
+/// "Umi 2026-10-25 at 10.41.07.umi" in `library` (made unique).
+fn new_bundle(library: &Path) -> std::io::Result<PathBuf> {
+    std::fs::create_dir_all(library)?;
+    let stamp = chrono::Local::now().format("Umi %Y-%m-%d at %H.%M.%S").to_string();
+    let mut path = library.join(format!("{stamp}.umi"));
+    let mut n = 2;
+    while path.exists() {
+        path = library.join(format!("{stamp} {n}.umi"));
+        n += 1;
+    }
+    std::fs::create_dir_all(&path)?;
+    Ok(path)
+}
+
+impl Recording {
+    /// Starts recording into a new bundle in `library` right away.
+    pub fn start(library: &Path, options: Options) -> Result<Recording, RecordError> {
+        let recording = Self::prepare(library, options)?;
+        recording.begin();
+        Ok(recording)
+    }
+
+    /// Opens every source and lets it warm up (cameras take a moment) without keeping
+    /// anything yet; [`begin`](Self::begin) starts the recording at time 0. Call it when a
+    /// countdown starts.
+    pub fn prepare(library: &Path, options: Options) -> Result<Recording, RecordError> {
+        let screen_options = ScreenOptions { fps: options.fps, max_size: options.max_size, show_cursor: false, system_audio: options.system_audio, exclude_own_windows: true };
+        let (rect, scale) = screen::geometry(&options.target)?;
+        let size = screen::fit(rect.2 * scale, rect.3 * scale, options.max_size);
+        let bundle_path = new_bundle(library)?;
+        let bundle = Bundle::new(&bundle_path);
+        let clock = Clock::new();
+
+        // Tracks: system sound first, then the microphone.
+        let mut tracks = 0;
+        let mut audio = AudioInfo::default();
+        if options.system_audio {
+            audio.system_track = Some(tracks as u32);
+            tracks += 1;
+        }
+        if options.microphone.is_some() {
+            audio.microphone_track = Some(tracks as u32);
+            tracks += 1;
+        }
+
+        let (tx, rx) = bounded::<Job>(256);
+        let screen_feed = Arc::new(Feed::new(tx));
+        let settings = WriterSettings { width: size.0, height: size.1, fps: options.fps, codec: VideoCodec::H264, bit_rate: 0, audio_tracks: tracks, fragmented: true, hardware: true };
+        let mut writers = vec![writer_thread(bundle.screen(), Some(settings), options.fps, rx)];
+
+        let mut recording = Recording {
+            bundle: bundle_path.clone(),
+            clock: clock.clone(),
+            options: options.clone(),
+            started: chrono::Utc::now(),
+            screen: None,
+            mic: None,
+            camera: None,
+            input: parking_lot::Mutex::new(None),
+            screen_feed: Some(screen_feed.clone()),
+            camera_feed: None,
+            writers: vec![],
+            size,
+            capture_rect: rect,
+            audio,
+        };
+
+        let result = (|| -> Result<(), RecordError> {
+            let system: Option<Arc<dyn AudioSink>> = audio.system_track.map(|t| Arc::new(Track(screen_feed.clone(), t as usize)) as Arc<dyn AudioSink>);
+            recording.screen = Some(screen::start(&options.target, &screen_options, clock.clone(), screen_feed.clone(), system)?);
+            if let (Some(id), Some(track)) = (&options.microphone, audio.microphone_track) {
+                let sink: Arc<dyn AudioSink> = Arc::new(Track(screen_feed.clone(), track as usize));
+                recording.mic = Some(umi_capture::audio::start(Some(id.as_str()).filter(|s| !s.is_empty()), clock.clone(), Some(sink))?);
+            }
+            if let Some(id) = &options.camera {
+                let (tx, rx) = bounded::<Job>(64);
+                let feed = Arc::new(Feed::new(tx));
+                writers.push(writer_thread(bundle.camera(), None, 30, rx));
+                recording.camera = Some(umi_capture::camera::start(Some(id.as_str()).filter(|s| !s.is_empty()), clock.clone(), feed.clone())?);
+                recording.camera_feed = Some(feed);
+            }
+            Ok(())
+        })();
+        recording.writers = writers;
+        if let Err(e) = result {
+            recording.cancel();
+            return Err(e);
+        }
+        Ok(recording)
+    }
+
+    /// Time 0: waits (up to 2 s) for the screen's and camera's first frames, then keeps
+    /// everything from now on.
+    pub fn begin(&self) {
+        use std::sync::atomic::Ordering::Relaxed;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let feeds: Vec<&Arc<Feed>> = self.screen_feed.iter().chain(self.camera_feed.iter()).collect();
+        while std::time::Instant::now() < deadline && feeds.iter().any(|f| f.seen.load(Relaxed) == 0) {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        self.clock.restart();
+        for f in &feeds {
+            f.open.store(true, Relaxed);
+        }
+        let r = self.capture_rect;
+        *self.input.lock() = Some(InputRecorder::start(self.clock.clone(), Area { x: r.0, y: r.1, width: r.2, height: r.3 }));
+    }
+
+    pub fn elapsed(&self) -> f64 {
+        self.clock.elapsed()
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.clock.is_paused()
+    }
+
+    pub fn pause(&self) {
+        self.clock.pause();
+    }
+
+    pub fn resume(&self) {
+        self.clock.resume();
+    }
+
+    /// Microphone peak level, 0…1 (for the control bar's meter).
+    pub fn mic_level(&self) -> f32 {
+        self.mic.as_ref().map_or(0.0, |m| m.level())
+    }
+
+    /// Frames dropped because encoding fell behind.
+    pub fn dropped_frames(&self) -> u64 {
+        self.screen_feed.as_ref().map_or(0, |f| f.dropped.load(std::sync::atomic::Ordering::Relaxed))
+    }
+
+    fn stop_sources(&mut self) -> umi_project::CursorData {
+        if let Some(mut s) = self.screen.take() {
+            let _ = s.stop();
+        }
+        self.mic = None;
+        if let Some(mut c) = self.camera.take() {
+            c.stop();
+        }
+        // Closing the feeds ends the writer threads.
+        self.screen_feed = None;
+        self.camera_feed = None;
+        self.input.lock().take().map(InputRecorder::stop).unwrap_or_default()
+    }
+
+    /// Stops and finishes the bundle; returns its path.
+    pub fn stop(mut self) -> Result<PathBuf, RecordError> {
+        let duration = self.clock.elapsed();
+        let cursor = self.stop_sources();
+        for w in std::mem::take(&mut self.writers) {
+            w.join().map_err(|_| RecordError::Write("writer crashed".into()))?.map_err(RecordError::Write)?;
+        }
+        let bundle = Bundle::new(&self.bundle);
+        bundle.write_cursor(&cursor).map_err(|e| RecordError::Write(e.to_string()))?;
+        let has_camera = bundle.camera().exists();
+        let project = RecordingProject {
+            version: 1,
+            created_at: self.started,
+            // The file is the truth (the last frames may end slightly before the clock).
+            duration: umi_media::duration(&bundle.screen()).ok().filter(|d| *d > 0.1).unwrap_or(duration),
+            screen: ScreenInfo {
+                pixel_width: self.size.0,
+                pixel_height: self.size.1,
+                capture_rect: Rect::new(self.capture_rect.0, self.capture_rect.1, self.capture_rect.2, self.capture_rect.3),
+                fps: self.options.fps,
+            },
+            camera: has_camera.then(|| CameraInfo { bubble_center: self.options.camera_style.as_ref().map(|c| c.position), bubble: self.options.camera_style.clone() }),
+            audio: self.audio,
+            edit: None,
+            camera_only: self.options.camera_only.then_some(true),
+        };
+        bundle.write_project(&project).map_err(|e| RecordError::Write(e.to_string()))?;
+        Ok(self.bundle.clone())
+    }
+
+    /// Stops and throws the recording away (to the Trash is the app's choice; this removes
+    /// the unfinished folder it made).
+    pub fn cancel(mut self) {
+        self.stop_sources();
+        for w in std::mem::take(&mut self.writers) {
+            let _ = w.join();
+        }
+        let _ = std::fs::remove_dir_all(&self.bundle);
+    }
+}
+
+/// Bundles left without a project.json (the app quit while recording): finished from what
+/// was written. Returns the recovered bundles.
+pub fn recover(library: &Path) -> Vec<PathBuf> {
+    let mut out = vec![];
+    for entry in std::fs::read_dir(library).into_iter().flatten().flatten() {
+        let path = entry.path();
+        let bundle = Bundle::new(&path);
+        if path.extension().is_none_or(|e| e != "umi") || bundle.file(umi_project::project::PROJECT_FILE).exists() || !bundle.screen().exists() {
+            continue;
+        }
+        let Ok(mut decoder) = umi_media::VideoDecoder::open(&bundle.screen(), false) else { continue };
+        let info = decoder.info().clone();
+        let _ = &mut decoder;
+        if info.duration < 0.3 {
+            continue;
+        }
+        let tracks = umi_media::audio_streams(&bundle.screen()).map(|a| a.len()).unwrap_or(0);
+        let project = RecordingProject {
+            version: 1,
+            created_at: entry.metadata().and_then(|m| m.created()).map(chrono::DateTime::<chrono::Utc>::from).unwrap_or_else(|_| chrono::Utc::now()),
+            duration: info.duration,
+            screen: ScreenInfo { pixel_width: info.width, pixel_height: info.height, capture_rect: Rect::new(0.0, 0.0, info.width as f64 / 2.0, info.height as f64 / 2.0), fps: info.fps.round().max(1.0) as u32 },
+            camera: bundle.camera().exists().then(CameraInfo::default),
+            // Without the original settings: the last track is taken as the microphone.
+            audio: AudioInfo { system_track: (tracks >= 2).then_some(0), microphone_track: (tracks >= 1).then_some(tracks as u32 - 1) },
+            edit: None,
+            camera_only: None,
+        };
+        if bundle.write_project(&project).is_ok() {
+            if !bundle.file(umi_project::project::CURSOR_FILE).exists() {
+                let _ = bundle.write_cursor(&umi_project::CursorData::default());
+            }
+            out.push(path);
+        }
+    }
+    out
+}
