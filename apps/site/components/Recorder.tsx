@@ -551,7 +551,7 @@ function useLevel(stream: MediaStream | null | undefined) {
  */
 function SoundNote({ browser, dismissed, onDismiss }: { browser: BrowserInfo; dismissed: boolean; onDismiss: () => void }) {
   const [copied, setCopied] = useState(false);
-  if (browser.sound === "full") return <p className="mt-3 px-1 text-[12px] text-muted">For your computer’s sound, turn on “Share audio” in the next window.</p>;
+  if (browser.sound === "full") return <p className="mt-3 px-1 text-[12px] text-muted">In the next window, click your screen’s preview, then Share. For your computer’s sound, keep “Share audio” on.</p>;
   if (browser.sound === "tab") return <p className="mt-3 px-1 text-[12px] text-muted">{browser.name} records a tab’s sound: pick a tab and turn on “Share tab audio”.</p>;
   if (dismissed) return null;
   return (
