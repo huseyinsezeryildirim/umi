@@ -22,6 +22,7 @@ pub enum Op {
     Split { time: f64 },
     Cut { start: f64, end: f64 },
     DeleteClip { index: usize },
+    JoinClips { index: usize },
     TrimClip { index: usize, start: Option<f64>, end: Option<f64> },
     SetSpeed { index: usize, speed: f64 },
     MoveClip { from: usize, to: usize },
@@ -143,6 +144,7 @@ impl EditorSession {
         let mut history = self.history.lock();
         let before = doc.edit.clone();
         let mut selection = None;
+        let is_history_op = matches!(op, Op::Undo | Op::Redo);
         match op {
             Op::SetEdit { edit } => doc.edit = *edit,
             Op::Split { time } => {
@@ -153,6 +155,11 @@ impl EditorSession {
             }
             Op::DeleteClip { index } => {
                 doc.delete_clip(index);
+            }
+            Op::JoinClips { index } => {
+                if doc.join_clips(index) {
+                    selection = Some(Selection::Clip(index));
+                }
             }
             Op::TrimClip { index, start, end } => doc.trim_clip(index, start, end),
             Op::SetSpeed { index, speed } => doc.set_speed(index, speed),
@@ -186,8 +193,11 @@ impl EditorSession {
             }
         }
         let after = doc.edit.clone();
-        if !matches!(&before, b if *b == after) {
-            history.record(&before, &after);
+        if before != after {
+            // Undo/redo move through the history; recording them would loop back.
+            if !is_history_op {
+                history.record(&before, &after);
+            }
             *self.save_pending.lock() = true;
         }
         drop(history);

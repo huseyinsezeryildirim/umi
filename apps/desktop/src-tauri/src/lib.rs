@@ -10,7 +10,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use tauri::ipc::Response;
-use tauri::{Manager, State};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::{Emitter, Manager, State};
 use umi_render::Gpu;
 
 #[derive(Default)]
@@ -213,6 +214,50 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
         .setup(|app| {
+            // Our own menu: Undo/Redo go to the editor (the default Edit menu would swallow
+            // ⌘Z before the page sees it); cut/copy/paste stay native for text fields.
+            let handle = app.handle();
+            let app_menu = Submenu::with_items(
+                handle,
+                "Umi",
+                true,
+                &[
+                    &PredefinedMenuItem::about(handle, Some("About Umi"), None)?,
+                    &PredefinedMenuItem::separator(handle)?,
+                    &PredefinedMenuItem::hide(handle, None)?,
+                    &PredefinedMenuItem::hide_others(handle, None)?,
+                    &PredefinedMenuItem::separator(handle)?,
+                    &PredefinedMenuItem::quit(handle, None)?,
+                ],
+            )?;
+            let edit_menu = Submenu::with_items(
+                handle,
+                "Edit",
+                true,
+                &[
+                    &MenuItem::with_id(handle, "undo", "Undo", true, Some("CmdOrCtrl+Z"))?,
+                    &MenuItem::with_id(handle, "redo", "Redo", true, Some("Shift+CmdOrCtrl+Z"))?,
+                    &PredefinedMenuItem::separator(handle)?,
+                    &PredefinedMenuItem::cut(handle, None)?,
+                    &PredefinedMenuItem::copy(handle, None)?,
+                    &PredefinedMenuItem::paste(handle, None)?,
+                    &PredefinedMenuItem::select_all(handle, None)?,
+                ],
+            )?;
+            let window_menu = Submenu::with_items(
+                handle,
+                "Window",
+                true,
+                &[&PredefinedMenuItem::minimize(handle, None)?, &PredefinedMenuItem::maximize(handle, None)?, &PredefinedMenuItem::close_window(handle, None)?],
+            )?;
+            app.set_menu(Menu::with_items(handle, &[&app_menu, &edit_menu, &window_menu])?)?;
+            app.on_menu_event(|app, event| {
+                let id = event.id().as_ref();
+                if id == "undo" || id == "redo" {
+                    let _ = app.emit("menu", id);
+                }
+            });
+
             // Warm the GPU up off the main thread so the first editor opens fast.
             let handle = app.handle().clone();
             std::thread::spawn(move || {

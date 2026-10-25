@@ -621,3 +621,49 @@
   box-shadow: 0 0 0 1.5px var(--lane);
   pointer-events: none;
 }
+
+/* Seam between two clips: a join button that shows on hover. */
+.ed-seam {
+  position: absolute;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--umi-ink);
+  background: var(--umi-trim);
+  box-shadow: 0 2px 6px rgba(14, 17, 30, 0.3);
+  opacity: 0;
+  transform: scale(0.7);
+  transition:
+    opacity var(--umi-fast),
+    transform var(--umi-normal) var(--umi-ease-spring);
+}
+.ed-seam:hover,
+.ed-tl-content:hover .ed-seam:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+.ed-lane--clips:hover ~ .ed-seam,
+.ed-seam:hover {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Magnet join: the edge sits on the cut and glows. */
+.ed-clip[data-magnet="end"],
+.ed-clip[data-magnet="start"] {
+  box-shadow:
+    inset 0 0 0 2px var(--umi-trim),
+    0 0 0 3px var(--umi-trim-glow),
+    0 4px 14px rgba(14, 17, 30, 0.25);
+}
+.ed-clip[data-magnet="end"] .ed-trim--end,
+.ed-clip[data-magnet="start"] .ed-trim--start {
+  opacity: 1;
+  box-shadow: 0 0 14px 2px var(--umi-trim-glow);
+}

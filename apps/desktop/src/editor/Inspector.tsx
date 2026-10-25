@@ -6,6 +6,7 @@ import {
   Camera,
   Clapperboard,
   Crosshair,
+  Merge,
   Image,
   Monitor,
   MousePointer2,
@@ -282,6 +283,11 @@ function SelectionPanel(props: { editor: Editor; selection: Selection }) {
                 onChange={(v) => void ed.apply({ op: "setSpeed", index: (s as { id: number }).id, speed: v })}
                 options={[0.5, 1, 1.5, 2, 4].map((v) => ({ value: v, label: `${v}×` }))}
               />
+              <Show when={(s as { id: number }).id + 1 < ed.state().placements.length}>
+                <Button size="sm" tip="Join with the next clip, bringing back anything cut between them" shortcut="⌘J" onClick={() => void ed.apply({ op: "joinClips", index: (s as { id: number }).id })}>
+                  <Merge size={14} /> Join with next clip
+                </Button>
+              </Show>
             </>
           )}
         </Match>

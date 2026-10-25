@@ -8,6 +8,7 @@ type Op =
   | { op: "split"; time: number }
   | { op: "cut"; start: number; end: number }
   | { op: "deleteClip"; index: number }
+  | { op: "joinClips"; index: number }
   | { op: "trimClip"; index: number; start?: number; end?: number }
   | { op: "setSpeed"; index: number; speed: number }
   | { op: "moveClip"; from: number; to: number }
