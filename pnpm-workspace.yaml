@@ -1,3 +1,7 @@
 packages:
   - packages/*
   - apps/*
+# Install scripts stay off: the site only uses the browser builds of these packages.
+allowBuilds:
+  onnxruntime-node: false
+  protobufjs: false
