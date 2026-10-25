@@ -4,7 +4,18 @@
 export const API = (process.env.NEXT_PUBLIC_UMI_API ?? "http://localhost:8799").replace(/\/+$/, "");
 const KEY = "umi.session";
 
-export type Account = { id: string; email: string | null; isPaid: boolean; emailVerified: boolean };
+export type Plan = "free" | "pro" | "team";
+export type Entitlements = {
+  cloudLinks: boolean;
+  maxVideoMinutes: number | null;
+  storageGB: number | null;
+  umiBadge: boolean;
+  insights: boolean;
+  linkControls: boolean;
+  workspaces: boolean;
+  customDomain: boolean;
+};
+export type Account = { id: string; email: string | null; isPaid: boolean; emailVerified: boolean; plan: Plan; entitlements: Entitlements };
 
 export function getToken(): string | null {
   try {
@@ -83,4 +94,9 @@ export async function resetPassword(token: string, password: string): Promise<Ac
   const r = await call<{ token: string; account: Account }>("/api/auth/reset", { method: "POST", body: JSON.stringify({ token, password }) });
   setToken(r.token);
   return r.account;
+}
+
+/** Local development only: switch your own plan to try what each one allows. */
+export async function setPlanForTesting(plan: Plan): Promise<Account> {
+  return (await call<{ account: Account }>("/api/auth/dev-plan", { method: "POST", body: JSON.stringify({ plan }) })).account;
 }

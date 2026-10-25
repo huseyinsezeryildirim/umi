@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { type Account, me, resendVerification, signOut } from "@/lib/account";
+import { type Account, type Plan, me, resendVerification, setPlanForTesting, signOut } from "@/lib/account";
 import { Recorder } from "./Recorder";
 import { Mark } from "./ui";
 
@@ -37,7 +37,7 @@ export function Workspace() {
   return (
     <>
       {!account.emailVerified && <VerifyBanner email={account.email} />}
-      <Recorder account={<AccountMenu account={account} />} />
+      <Recorder account={<AccountMenu account={account} onChange={setAccount} />} />
     </>
   );
 }
@@ -62,7 +62,9 @@ function VerifyBanner({ email }: { email: string | null }) {
   );
 }
 
-function AccountMenu({ account }: { account: Account }) {
+const PLAN_NAMES: Record<Plan, string> = { free: "Free", pro: "Pro", team: "Team" };
+
+function AccountMenu({ account, onChange }: { account: Account; onChange: (a: Account) => void }) {
   const [open, setOpen] = useState(false);
   const letter = (account.email ?? "?")[0].toUpperCase();
   return (
@@ -74,9 +76,26 @@ function AccountMenu({ account }: { account: Account }) {
         <div className="absolute top-11 right-0 z-50 w-60 rounded-2xl bg-white p-2 text-left shadow-[0_0_0_1px_rgb(17_24_39/0.08),0_20px_50px_-12px_rgb(17_24_39/0.25)]">
           <p className="truncate px-3 pt-2 text-[14px] font-medium">{account.email}</p>
           <p className="px-3 pb-2 text-[12px] text-faint">
-            {account.isPaid ? "Umi Cloud" : "Free"}
+            {PLAN_NAMES[account.plan]} plan
             {account.emailVerified ? "" : " · email not confirmed"}
           </p>
+          {process.env.NODE_ENV !== "production" && (
+            <div className="mx-1 mb-2 rounded-xl bg-[#fff8eb] p-2">
+              <p className="px-1 pb-1.5 text-[11px] font-medium text-[#8a5a0f]">Testing: switch plan</p>
+              <div className="grid grid-cols-3 gap-1">
+                {(Object.keys(PLAN_NAMES) as Plan[]).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => void setPlanForTesting(p).then(onChange)}
+                    className={`h-7 rounded-lg text-[12px] font-medium ${account.plan === p ? "bg-[#7a4b00] text-white" : "bg-white text-[#7a4b00]"}`}
+                  >
+                    {PLAN_NAMES[p]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <a href="/" className="block rounded-xl px-3 py-2 text-[14px] hover:bg-ink/5">
             Umi website
           </a>
