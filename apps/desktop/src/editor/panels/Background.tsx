@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { Button, Section, SliderField, Spinner, Swatch } from "@umi/ui";
-import { ImagePlus, Palette, Shuffle } from "lucide-solid";
+import { Blend, Droplets, Image as ImageIcon, ImagePlus, Mountain, PaintBucket, Palette, Shuffle } from "lucide-solid";
+import type { JSX } from "solid-js";
 import type { Editor } from "../store";
 import type { Background, EditSettings, GradientPreset } from "../types";
 import { bundlePath, chooseIntoBundle, IMAGE_EXTENSIONS } from "./files";
@@ -25,12 +26,12 @@ const PICKABLE: GradientPreset[] = ["sky", "ice", "navy", "graphite", "mist", "m
 const COLORS = ["#0e111e", "#ffffff", "#f1f7fc", "#116ff5", "#13a874", "#f0443a", "#ffc83d", "#7a5af8"];
 
 type Kind = "gradient" | "color" | "wallpaper" | "image" | "blurred";
-const KINDS: [Kind, string][] = [
-  ["gradient", "Gradient"],
-  ["color", "Color"],
-  ["wallpaper", "Wallpaper"],
-  ["image", "Image"],
-  ["blurred", "Blur"],
+const KINDS: [Kind, string, () => JSX.Element][] = [
+  ["gradient", "Gradient", () => <Blend size={16} />],
+  ["color", "Color", () => <PaintBucket size={16} />],
+  ["wallpaper", "Wallpaper", () => <Mountain size={16} />],
+  ["image", "Image", () => <ImageIcon size={16} />],
+  ["blurred", "Blur", () => <Droplets size={16} />],
 ];
 
 interface Wallpaper {
@@ -115,11 +116,12 @@ export function BackgroundSection(props: { editor: Editor; gesture: object }) {
         </Button>
       }
     >
-      <div class="ed-chips">
+      <div class="ed-tiles">
         <For each={KINDS}>
-          {([value, label]) => (
-            <button type="button" class="ed-chip" data-selected={kind() === value ? "true" : "false"} onClick={() => pick(value)}>
-              {label}
+          {([value, label, icon]) => (
+            <button type="button" class="ed-tile" data-selected={kind() === value ? "true" : "false"} onClick={() => pick(value)}>
+              {icon()}
+              <span>{label}</span>
             </button>
           )}
         </For>
