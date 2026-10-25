@@ -267,6 +267,11 @@ pub async fn record_prepare(app: AppHandle) -> Result<(), String> {
             return Err("Already recording".to_string());
         }
         let settings = load_settings();
+        // Without the permission, capture waits on macOS's prompt and nothing seems to happen:
+        // ask once (macOS shows its prompt) and say so instead.
+        if !screen_permission() {
+            return Err(SCREEN_PERMISSION.to_string());
+        }
         let options = options(&settings)?;
         // The meter and preview step aside; the recording opens the devices itself.
         *rec.meter.lock() = None;
@@ -278,6 +283,27 @@ pub async fn record_prepare(app: AppHandle) -> Result<(), String> {
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// What `record_prepare` answers when macOS hasn't allowed screen recording (the UI shows the
+/// launcher's permission row then).
+const SCREEN_PERMISSION: &str = "SCREEN_PERMISSION";
+
+/// Screen recording is allowed; if not, macOS's prompt is shown (once per app version).
+#[allow(unsafe_code)]
+fn screen_permission() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        #[link(name = "CoreGraphics", kind = "framework")]
+        unsafe extern "C" {
+            fn CGPreflightScreenCaptureAccess() -> bool;
+            fn CGRequestScreenCaptureAccess() -> bool;
+        }
+        // SAFETY: plain CoreGraphics calls without arguments.
+        unsafe { CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() }
+    }
+    #[cfg(not(target_os = "macos"))]
+    true
 }
 
 /// Time 0 (after the countdown).

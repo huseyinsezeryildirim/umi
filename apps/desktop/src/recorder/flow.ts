@@ -38,8 +38,15 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
     } catch (e) {
       await recorder.hide("countdown");
       await invoke("record_cancel").catch(() => {});
-      toast(`Couldn't start recording: ${e}`);
-      await recorder.show("main");
+      if (String(e).includes("SCREEN_PERMISSION")) {
+        // Back to the launcher, which shows how to allow it.
+        await recorder.hide("prompter").catch(() => {});
+        await recorder.show("launcher");
+        toast("Umi needs permission to record your screen. Allow it in System Settings, then press Start again.");
+      } else {
+        toast(`Couldn't start recording: ${e}`);
+        await recorder.show("main");
+      }
     } finally {
       busy = false;
     }
