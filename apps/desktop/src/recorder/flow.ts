@@ -22,15 +22,22 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
     try {
       await recorder.hide("launcher");
       if (settings.notesOn) await recorder.show("prompter");
-      await invoke("record_prepare");
+      // The countdown starts at once; the screen, camera and microphone warm up meanwhile.
+      let failed: unknown = null;
+      const prepared = invoke("record_prepare").catch((e) => {
+        failed = e;
+      });
       if (settings.countdown) {
         await recorder.show("countdown");
         for (const n of [3, 2, 1]) {
+          if (failed) break;
           await emit("countdown", n);
           await new Promise((r) => setTimeout(r, 1000));
         }
         await recorder.hide("countdown");
       }
+      await prepared;
+      if (failed) throw failed;
       await invoke("record_begin");
       if (settings.flow === "instant") reserved = invoke<string | null>("instant_reserve").catch(() => null);
       await recorder.show("controls");

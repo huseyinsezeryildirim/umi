@@ -74,6 +74,9 @@ pub trait ScreenSession: Send {
     fn stop(&mut self) -> Result<(), CaptureError>;
     /// Pixel size of the frames being delivered.
     fn size(&self) -> (u32, u32);
+    /// Looks again for our own windows to leave out (ones opened after the recording
+    /// started, like the control bar). Display recordings only.
+    fn refresh_exclusions(&self) {}
 }
 
 pub fn displays() -> Result<Vec<Display>, CaptureError> {

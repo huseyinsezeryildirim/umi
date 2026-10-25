@@ -13,9 +13,11 @@ pub struct Spec {
 pub const LAUNCHER: Spec = Spec { view: "launcher", size: (360.0, 560.0), transparent: true, focus: true };
 pub const BUBBLE: Spec = Spec { view: "bubble", size: (240.0, 240.0), transparent: true, focus: false };
 /// A column on the left, like Loom's: stop, time, sound, pen, pause, start over, discard.
-pub const CONTROLS: Spec = Spec { view: "controls", size: (64.0, 360.0), transparent: true, focus: false };
+pub const CONTROLS: Spec = Spec { view: "controls", size: (72.0, 380.0), transparent: true, focus: false };
 pub const COUNTDOWN: Spec = Spec { view: "countdown", size: (240.0, 240.0), transparent: true, focus: false };
 pub const SHOT: Spec = Spec { view: "shot", size: (1120.0, 760.0), transparent: false, focus: true };
+/// The camera menu, opened from the bubble's adjust button, next to the bubble.
+pub const CAMERA_MENU: Spec = Spec { view: "camera", size: (280.0, 300.0), transparent: true, focus: true };
 pub const PROMPTER: Spec = Spec { view: "prompter", size: (520.0, 220.0), transparent: true, focus: true };
 
 /// The main display's frame in points (position, size).
@@ -36,13 +38,33 @@ fn main_display(app: &AppHandle) -> (LogicalPosition<f64>, LogicalSize<f64>) {
 /// Shows the window for `spec` (creating it the first time) at `at` (points), or a default
 /// place for that view.
 pub fn show(app: &AppHandle, spec: &Spec, at: Option<(f64, f64)>) -> tauri::Result<WebviewWindow> {
+    let window = show_window(app, spec, at)?;
+    // Recording: keep the window that just appeared out of the video.
+    if spec.transparent {
+        let app = app.clone();
+        std::thread::spawn(move || {
+            // Once it's really on screen.
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            if let Some(r) = app.state::<crate::AppState>().recorder.current.lock().as_ref() {
+                r.refresh_exclusions();
+            }
+        });
+    }
+    Ok(window)
+}
+
+fn show_window(app: &AppHandle, spec: &Spec, at: Option<(f64, f64)>) -> tauri::Result<WebviewWindow> {
     let (origin, display) = main_display(app);
+    // The countdown dims the whole screen.
+    let full = Spec { view: spec.view, size: (display.width, display.height), transparent: spec.transparent, focus: spec.focus };
+    let spec = if spec.view == "countdown" { &full } else { spec };
     let place = at.unwrap_or_else(|| match spec.view {
         "launcher" => (origin.x + display.width - spec.size.0 - 16.0, origin.y + 36.0),
         "bubble" => (origin.x + 40.0, origin.y + display.height - spec.size.1 - 60.0),
         "controls" => (origin.x + 16.0, origin.y + (display.height - spec.size.1) / 2.0),
         // Just under the menu bar, near the camera, so eyes stay close to the lens.
         "prompter" => (origin.x + (display.width - spec.size.0) / 2.0, origin.y + 34.0),
+        "countdown" => (origin.x, origin.y),
         "shot" => (origin.x + (display.width - spec.size.0) / 2.0, origin.y + (display.height - spec.size.1) / 2.0),
         _ => (origin.x + (display.width - spec.size.0) / 2.0, origin.y + (display.height - spec.size.1) / 2.0),
     });
@@ -190,6 +212,20 @@ pub fn window_show(app: AppHandle, view: String, x: Option<f64>, y: Option<f64>)
         "bubble" => show(&app, &BUBBLE, at).map(|_| ()),
         "controls" => show(&app, &CONTROLS, at).map(|_| ()),
         "prompter" => show(&app, &PROMPTER, at).map(|_| ()),
+        "camera" => {
+            // Beside the bubble: to its right, or its left near the screen's right edge.
+            let place = app.get_webview_window("bubble").and_then(|b| {
+                let scale = b.scale_factor().ok()?;
+                let pos = b.outer_position().ok()?.to_logical::<f64>(scale);
+                let size = b.outer_size().ok()?.to_logical::<f64>(scale);
+                let (origin, display) = main_display(&app);
+                let right = pos.x + size.width + 8.0;
+                let x = if right + CAMERA_MENU.size.0 > origin.x + display.width { pos.x - CAMERA_MENU.size.0 - 8.0 } else { right };
+                let y = (pos.y + size.height - CAMERA_MENU.size.1).max(origin.y + 30.0);
+                Some((x, y))
+            });
+            show(&app, &CAMERA_MENU, at.or(place)).map(|_| ())
+        }
         "shot" => show(&app, &SHOT, at).map(|_| ()),
         "countdown" => show(&app, &COUNTDOWN, at).map(|w| {
             let _ = w.set_ignore_cursor_events(true);

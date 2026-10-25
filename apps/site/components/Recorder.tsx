@@ -28,6 +28,7 @@ const SURFACES: [Surface, string][] = [
   ["browser", "Tab"],
 ];
 const SIZES = { S: 150, M: 210, L: 300 } as const;
+const SHAPES: CameraShape[] = ["circle", "rounded", "square"];
 type Size = keyof typeof SIZES;
 type Place = { x: number; y: number; size: Size; shape: CameraShape; mirror: boolean };
 
@@ -374,7 +375,7 @@ function Bubble({ stream, place, onPlace }: { stream: MediaStream; place: Place;
   };
   return (
     <motion.div
-      className="fixed z-50 cursor-grab touch-none overflow-hidden bg-[#1a1d29] shadow-[0_0_0_3px_rgb(255_255_255/0.95),0_20px_50px_-12px_rgb(0_0_0/0.45)] select-none active:cursor-grabbing"
+      className="fixed z-50 cursor-grab touch-none overflow-hidden bg-[#1a1d29] shadow-[0_0_0_3px_#fff] select-none active:cursor-grabbing"
       style={{ left: x, top: y, width: d, height: d, borderRadius: place.shape === "circle" ? "50%" : place.shape === "rounded" ? "28%" : "8%", transition: "width .3s, height .3s, border-radius .3s" }}
       initial={{ opacity: 0, scale: 0.7 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -385,13 +386,17 @@ function Bubble({ stream, place, onPlace }: { stream: MediaStream; place: Place;
     >
       <video ref={video} autoPlay muted playsInline className={`pointer-events-none size-full object-cover ${place.mirror ? "-scale-x-100" : ""}`} />
       {hover && (
-        // Shape and mirror, in a small row near the bottom.
-        <div className="absolute bottom-[11%] left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-full bg-[rgb(14_17_30/0.72)] p-1 backdrop-blur-md">
-          {(["circle", "rounded", "square"] as CameraShape[]).map((shape) => (
-            <PillButton key={shape} label={shape === "rounded" ? "Rounded" : shape === "circle" ? "Circle" : "Square"} on={place.shape === shape} onClick={() => onPlace({ ...place, shape })}>
-              <span className={`size-2.5 border-[1.5px] border-current ${shape === "circle" ? "rounded-full" : shape === "rounded" ? "rounded-[35%]" : "rounded-[2px]"}`} />
+        // Size (three dots), shape (one button that cycles) and mirror, across the middle.
+        <div className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 rounded-full bg-[rgb(14_17_30/0.72)] p-1 backdrop-blur-md">
+          {(Object.keys(SIZES) as Size[]).map((s, i) => (
+            <PillButton key={s} label={["Small", "Medium", "Large"][i]} on={place.size === s} onClick={() => onPlace({ ...place, size: s })}>
+              <span className="rounded-full bg-current" style={{ width: 4 + i * 3, height: 4 + i * 3 }} />
             </PillButton>
           ))}
+          <span className="mx-0.5 h-3.5 w-px bg-white/20" />
+          <PillButton label="Shape" on={false} onClick={() => onPlace({ ...place, shape: SHAPES[(SHAPES.indexOf(place.shape) + 1) % SHAPES.length] })}>
+            <span className={`size-2.5 border-[1.5px] border-current ${place.shape === "circle" ? "rounded-full" : place.shape === "rounded" ? "rounded-[35%]" : "rounded-[2px]"}`} />
+          </PillButton>
           <PillButton label="Mirror" on={place.mirror} onClick={() => onPlace({ ...place, mirror: !place.mirror })}>
             <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 3v18M8 7 3 12l5 5zM16 7l5 5-5 5z" />
