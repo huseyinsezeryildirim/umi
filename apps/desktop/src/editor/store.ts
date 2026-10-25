@@ -23,6 +23,10 @@ type Op =
   | { op: "delete"; selection: Selection }
   | { op: "deleteMany"; selections: Selection[] }
   | { op: "shiftMany"; selections: Selection[]; delta: number }
+  | { op: "editCaptionLine"; ids: string[]; text: string }
+  | { op: "cutWords"; ids: string[] }
+  | { op: "removeFillers" }
+  | { op: "removePauses"; min: number }
   | { op: "beginGesture" }
   | { op: "endGesture" }
   | { op: "undo" }
@@ -110,6 +114,13 @@ export function createEditor(initial: EditorState) {
     thumbnails,
     waveform,
     panelRequest,
+    /** Whether a recording time is still in the video (not cut out). */
+    isKept: (source: number) => state().placements.some((p) => source >= p.clip.start - 1e-3 && source <= p.clip.end + 1e-3),
+    /** Output time showing recording time `source`, or null if it's cut out. */
+    outputTimeAt: (source: number) => {
+      const p = state().placements.find((p) => source >= p.clip.start - 1e-3 && source <= p.clip.end + 1e-3);
+      return p ? p.outputStart + (source - p.clip.start) / p.clip.speed : null;
+    },
     requestPanel: (tab: string) => requestPanel({ tab }),
     setTime: (t: number) => setTime(Math.min(Math.max(t, 0), state().outputDuration)),
     setPlaying,

@@ -1,0 +1,23 @@
+[package]
+name = "umi-ai"
+description = "On-device AI: transcription (Whisper), voiceover (Kokoro), person segmentation and face detection. Models download on first use."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+umi-media = { path = "../umi-media" }
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ureq = "3"
+dirs = "6"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+whisper-rs = { version = "0.16", features = ["metal"] }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+whisper-rs = "0.16"
+
+[lints]
+workspace = true

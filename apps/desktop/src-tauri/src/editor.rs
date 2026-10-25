@@ -40,6 +40,14 @@ pub enum Op {
     DeleteMany { selections: Vec<Selection> },
     /// Moves several timed items by the same amount (multi-selection drag).
     ShiftMany { selections: Vec<Selection>, delta: f64 },
+    /// Replaces the words of one caption line.
+    EditCaptionLine { ids: Vec<uuid::Uuid>, text: String },
+    /// Text-based editing: cuts these words out of the video.
+    CutWords { ids: Vec<uuid::Uuid> },
+    /// Cuts every filler word ("um", "uh", "şey"…).
+    RemoveFillers,
+    /// Shortens silences longer than `min` seconds.
+    RemovePauses { min: f64 },
     BeginGesture,
     EndGesture,
     Undo,
@@ -200,6 +208,18 @@ impl EditorSession {
                     }
                 }
             }
+            Op::EditCaptionLine { ids, text } => doc.edit_caption_line(&ids, &text),
+            Op::CutWords { ids } => {
+                doc.cut_words(&ids);
+            }
+            Op::RemoveFillers => {
+                let ids = umi_project::captions::filler_words(&doc.edit.captions.words);
+                doc.cut_words(&ids);
+            }
+            Op::RemovePauses { min } => {
+                let ranges = umi_project::captions::long_pauses(&doc.edit.captions.words, min.max(0.3), 0.3);
+                doc.cut_source_ranges(&ranges);
+            }
             Op::BeginGesture => history.begin_gesture(&doc.edit),
             Op::EndGesture => history.end_gesture(&doc.edit),
             Op::Undo => {
@@ -291,6 +311,55 @@ impl EditorSession {
     pub fn export(&self, gpu: Arc<Gpu>, settings: &ExportSettings, destination: &Path, progress: &(dyn Fn(f64) + Sync), cancel: &AtomicBool) -> Result<(), String> {
         let edit = self.doc.lock().edit.clone();
         umi_engine::export(gpu, &self.bundle, edit, settings, destination, progress, cancel).map_err(|e| e.to_string())
+    }
+
+    /// Transcribes the voice on device and stores the words as captions (turned on).
+    /// `progress` gets (stage, 0…1): "download" for the model's first use, then "transcribe".
+    pub fn transcribe(&self, language: Option<String>, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<EditorState, String> {
+        let model = umi_ai::models::Model::WhisperBase.ensure(&|p| progress("download", p)).map_err(|e| e.to_string())?;
+        let (screen, track) = {
+            let doc = self.doc.lock();
+            let tracks = umi_media::audio_streams(&Bundle::new(&self.bundle).screen()).map(|t| t.len()).unwrap_or(0);
+            if tracks == 0 {
+                return Err("This recording has no sound.".into());
+            }
+            let mic = doc.project.audio.microphone_track.map(|t| t as usize).filter(|t| *t < tracks);
+            (Bundle::new(&self.bundle).screen(), mic.unwrap_or(0))
+        };
+        progress("transcribe", 0.0);
+        let samples = umi_ai::transcribe::read_mono_16k(&screen, track).map_err(|e| e.to_string())?;
+        let language = language.filter(|l| l != "auto");
+        let report = std::sync::Arc::new(parking_lot::Mutex::new(Vec::<i32>::new()));
+        let (words, detected) = std::thread::scope(|scope| {
+            let sink = report.clone();
+            let job = scope.spawn(move || umi_ai::transcribe::transcribe(&model, &samples, language.as_deref(), move |p| sink.lock().push(p)));
+            // Whisper reports progress on its own thread; relay it from here.
+            while !job.is_finished() {
+                if let Some(p) = report.lock().last().copied() {
+                    progress("transcribe", p as f64 / 100.0);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            job.join().map_err(|_| "transcription crashed".to_string())
+        })?
+        .map_err(|e| e.to_string())?;
+        if words.is_empty() {
+            return Err("No speech found.".into());
+        }
+        let mut edit = self.doc.lock().edit.clone();
+        edit.captions.words = words
+            .into_iter()
+            .map(|w| umi_project::edit::CaptionWord { id: uuid::Uuid::new_v4(), start: w.start, end: w.end, text: w.text })
+            .collect();
+        edit.captions.language = detected;
+        edit.captions.enabled = true;
+        Ok(self.apply(Op::SetEdit { edit: Box::new(edit) }))
+    }
+
+    /// Captions as SRT or WebVTT on the edited timeline.
+    pub fn subtitles(&self, vtt: bool) -> String {
+        let doc = self.doc.lock();
+        umi_project::captions::subtitles(&doc, if vtt { umi_project::captions::SubtitleFormat::Vtt } else { umi_project::captions::SubtitleFormat::Srt })
     }
 
     fn edit_change(&self) -> Option<Box<EditSettings>> {

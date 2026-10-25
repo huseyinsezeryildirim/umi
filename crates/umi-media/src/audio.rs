@@ -128,17 +128,35 @@ impl AudioReader {
     }
 
     fn push(&mut self, frame: &ff::frame::Audio) -> Result<(), MediaError> {
-        if self.resampler.is_none() {
+        // Some files (AIFF, older WAVs) leave the channel layout unset; give it the usual
+        // layout for its channel count so the resampler accepts it.
+        let mut fixed;
+        let frame = if frame.channel_layout().is_empty() || frame.channel_layout().channels() != frame.channels() as i32 {
+            fixed = frame.clone();
+            fixed.set_channel_layout(ff::ChannelLayout::default(frame.channels() as i32));
+            &fixed
+        } else {
+            frame
+        };
+        let input = (frame.format(), frame.channel_layout(), frame.rate());
+        // A stream can change format midway: rebuild the resampler when it does.
+        if self.resampler.as_ref().is_none_or(|r| {
+            let i = r.input();
+            (i.format, i.channel_layout, i.rate) != input
+        }) {
             self.resampler = Some(ff::software::resampling::Context::get(
-                frame.format(),
-                frame.channel_layout(),
-                frame.rate(),
+                input.0,
+                input.1,
+                input.2,
                 ff::format::Sample::F32(ff::format::sample::Type::Packed),
                 ff::ChannelLayout::STEREO,
                 SAMPLE_RATE,
             )?);
         }
-        let mut out = ff::frame::Audio::empty();
+        // Room for everything this frame becomes at 48 kHz (upsampling makes more samples
+        // than came in; a smaller buffer would leave the rest stuck in the resampler).
+        let capacity = frame.samples() * SAMPLE_RATE as usize / frame.rate().max(1) as usize + 64;
+        let mut out = ff::frame::Audio::new(ff::format::Sample::F32(ff::format::sample::Type::Packed), capacity, ff::ChannelLayout::STEREO);
         if let Some(resampler) = &mut self.resampler {
             resampler.run(frame, &mut out)?;
         }
