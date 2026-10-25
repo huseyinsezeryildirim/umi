@@ -1356,6 +1356,95 @@
   border-radius: 2px 2px 0 0;
   background: linear-gradient(180deg, #6fb5ef, var(--umi-accent));
 }
+.ed-retention {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ed-retention__plot {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  height: 84px;
+  padding: 0 32px 0 0;
+}
+.ed-retention__plot svg {
+  flex: 1;
+  height: 100%;
+  overflow: visible;
+  border-bottom: 1px solid var(--umi-hairline);
+  cursor: crosshair;
+}
+.ed-retention__axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--umi-text-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ed-retention__axis i {
+  font-style: normal;
+  line-height: 1;
+}
+.ed-retention__grid {
+  stroke: var(--umi-hairline);
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+.ed-retention__line {
+  fill: none;
+  stroke: var(--umi-accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.ed-retention__drop {
+  fill: #fff;
+  stroke: #f0443a;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.ed-retention__cursor {
+  stroke: var(--umi-ink);
+  stroke-opacity: 0.3;
+  vector-effect: non-scaling-stroke;
+}
+.ed-retention__end {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  font-size: 12px;
+  font-weight: var(--umi-weight-semibold);
+  color: var(--umi-accent);
+  font-variant-numeric: tabular-nums;
+}
+.ed-retention__tip {
+  position: absolute;
+  top: -6px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--umi-ink);
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+  transform: translate(-50%, -100%);
+  margin-left: 22px;
+  pointer-events: none;
+}
+.ed-retention__times {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 32px 0 28px;
+  font-size: 10.5px;
+  color: var(--umi-text-3);
+  font-variant-numeric: tabular-nums;
+}
+.ed-retention__note {
+  color: #f0443a;
+}
 .ed-viewers__country {
   display: grid;
   grid-template-columns: 18px minmax(0, 7.5em) 1fr 2.5em;

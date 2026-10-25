@@ -15,6 +15,7 @@ interface Video {
   allowComments?: boolean;
   expiresAt?: string | null;
   workspaceId?: string | null;
+  durationMs?: number | null;
 }
 interface Insights {
   views: number;
@@ -190,7 +191,7 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
                     {copied() === "link" ? "Copied" : "Copy"}
                   </Button>
                 </div>
-                <Show when={insights()}>{(i) => <ViewerInsights insights={i()} />}</Show>
+                <Show when={insights()}>{(i) => <ViewerInsights insights={i()} seconds={(v().durationMs ?? 0) / 1000} />}</Show>
                 <SwitchRow label={`Start at ${Math.floor(ed.time() / 60)}:${String(Math.floor(ed.time() % 60)).padStart(2, "0")}`} checked={atTime()} onChange={setAtTime} />
                 <Show when={teams().length}>
                   <div class="umi-field-label">Team</div>
@@ -274,6 +275,80 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
 
 const duration = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`);
 
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+/**
+ * Share of viewers still watching across the video (0–100%), with the biggest drop marked
+ * and the value under the pointer.
+ */
+function RetentionChart(props: { retention: number[]; seconds: number }) {
+  const W = 320;
+  const H = 84;
+  const points = () => props.retention.map((r, k, all) => [(k / Math.max(all.length - 1, 1)) * W, H - r * H] as const);
+  const line = () => points().map(([x, y], k) => `${k ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  const area = () => `${line()} L${W} ${H} L0 ${H} Z`;
+  /** Where the most viewers leave between two points. */
+  const drop = () => {
+    const r = props.retention;
+    let best = -1;
+    let size = 0;
+    for (let k = 1; k < r.length; k++) if (r[k - 1] - r[k] > size) (size = r[k - 1] - r[k]), (best = k);
+    return size >= 0.05 ? best : -1;
+  };
+  const [hover, setHover] = createSignal<number | null>(null);
+  const at = (k: number) => (props.seconds ? clock((k / Math.max(props.retention.length - 1, 1)) * props.seconds) : `${Math.round((k / Math.max(props.retention.length - 1, 1)) * 100)}%`);
+  const last = () => props.retention[props.retention.length - 1] ?? 0;
+  return (
+    <div class="ed-retention">
+      <div class="ed-retention__plot">
+        <span class="ed-retention__axis">
+          <i>100%</i>
+          <i>50%</i>
+          <i>0</i>
+        </span>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="none"
+          onPointerMove={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setHover(Math.round(((e.clientX - r.left) / r.width) * (props.retention.length - 1)));
+          }}
+          onPointerLeave={() => setHover(null)}
+        >
+          <defs>
+            <linearGradient id="retention-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#116ff5" stop-opacity="0.28" />
+              <stop offset="1" stop-color="#116ff5" stop-opacity="0.02" />
+            </linearGradient>
+          </defs>
+          <line x1="0" x2={W} y1={H / 2} y2={H / 2} class="ed-retention__grid" />
+          <path d={area()} fill="url(#retention-fill)" />
+          <path d={line()} class="ed-retention__line" />
+          <Show when={drop() >= 0}>
+            <circle cx={points()[drop()][0]} cy={points()[drop()][1]} r="3.5" class="ed-retention__drop" />
+          </Show>
+          <Show when={hover() !== null}>
+            <line x1={points()[hover()!][0]} x2={points()[hover()!][0]} y1="0" y2={H} class="ed-retention__cursor" />
+          </Show>
+        </svg>
+        <span class="ed-retention__end">{Math.round(last() * 100)}%</span>
+        <Show when={hover() !== null}>
+          <span class="ed-retention__tip" style={{ left: `${(hover()! / Math.max(props.retention.length - 1, 1)) * 100}%` }}>
+            {at(hover()!)} · {Math.round(props.retention[hover()!] * 100)}% watching
+          </span>
+        </Show>
+      </div>
+      <div class="ed-retention__times">
+        <span>0:00</span>
+        <Show when={drop() >= 0}>
+          <span class="ed-retention__note">Most leave around {at(drop())}</span>
+        </Show>
+        <span>{props.seconds ? clock(props.seconds) : "end"}</span>
+      </div>
+    </div>
+  );
+}
+
 /** "TR" → 🇹🇷 and the country's name in the reader's language. */
 const flag = (code: string) => String.fromCodePoint(...[...code.toUpperCase()].map((c) => 0x1f1a5 + c.charCodeAt(0)));
 const countryName = (code: string) => {
@@ -285,7 +360,7 @@ const countryName = (code: string) => {
 };
 
 /** Views, watch time and where people stop watching (Umi Cloud). */
-function ViewerInsights(props: { insights: Insights }) {
+function ViewerInsights(props: { insights: Insights; seconds: number }) {
   const i = () => props.insights;
   const top = () => i().countries.slice(0, 4);
   const most = () => Math.max(1, ...top().map((c) => c.count));
@@ -311,10 +386,8 @@ function ViewerInsights(props: { insights: Insights }) {
       </div>
       <Show when={i().views > 0}>
         <div class="ed-viewers__block">
-          <span class="ed-viewers__label">Where people stop watching</span>
-          <div class="ed-viewers__curve">
-            <For each={i().retention}>{(r) => <span style={{ height: `${Math.max(4, r * 100)}%` }} title={`${Math.round(r * 100)}% still watching`} />}</For>
-          </div>
+          <span class="ed-viewers__label">Still watching, through the video</span>
+          <RetentionChart retention={i().retention} seconds={props.seconds} />
         </div>
         <Show when={top().length}>
           <div class="ed-viewers__block">
