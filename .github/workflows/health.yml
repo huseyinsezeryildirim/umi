@@ -1,0 +1,58 @@
+name: Health
+
+# Hourly: do staging and production answer {"ok":true} on /healthz? A failure opens an issue (or
+# comments on the open one); recovery closes it. The URLs are the repository variables
+# STAGING_API_URL and PRODUCTION_API_URL (repository-level, so these runs never wait for the
+# production environment's reviewers); an unset one is skipped. One short job per hour keeps this
+# around 720 Actions minutes a month on a private repository (free on a public one).
+on:
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      STAGING_API_URL: ${{ vars.STAGING_API_URL }}
+      PRODUCTION_API_URL: ${{ vars.PRODUCTION_API_URL }}
+    steps:
+      - name: /healthz
+        run: |
+          healthy() {
+            for _ in 1 2 3; do
+              curl -fsS --max-time 15 "$1" 2>/dev/null | grep -q '"ok":true' && return 0
+              sleep 20
+            done
+            return 1
+          }
+          issue() { gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$1\" in:title" --json number -q '.[0].number'; }
+          run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          failed=0
+          for target in staging production; do
+            var="${target^^}_API_URL"
+            base="${!var}"
+            if [ -z "$base" ]; then echo "::notice::$var isn't set; skipping $target."; continue; fi
+            url="${base%/}/healthz"
+            title="Health check failing: $target"
+            open=$(issue "$title")
+            if healthy "$url"; then
+              echo "$target: healthy"
+              if [ -n "$open" ]; then gh issue close "$open" --repo "$GITHUB_REPOSITORY" --comment "Healthy again: $run"; fi
+            else
+              echo "::error::$url didn't answer {\"ok\":true} three times in a row."
+              failed=1
+              if [ -n "$open" ]; then
+                gh issue comment "$open" --repo "$GITHUB_REPOSITORY" --body "Still failing: $run"
+              else
+                gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+                  --body "$url stopped answering {\"ok\":true}. Run: $run"$'\n\n'"See docs/DEVOPS.md, Monitoring."
+              fi
+            fi
+          done
+          exit $failed

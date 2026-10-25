@@ -1,0 +1,46 @@
+# Weekly dependency updates, grouped so each ecosystem opens at most a couple of PRs.
+# CI (ci.yml) builds every PR on macOS, Windows, Linux and the web.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      tauri:
+        patterns: ["tauri*"]
+      rust:
+        update-types: [minor, patch]
+
+  # The pnpm workspace (desktop UI, site, packages/*).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      tauri:
+        patterns: ["@tauri-apps/*"]
+      js:
+        update-types: [minor, patch]
+
+  # The Cloudflare Worker (npm, web/package-lock.json).
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      cloud:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
