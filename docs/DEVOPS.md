@@ -43,6 +43,8 @@ npx wrangler d1 create umi             # copy the printed database_id into env.p
 openssl rand -base64 32 | npx wrangler secret put SIGNING_SECRET --env staging
 openssl rand -base64 32 | npx wrangler secret put SIGNING_SECRET --env production
 npx wrangler secret put RESEND_API_KEY --env production     # production sends email through Resend
+npx wrangler secret put ADMIN_PASSWORD --env production     # moderation panel at umi.cam/adagiris (sign in as ADMIN_EMAIL)
+npx wrangler secret put ADMIN_PASSWORD --env staging
 # Optional, for direct-to-R2 uploads (also set R2_S3_ENDPOINT in wrangler.jsonc):
 #   npx wrangler secret put R2_ACCESS_KEY_ID --env production
 #   npx wrangler secret put R2_SECRET_ACCESS_KEY --env production
