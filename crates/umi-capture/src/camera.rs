@@ -3,7 +3,7 @@
 use crate::{CaptureError, Clock, Frame, VideoSink};
 use nokhwa::Camera;
 use nokhwa::pixel_format::RgbAFormat;
-use nokhwa::utils::{ApiBackend, CameraIndex, RequestedFormat, RequestedFormatType};
+use nokhwa::utils::{ApiBackend, CameraIndex, FrameFormat, RequestedFormat, RequestedFormatType};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
@@ -93,7 +93,13 @@ pub fn start(id: Option<&str>, clock: Clock, sink: Arc<dyn VideoSink>) -> Result
             while !flag.load(Ordering::Relaxed) {
                 let Ok(buffer) = camera.frame() else { continue };
                 let Some(t) = clock.now() else { continue };
-                let Ok(image) = buffer.decode_image::<RgbAFormat>() else { continue };
+                // MJPEG with the pure-Rust decoder; raw formats with nokhwa's converters.
+                let image = if buffer.source_frame_format() == FrameFormat::MJPEG {
+                    image::load_from_memory_with_format(buffer.buffer(), image::ImageFormat::Jpeg).ok().map(|i| i.to_rgba8())
+                } else {
+                    buffer.decode_image::<RgbAFormat>().ok().and_then(|i| image::RgbaImage::from_raw(i.width(), i.height(), i.into_raw()))
+                };
+                let Some(image) = image else { continue };
                 let (w, h) = (image.width(), image.height());
                 sink.frame(Frame::Rgba { width: w, height: h, data: image.as_raw(), stride: w as usize * 4 }, t);
             }

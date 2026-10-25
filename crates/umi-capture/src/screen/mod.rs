@@ -7,6 +7,8 @@ use std::sync::Arc;
 mod mac;
 #[cfg(windows)]
 mod windows;
+#[cfg(target_os = "linux")]
+mod linux;
 
 #[derive(Debug, Clone)]
 pub struct ScreenOptions {
@@ -39,6 +41,8 @@ pub fn displays() -> Result<Vec<Display>, CaptureError> {
     return mac::displays();
     #[cfg(windows)]
     return windows::displays();
+    #[cfg(target_os = "linux")]
+    return linux::displays();
     #[allow(unreachable_code)]
     Err(CaptureError::Unsupported)
 }
@@ -48,6 +52,8 @@ pub fn windows() -> Result<Vec<Window>, CaptureError> {
     return mac::windows();
     #[cfg(windows)]
     return windows::windows();
+    #[cfg(target_os = "linux")]
+    return linux::windows();
     #[allow(unreachable_code)]
     Err(CaptureError::Unsupported)
 }
@@ -58,6 +64,8 @@ pub fn start(target: &Target, options: &ScreenOptions, clock: Clock, video: Arc<
     return mac::start(target, options, clock, video, audio);
     #[cfg(windows)]
     return windows::start(target, options, clock, video, audio);
+    #[cfg(target_os = "linux")]
+    return linux::start(target, options, clock, video, audio);
     #[allow(unreachable_code)]
     {
         let _ = (target, options, clock, video, audio);
