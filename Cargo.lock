@@ -6598,6 +6598,8 @@ dependencies = [
  "ffmpeg-next",
  "ffmpeg-sys-next",
  "gif",
+ "objc",
+ "serde",
  "thiserror 2.0.21",
  "tracing",
 ]

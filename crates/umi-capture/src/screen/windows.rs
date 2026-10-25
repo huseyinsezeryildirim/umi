@@ -129,6 +129,7 @@ pub fn start(target: &Target, options: &ScreenOptions, clock: Clock, video: Arc<
             let settings = Settings::new(monitor, cursor, DrawBorderSettings::WithoutBorder, SecondaryWindowSettings::Default, interval, DirtyRegionSettings::Default, ColorFormat::Bgra8, make(crop));
             (Handler::start_free_threaded(settings).map_err(err)?, size)
         }
+        Target::Device { .. } => return Err(CaptureError::Unsupported),
         Target::Window { id } => {
             let window = WinWindow::from_raw_hwnd(*id as usize as *mut std::ffi::c_void);
             let size = fit(window.width().map_err(err)? as f64, window.height().map_err(err)? as f64, 0);

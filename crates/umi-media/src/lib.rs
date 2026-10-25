@@ -3,6 +3,7 @@
 
 pub mod audio;
 pub mod decode;
+pub mod device;
 pub mod encode;
 pub mod gif;
 pub mod record;

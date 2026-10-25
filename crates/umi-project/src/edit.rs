@@ -376,6 +376,9 @@ pub enum DeviceFrame {
     Browser,
     #[serde(rename = "macBook")]
     MacBook,
+    /// A phone around the screen (iPhone/iPad and Android recordings, vertical videos).
+    #[serde(rename = "phone")]
+    Phone,
 }
 
 // MARK: Cursor, camera, zoom

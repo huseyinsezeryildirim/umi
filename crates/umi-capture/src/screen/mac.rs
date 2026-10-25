@@ -232,6 +232,7 @@ pub fn start(target: &Target, options: &ScreenOptions, clock: Clock, video: Arc<
                 _ => (filter, (f.size.width, f.size.height), scale, None),
             }
         }
+        Target::Device { .. } => return Err(CaptureError::Unsupported),
         Target::Window { id } => {
             let window = content.windows().into_iter().find(|w| w.window_id() == *id).ok_or_else(|| CaptureError::NotFound("That window".into()))?;
             let f = window.frame();

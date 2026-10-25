@@ -89,6 +89,8 @@ pub fn geometry(target: &Target) -> Result<((f64, f64, f64, f64), f64), CaptureE
             let scale = displays()?.into_iter().find(|d| w.x >= d.x && w.x < d.x + d.width && w.y >= d.y && w.y < d.y + d.height).map_or(2.0, |d| d.scale);
             Ok(((w.x, w.y, w.width, w.height), scale))
         }
+        // Read by the recorder through FFmpeg; its size comes from the device.
+        Target::Device { .. } => Err(CaptureError::Unsupported),
     }
 }
 
