@@ -94,11 +94,13 @@ pub struct Sound {
     pub level_voice: bool,
     pub microphone_volume: f64,
     pub system_volume: f64,
+    /// A soft click on every mouse click.
+    pub click_sounds: bool,
 }
 
 impl Default for Sound {
     fn default() -> Self {
-        Self { denoise: false, level_voice: false, microphone_volume: 1.0, system_volume: 1.0 }
+        Self { denoise: false, level_voice: false, microphone_volume: 1.0, system_volume: 1.0, click_sounds: false }
     }
 }
 
