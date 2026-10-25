@@ -4,11 +4,12 @@
 
 use crate::schedule::Schedule;
 use crate::stretch::TimeStretch;
+use crate::voice::VoiceFilter;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use umi_media::{AudioReader, CHANNELS, MediaError, SAMPLE_RATE, audio_streams, duration};
 use umi_project::EditSettings;
-use umi_project::edit::{Music, Voiceover};
+use umi_project::edit::{Music, Sound, Voiceover};
 
 const RATE: f64 = SAMPLE_RATE as f64;
 
@@ -17,6 +18,8 @@ struct Cursor {
     reader: AudioReader,
     position: f64,
     stretch: TimeStretch,
+    /// Clean-up for the microphone track.
+    filter: Option<VoiceFilter>,
 }
 
 pub struct AudioMixer {
@@ -30,6 +33,8 @@ pub struct AudioMixer {
     voices: Vec<(Voiceover, Option<Cursor>)>,
     schedule: Schedule,
     scratch: Vec<f32>,
+    sound: Sound,
+    microphone: Option<usize>,
 }
 
 impl AudioMixer {
@@ -42,7 +47,7 @@ impl AudioMixer {
                 let path = bundle.join(&m.file);
                 match (AudioReader::open(&path, 0), duration(&path)) {
                     (Ok(reader), Ok(length)) if length > 0.1 => {
-                        Some((Cursor { reader, position: 0.0, stretch: TimeStretch::new() }, length, m.clone()))
+                        Some((Cursor { reader, position: 0.0, stretch: TimeStretch::new(), filter: None }, length, m.clone()))
                     }
                     _ => None,
                 }
@@ -50,7 +55,8 @@ impl AudioMixer {
             None => None,
         };
         let voices = edit.voiceovers.iter().map(|v| (Voiceover { file: bundle.join(&v.file).to_string_lossy().into_owned(), ..v.clone() }, None)).collect();
-        Ok(Self { screen, tracks, readers: HashMap::new(), music, voices, schedule, scratch: vec![] })
+        let microphone = umi_project::Bundle::new(bundle).read_project().ok().and_then(|p| p.audio.microphone_track).map(|t| t as usize).filter(|t| *t < tracks);
+        Ok(Self { screen, tracks, readers: HashMap::new(), music, voices, schedule, scratch: vec![], sound: edit.sound.clone(), microphone })
     }
 
     /// Mixes the soundtrack for output time `t0` into `out` (interleaved stereo).
@@ -108,17 +114,33 @@ impl AudioMixer {
             std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
             std::collections::hash_map::Entry::Vacant(e) => {
                 let reader = AudioReader::open(&self.screen, track)?;
-                e.insert(Cursor { reader, position: f64::NAN, stretch: TimeStretch::new() })
+                let is_mic = Some(track) == self.microphone || (self.microphone.is_none() && self.tracks == 1);
+                let filter = Some(VoiceFilter::new(self.sound.denoise, self.sound.level_voice)).filter(|f| is_mic && f.is_active());
+                e.insert(Cursor { reader, position: f64::NAN, stretch: TimeStretch::new(), filter })
             }
         };
         if !((cursor.position - source).abs() < 0.02) {
             cursor.reader.seek(source)?;
             cursor.stretch.reset();
+            if let Some(f) = &mut cursor.filter {
+                f.reset();
+            }
             cursor.position = source;
         }
         self.scratch.resize(count * CHANNELS, 0.0);
         let consumed = cursor.stretch.process(&mut cursor.reader, speed, &mut self.scratch[..count * CHANNELS])?;
         cursor.position += consumed as f64 / RATE;
+        if let Some(f) = &mut cursor.filter {
+            f.process(&mut self.scratch[..count * CHANNELS]);
+        }
+        // Track volume (microphone or system sound).
+        let is_mic = Some(track) == self.microphone || (self.microphone.is_none() && self.tracks == 1);
+        let volume = if is_mic { self.sound.microphone_volume } else { self.sound.system_volume } as f32;
+        if (volume - 1.0).abs() > 1e-4 {
+            for s in &mut self.scratch[..count * CHANNELS] {
+                *s *= volume;
+            }
+        }
         Ok(())
     }
 
@@ -195,7 +217,7 @@ impl AudioMixer {
                 continue;
             }
             if cursor.is_none() {
-                *cursor = Some(Cursor { reader: AudioReader::open(Path::new(&voice.file), 0)?, position: f64::NAN, stretch: TimeStretch::new() });
+                *cursor = Some(Cursor { reader: AudioReader::open(Path::new(&voice.file), 0)?, position: f64::NAN, stretch: TimeStretch::new(), filter: None });
             }
             let Some(cursor) = cursor else { continue };
             let into = a - voice.start;

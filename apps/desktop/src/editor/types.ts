@@ -165,6 +165,7 @@ export interface EditSettings {
   overlays: MediaOverlay[];
   watermark?: { file: string; corner: "topLeft" | "topRight" | "bottomLeft" | "bottomRight"; size: number; opacity: number };
   voiceovers?: Voiceover[];
+  sound?: { denoise: boolean; levelVoice: boolean; microphoneVolume: number; systemVolume: number };
 }
 
 export interface Voiceover {

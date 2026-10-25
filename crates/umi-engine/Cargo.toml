@@ -13,6 +13,7 @@ thiserror.workspace = true
 uuid.workspace = true
 parking_lot = "0.12"
 crossbeam-channel = "0.5"
+nnnoiseless = { version = "0.5", default-features = false }
 tracing.workspace = true
 
 [dev-dependencies]

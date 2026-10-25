@@ -50,3 +50,47 @@ fn voiceover_plays_and_ducks_the_rest() {
     assert!((rms(&diff) - 0.354).abs() < 0.05, "voice level {}", rms(&diff));
     std::fs::remove_file(bundle.join(file)).ok();
 }
+
+/// Real speech (macOS's own voice) with fan-like noise: the pauses get much quieter while
+/// the words stay.
+#[test]
+fn denoise_keeps_speech_and_removes_noise() {
+    if !cfg!(target_os = "macos") {
+        return;
+    }
+    let aiff = std::env::temp_dir().join("umi-denoise.aiff");
+    let ok = std::process::Command::new("say").args(["-v", "Samantha", "-o"]).arg(&aiff).arg("Hello there. [[slnc 1500]] This is a test of noise removal.").status().is_ok_and(|s| s.success());
+    if !ok {
+        return;
+    }
+    let mut reader = umi_media::AudioReader::open(&aiff, 0).unwrap();
+    let mut clean = vec![0f32; 48_000 * 2 * 6];
+    let n = reader.read(&mut clean).unwrap();
+    clean.truncate(n);
+    // Add low, rumbling noise (a fan): smoothed white noise.
+    let mut seed = 7u32;
+    let mut low = 0f32;
+    let noisy: Vec<f32> = clean
+        .chunks_exact(2)
+        .flat_map(|s| {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            let white = (seed >> 9) as f32 / (1 << 23) as f32 * 2.0 - 1.0;
+            low = low * 0.9 + white * 0.1;
+            let v = s[0] + low * 0.12;
+            [v, v]
+        })
+        .collect();
+    let mut out = noisy.clone();
+    let mut filter = umi_engine::voice::VoiceFilter::new(true, false);
+    for chunk in out.chunks_mut(2 * 1024) {
+        filter.process(chunk);
+    }
+    // The pause: about 1.0–2.2 s in (the say command's silence).
+    let frames = |a: f64, b: f64, x: &[f32]| x[(a * 96_000.0) as usize..(b * 96_000.0) as usize].to_vec();
+    let speech_level = |x: &[f32]| rms(&frames(0.1, 0.8, x));
+    let pause_noise = |x: &[f32]| rms(&frames(1.2, 2.0, x));
+    let (before, after) = (pause_noise(&noisy), pause_noise(&out));
+    eprintln!("pause noise {before:.4} → {after:.4}; speech {:.4} → {:.4}", speech_level(&noisy), speech_level(&out));
+    assert!(after < before * 0.25, "noise {before} → {after}");
+    assert!(speech_level(&out) > speech_level(&clean) * 0.5, "speech kept");
+}
