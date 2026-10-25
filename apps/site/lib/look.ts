@@ -25,6 +25,8 @@ export const ASPECTS: [Aspect, string][] = [
   ["vertical", "9:16"],
 ];
 
+export type CameraShape = "circle" | "rounded" | "square";
+
 export type Look = {
   gradient: string;
   padding: number;
@@ -33,12 +35,17 @@ export type Look = {
   camera: boolean;
   corner: Corner;
   camSize: number;
+  camShape: CameraShape;
+  /** Mirror the camera, like the preview the speaker saw. */
+  mirror: boolean;
+  /** Blur or remove the room behind the speaker. */
+  camBg: "none" | "blur" | "remove";
   captions: boolean;
   zoom: boolean;
   zoomScale: number;
 };
 
-export const LOOK: Look = { gradient: "sky", padding: 0.08, radius: 0.025, aspect: "auto", camera: true, corner: "br", camSize: 0.24, captions: true, zoom: true, zoomScale: 1.6 };
+export const LOOK: Look = { gradient: "sky", padding: 0.08, radius: 0.025, aspect: "auto", camera: true, corner: "br", camSize: 0.24, camShape: "circle", mirror: true, camBg: "none", captions: true, zoom: true, zoomScale: 1.6 };
 
 /** A word with its time in the recording, in seconds. */
 export type Word = { text: string; start: number; end: number };
@@ -147,23 +154,28 @@ export function paint(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingCo
     const edge = Math.max(pad * 0.5, m * 0.03);
     const cx = look.corner.endsWith("l") ? edge + d / 2 : W - edge - d / 2;
     const cy = look.corner.startsWith("t") ? edge + d / 2 : H - edge - d / 2;
+    const shape = (grow: number) => {
+      const r = d / 2 + grow;
+      ctx.beginPath();
+      if (look.camShape === "circle") ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      else ctx.roundRect(cx - r, cy - r, r * 2, r * 2, look.camShape === "rounded" ? r * 0.45 : r * 0.12);
+    };
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,0.35)";
     ctx.shadowBlur = d * 0.12;
-    ctx.beginPath();
-    ctx.arc(cx, cy, d / 2 + d * 0.02, 0, Math.PI * 2);
+    shape(d * 0.02);
     ctx.fillStyle = "#fff";
     ctx.fill();
     ctx.restore();
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, d / 2, 0, Math.PI * 2);
+    shape(0);
     ctx.clip();
     const [vw, vh] = f.cameraSize;
     const s = Math.min(vw, vh);
-    // Mirrored, like the preview the speaker saw.
-    ctx.translate(cx * 2, 0);
-    ctx.scale(-1, 1);
+    if (look.mirror) {
+      ctx.translate(cx * 2, 0);
+      ctx.scale(-1, 1);
+    }
     ctx.drawImage(f.camera, (vw - s) / 2, (vh - s) / 2, s, s, cx - d / 2, cy - d / 2, d, d);
     ctx.restore();
   }

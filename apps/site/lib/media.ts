@@ -17,6 +17,7 @@ import {
   getFirstEncodableVideoCodec,
 } from "mediabunny";
 import { type Look, type Word, type Zoom, canvasSize, paint } from "./look";
+import { cameraWithBackground, loadSegmenter } from "./segment";
 import type { Range } from "./timeline";
 
 export const canExportFast = () => typeof VideoEncoder !== "undefined" && typeof VideoDecoder !== "undefined" && typeof OffscreenCanvas !== "undefined";
@@ -37,6 +38,9 @@ type ExportJob = {
 };
 
 const FPS = 30;
+
+/** This browser can't encode the recording's sound; the caller falls back to real-time export. */
+export class NoAudioEncoder extends Error {}
 
 /**
  * Renders the edited video frame by frame, as fast as the computer's video hardware allows
@@ -65,11 +69,12 @@ export async function exportFast(job: ExportJob): Promise<Blob | null> {
   let sound: AudioBufferSource | null = null;
   if (audio) {
     const acodec = await getFirstEncodableAudioCodec(["aac", "opus"], { numberOfChannels: audio.numberOfChannels, sampleRate: audio.sampleRate });
-    if (acodec) {
-      sound = new AudioBufferSource({ codec: acodec, quality: QUALITY_HIGH });
-      output.addAudioTrack(sound);
-    }
+    // No encoder for the sound here (some Safari and Firefox versions): don't make a silent video.
+    if (!acodec) throw new NoAudioEncoder();
+    sound = new AudioBufferSource({ codec: acodec, quality: QUALITY_HIGH });
+    output.addAudioTrack(sound);
   }
+  if (job.look.camera && job.look.camBg !== "none") await loadSegmenter();
   await output.start();
 
   // Every output frame's time in the recording.
@@ -91,11 +96,12 @@ export async function exportFast(job: ExportJob): Promise<Blob | null> {
         }
         const s = (await screens.next()).value;
         const c = cams ? (await cams.next()).value : null;
+        const cam = c ? (cameraWithBackground(c.canvas, 480, 480, 480, job.look.camBg) ?? c.canvas) : null;
         paint(ctx, {
           look: job.look,
           screen: s?.canvas ?? null,
           screenSize: [video.displayWidth, video.displayHeight],
-          camera: c?.canvas ?? null,
+          camera: cam,
           cameraSize: [480, 480],
           time: times[i],
           zooms: job.zooms,
