@@ -115,7 +115,7 @@ export function Pricing() {
 const QUESTIONS: [string, string][] = [
   ["Is it really free?", "Yes. Recording, editing, exporting and everything that runs on your computer is free, with no time limit or watermark, for personal and commercial use. Only hosted features like share links and team spaces will be paid."],
   ["Does my video leave my computer?", "Only if you share a link. Captions, voiceover, noise removal and background removal all run locally."],
-  ["Which computers does it run on?", "macOS 13 or later on Apple silicon and Intel, Windows 10 and 11, and most Linux distributions. There’s also a Chrome extension."],
+  ["Which computers does it run on?", "macOS 13 or later on Apple silicon and Intel, Windows 10 and 11, and most Linux distributions. You can also record and edit right in your browser, nothing to install."],
   ["Can I bring my Loom videos?", "Paste your Loom links and they become Umi projects you can edit. It’s free."],
   ["Is the code public?", "Yes, Umi is open source. You can read it, build it yourself and contribute on GitHub."],
 ];
@@ -174,7 +174,7 @@ export function Ending() {
           <div className="mt-10">
             <DownloadButton />
           </div>
-          <p className="mt-4 text-[15px] text-ink/60">Also for Windows, Linux and Chrome</p>
+          <p className="mt-4 text-[15px] text-ink/60">Also for Windows, Linux and your browser</p>
         </Rise>
       </div>
     </section>
@@ -185,7 +185,7 @@ export function Footer() {
   const cols: [string, [string, string][]][] = [
     ["Product", [["Download", "#download"], ["Pricing", "#pricing"], ["Questions", "#faq"]]],
     ["Open source", [["GitHub", "https://github.com/umi-cam/umi"], ["Releases", "https://github.com/umi-cam/umi/releases"], ["Report a bug", "https://github.com/umi-cam/umi/issues"]]],
-    ["Platforms", [["macOS", "#download"], ["Windows", "#download"], ["Linux", "#download"], ["Chrome", "#download"]]],
+    ["Platforms", [["macOS", "#download"], ["Windows", "#download"], ["Linux", "#download"], ["Browser", "/signup"]]],
   ];
   return (
     <footer className="px-5 pt-20 pb-12">

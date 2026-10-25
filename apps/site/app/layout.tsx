@@ -5,11 +5,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Umi — the free screen recorder",
   description:
-    "Record your screen, camera and voice. Smooth zooms, captions, clean sound and AI that runs on your computer. Free and open source for Mac, Windows, Linux and Chrome.",
+    "Record your screen, camera and voice. Smooth zooms, captions, clean sound and AI that runs on your computer. Free and open source for Mac, Windows, Linux and the browser.",
   icons: { icon: "/umi-mark.svg" },
   openGraph: {
     title: "Umi — the free screen recorder",
-    description: "Beautiful screen recordings, free forever. Mac, Windows, Linux and Chrome.",
+    description: "Beautiful screen recordings, free forever. Mac, Windows, Linux and the browser.",
     type: "website",
   },
 };
