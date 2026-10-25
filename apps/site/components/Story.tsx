@@ -43,14 +43,14 @@ export function Privacy() {
                 <p className="mb-2 px-1 text-[11px] font-semibold tracking-wide text-black/45 uppercase">On your computer</p>
                 <div className="overflow-hidden rounded-xl bg-white">
                   {labels.map((l, k) => (
-                    <div key={l} className={`flex items-center justify-between px-4 py-3 text-[14px] ${k < labels.length - 1 ? "border-b border-black/5" : ""} ${k === 3 ? "mt-0" : ""}`}>
+                    <div key={l} className={`flex items-center justify-between gap-4 px-4 py-3 text-[14px] ${k < labels.length - 1 ? "border-b border-black/5" : ""} ${k === 3 ? "mt-0" : ""}`}>
                       {l}
                       <button
                         type="button"
                         aria-pressed={toggles[k]}
                         aria-label={l}
                         onClick={() => setToggles((t) => t.map((v, j) => (j === k ? !v : v)))}
-                        className={`relative h-[22px] w-[38px] rounded-full transition-colors duration-300 ${toggles[k] ? "bg-accent" : "bg-black/15"}`}
+                        className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors duration-300 ${toggles[k] ? "bg-accent" : "bg-black/15"}`}
                       >
                         <motion.i layout transition={{ type: "spring", stiffness: 500, damping: 32 }} className={`absolute top-[2px] block size-[18px] rounded-full bg-white shadow ${toggles[k] ? "right-[2px]" : "left-[2px]"}`} />
                       </button>
