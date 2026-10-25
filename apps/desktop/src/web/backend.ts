@@ -6,7 +6,11 @@ import { ALL_FORMATS, BlobSource, CanvasSink, Input } from "mediabunny";
 import music from "../../src-tauri/resources/music.json";
 import { deleteRecording, fileNames, getFile, getRecording, listRecordings, putFile, putRecording, type StoredRecording } from "./db";
 import { Session } from "./engine";
-import { exportVideo, type ExportRequest } from "./exporter";
+import { combineTakes, exportVideo, type ExportRequest } from "./exporter";
+import { trackFace } from "./face";
+import { downloadLoom } from "./loom";
+import { maskRectAt, type PrivacyMask } from "../editor/types";
+import { trackRegion } from "./pkg/umi_web.js";
 import { loadSegmenter } from "./segment";
 import { voice16k, waveform } from "./sound";
 
@@ -129,6 +133,9 @@ export async function addRecording(r: StoredRecording, files: Record<string, Blo
 }
 
 async function openEditor(id: string) {
+  // The editor draws with the GPU (the same renderer as the Mac app).
+  if (!("gpu" in navigator) || !(await (navigator as Navigator & { gpu: { requestAdapter(): Promise<unknown> } }).gpu.requestAdapter().catch(() => null)))
+    throw new Error("The editor needs WebGPU: open Umi in Chrome, Edge or Safari 26 or later.");
   const open = sessions.get(id);
   if (open) return open.state();
   const r = await getRecording(id);
@@ -203,8 +210,8 @@ async function importInto(id: string, file: string, base: string) {
   return name;
 }
 
-/** Videos picked in the library become recordings. */
-async function importVideos(paths: string[]) {
+/** Videos picked in the library become recordings (`title`: the name for a single one). */
+async function importVideos(paths: string[], title?: string) {
   const made: string[] = [];
   for (const p of paths) {
     const blob = staged.get(p);
@@ -214,19 +221,145 @@ async function importVideos(paths: string[]) {
     if (!track) continue;
     const duration = await input.computeDuration();
     const id = crypto.randomUUID();
-    const title = p.split("/").pop()!.replace(/\.[^.]+$/, "");
+    const name = title ?? p.split("/").pop()!.replace(/\.[^.]+$/, "");
     const project = {
       version: 1,
       createdAt: new Date().toISOString(),
       duration,
       screen: { pixelWidth: track.displayWidth, pixelHeight: track.displayHeight, captureRect: [[0, 0], [track.displayWidth, track.displayHeight]], fps: 30 },
-      audio: {},
-      title,
+      audio: (await input.getPrimaryAudioTrack()) ? { microphoneTrack: 0 } : {},
+      title: name,
     };
     await addRecording({ id, createdAt: project.createdAt, project, mediaDuration: duration }, { "screen.webm": blob });
     made.push(id);
   }
   return made;
+}
+
+// MARK: Tracking, voiceover, combining
+
+/** Sticks a mask to the content under it (the Mac app's tracker, in WebAssembly). */
+async function trackMask(id: string, maskId: string, anchorAt: number | null, progress: Progress<number>) {
+  const s = editor(id);
+  const edit = structuredClone(s.current.edit) as { masks: PrivacyMask[] };
+  const m = edit.masks.find((x) => x.id === maskId);
+  if (!m) throw new Error("mask not found");
+  const anchor = Math.min(Math.max(anchorAt ?? m.start, m.start), m.end);
+  const rect = maskRectAt(m, anchor);
+  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(await screenOf(id)) });
+  const track = await input.getPrimaryVideoTrack();
+  if (!track) throw new Error("This recording has no video.");
+  const width = Math.min(480, track.displayWidth);
+  const height = Math.max(1, Math.round((track.displayHeight * width) / track.displayWidth));
+  const times: number[] = [];
+  for (let k = 0; ; k++) {
+    const t = Math.min(m.start + k / 30, m.end);
+    times.push(t);
+    if (t >= m.end) break;
+  }
+  const luma = new Uint8Array(width * height * times.length);
+  const canvas = new OffscreenCanvas(width, height);
+  const g = canvas.getContext("2d", { willReadFrequently: true })!;
+  let i = 0;
+  for await (const frame of new CanvasSink(track, { width, height, fit: "fill", poolSize: 1 }).canvasesAtTimestamps(times)) {
+    if (frame) {
+      g.drawImage(frame.canvas, 0, 0);
+      const px = g.getImageData(0, 0, width, height).data;
+      const base = i * width * height;
+      for (let k = 0; k < width * height; k++) luma[base + k] = (77 * px[k * 4] + 150 * px[k * 4 + 1] + 29 * px[k * 4 + 2]) >> 8;
+    }
+    i++;
+    if (i % 5 === 0) progress.onmessage((0.9 * i) / times.length);
+  }
+  const keyframes = JSON.parse(trackRegion(JSON.stringify(rect), anchor, new Float64Array(times), width, height, luma));
+  progress.onmessage(1);
+  Object.assign(m, { rect, keyframes, follow: true });
+  const state = s.apply({ op: "setEdit", edit });
+  await save(id);
+  return state;
+}
+
+/** 16-bit mono WAV. */
+function wav(samples: Float32Array, rate: number) {
+  const out = new DataView(new ArrayBuffer(44 + samples.length * 2));
+  const str = (at: number, t: string) => [...t].forEach((c, k) => out.setUint8(at + k, c.charCodeAt(0)));
+  str(0, "RIFF");
+  out.setUint32(4, 36 + samples.length * 2, true);
+  str(8, "WAVEfmt ");
+  out.setUint32(16, 16, true);
+  out.setUint16(20, 1, true);
+  out.setUint16(22, 1, true);
+  out.setUint32(24, rate, true);
+  out.setUint32(28, rate * 2, true);
+  out.setUint16(32, 2, true);
+  out.setUint16(34, 16, true);
+  str(36, "data");
+  out.setUint32(40, samples.length * 2, true);
+  samples.forEach((v, k) => out.setInt16(44 + k * 2, Math.max(-1, Math.min(1, v)) * 0x7fff, true));
+  return new Blob([out.buffer], { type: "audio/wav" });
+}
+
+/** AI voiceover (Kokoro, af_heart) onto the Voice track at `time`, or replacing one. */
+async function voiceover(id: string, text: string, speed: number, time: number, replace: string | null, progress: Progress<{ stage: string; value: number }>) {
+  const s = editor(id);
+  if (!text.trim()) throw new Error("Type what to say.");
+  progress.onmessage({ stage: "speak", value: 0 });
+  const { audio, rate } = await new Promise<{ audio: Float32Array; rate: number }>((done, fail) => {
+    const worker = new Worker(new URL("./voice.worker.ts", import.meta.url), { type: "module" });
+    worker.onmessage = (e: MessageEvent<{ type: string; progress?: number; audio?: Float32Array; rate?: number; message?: string }>) => {
+      const m = e.data;
+      if (m.type === "loading") progress.onmessage({ stage: "download", value: m.progress ?? 0 });
+      else if (m.type === "done") {
+        worker.terminate();
+        done({ audio: m.audio!, rate: m.rate! });
+      } else {
+        worker.terminate();
+        fail(new Error(m.message ?? "Couldn't make the voiceover."));
+      }
+    };
+    worker.postMessage({ text, speed });
+  });
+  progress.onmessage({ stage: "speak", value: 1 });
+  const name = `voiceover-${crypto.randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase()}.wav`;
+  const blob = wav(audio, rate);
+  await putFile(id, name, blob);
+  s.addFile(name, blob);
+  const state = s.apply({ op: "addVoiceover", file: name, text, start: time, duration: audio.length / rate, replace });
+  await save(id);
+  return state;
+}
+
+/** Recordings end to end in a new recording (each with its edit). */
+async function combine(ids: string[], progress: Progress<number>) {
+  if (ids.length < 2) throw new Error("Pick two or more recordings.");
+  const library = presets();
+  const preset = library.defaultId ? library.presets.find((x) => x.id === library.defaultId) : undefined;
+  // Fresh copies: the shape is changed for combining, not in the recordings themselves.
+  const takes: Session[] = [];
+  try {
+    for (const id of ids) {
+      const r = await getRecording(id);
+      if (!r) throw new Error("Recording not found.");
+      takes.push(await Session.open(id, fallbackName(r), r.project, r.cursor, r.mediaDuration, await fileNames(id), preset ? JSON.stringify(preset) : undefined));
+    }
+    const { blob, duration, width, height } = await combineTakes(takes, (v) => progress.onmessage(v * 0.97), new AbortController().signal);
+    const id = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+    const d = new Date();
+    const project = {
+      version: 1,
+      createdAt,
+      duration,
+      screen: { pixelWidth: width, pixelHeight: height, captureRect: [[0, 0], [width, height]], fps: 30 },
+      audio: { microphoneTrack: 0 },
+      title: `Combined ${d.toLocaleDateString(undefined, { day: "numeric", month: "short" })} at ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`,
+    };
+    await addRecording({ id, createdAt, project, mediaDuration: duration }, { "screen.webm": blob });
+    progress.onmessage(1);
+    return id;
+  } finally {
+    for (const t of takes) t.close();
+  }
 }
 
 // MARK: Commands
@@ -363,20 +496,33 @@ async function handle(cmd: string, p: Args): Promise<unknown> {
     case "editor_export_cancel":
       exports.get(String(p.id))?.abort();
       return null;
-    case "editor_camera_effects":
-      return editor(p.id).hasCamera ? ["blur", "remove"] : [];
+    case "editor_camera_effects": {
+      const s = editor(p.id);
+      if (!s.hasCamera) return [];
+      return s.file("camera-face.json") ? ["blur", "remove", "face"] : ["blur", "remove"];
+    }
     case "editor_camera_effect": {
-      if (p.effect === "face") throw new Error("Face framing is in the Mac app for now.");
+      const s = editor(p.id);
       const progress = p.progress as Progress<{ stage: string; value: number }>;
+      if (p.effect === "face") {
+        const camera = s.file("camera.webm");
+        if (!camera) throw new Error("This recording has no camera.");
+        const keys = await trackFace(camera, (stage, value) => progress.onmessage({ stage, value }));
+        if (!keys.length) throw new Error("No face found in the camera.");
+        const blob = new Blob([JSON.stringify(keys)], { type: "application/json" });
+        await putFile(s.id, "camera-face.json", blob);
+        s.addFile("camera-face.json", blob);
+        return null;
+      }
       progress.onmessage({ stage: "download", value: 0.2 });
       await loadSegmenter();
       progress.onmessage({ stage: "process", value: 1 });
       return null;
     }
     case "editor_track_mask":
-      throw new Error("Following moving content is in the Mac app for now — place the mask by hand here.");
+      return trackMask(String(p.id), String(p.mask), p.anchor as number | null, p.progress as Progress<number>);
     case "editor_voiceover":
-      throw new Error("AI voiceover is in the Mac app for now.");
+      return voiceover(String(p.id), String(p.text), Number(p.speed) || 1, Number(p.time) || 0, (p.replace as string | null) ?? null, p.progress as Progress<{ stage: string; value: number }>);
     case "bundle_import":
       return importInto(idOf(p.bundle), String(p.file), String(p.base));
     case "image_thumbnail": {
@@ -448,10 +594,18 @@ async function handle(cmd: string, p: Args): Promise<unknown> {
       return [];
     case "import_videos":
       return importVideos((p.paths as string[]) ?? []);
-    case "import_loom":
-      throw new Error("Importing from Loom is in the Mac app for now.");
+    case "import_loom": {
+      const progress = p.progress as Progress<number>;
+      const { video, title } = await downloadLoom(String(p.link), (v) => progress.onmessage(v));
+      const path = `picked:loom/${title}.mp4`;
+      staged.set(path, video);
+      const [id] = await importVideos([path], title);
+      staged.delete(path);
+      progress.onmessage(1);
+      return id;
+    }
     case "library_combine":
-      throw new Error("Combining recordings is in the Mac app for now.");
+      return combine((p.paths as string[]).map(idOf), p.progress as Progress<number>);
     case "copy_text_to_clipboard":
       await navigator.clipboard?.writeText(String(p.text));
       return null;
@@ -497,27 +651,32 @@ async function handle(cmd: string, p: Args): Promise<unknown> {
   }
 }
 
-/** Development: `?seed=<screen url>[&camera=<camera url>]` adds a recording to try things on. */
+/**
+ * Development: `?seed=<screen url>[&camera=<camera url>]` (repeat `seed` for more recordings;
+ * the camera goes with the first) adds recordings to try things on.
+ */
 async function seed() {
   const q = new URLSearchParams(location.search);
-  const screenUrl = q.get("seed");
-  if (!screenUrl || (await listRecordings()).length) return;
-  const screen = await (await fetch(screenUrl)).blob();
+  const screens = q.getAll("seed");
+  if (!screens.length || (await listRecordings()).length) return;
   const cameraUrl = q.get("camera");
-  const camera = cameraUrl ? await (await fetch(cameraUrl)).blob() : null;
-  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(screen) });
-  const track = (await input.getPrimaryVideoTrack())!;
-  const duration = await input.computeDuration();
-  const createdAt = new Date().toISOString();
-  const project = {
-    version: 1,
-    createdAt,
-    duration,
-    screen: { pixelWidth: track.displayWidth, pixelHeight: track.displayHeight, captureRect: [[0, 0], [track.displayWidth, track.displayHeight]], fps: 30 },
-    ...(camera ? { camera: {} } : {}),
-    audio: { microphoneTrack: 0 },
-  };
-  await addRecording({ id: crypto.randomUUID(), createdAt, project, mediaDuration: duration }, camera ? { "screen.webm": screen, "camera.webm": camera } : { "screen.webm": screen });
+  for (const [k, screenUrl] of screens.entries()) {
+    const screen = await (await fetch(screenUrl)).blob();
+    const camera = k === 0 && cameraUrl ? await (await fetch(cameraUrl)).blob() : null;
+    const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(screen) });
+    const track = (await input.getPrimaryVideoTrack())!;
+    const duration = await input.computeDuration();
+    const createdAt = new Date(Date.now() - k * 60_000).toISOString();
+    const project = {
+      version: 1,
+      createdAt,
+      duration,
+      screen: { pixelWidth: track.displayWidth, pixelHeight: track.displayHeight, captureRect: [[0, 0], [track.displayWidth, track.displayHeight]], fps: 30 },
+      ...(camera ? { camera: {} } : {}),
+      audio: { microphoneTrack: 0 },
+    };
+    await addRecording({ id: crypto.randomUUID(), createdAt, project, mediaDuration: duration }, camera ? { "screen.webm": screen, "camera.webm": camera } : { "screen.webm": screen });
+  }
 }
 
 export async function installWebBackend() {

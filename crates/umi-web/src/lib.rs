@@ -415,6 +415,16 @@ impl Editor {
         vec![r.min_x() / canvas.width(), 1.0 - r.max_y() / canvas.height(), r.width() / canvas.width(), r.height() / canvas.height()]
     }
 
+    /// The face's path in the camera video (`camera-face.json`: [{t, x, y, size}], 0…1).
+    #[wasm_bindgen(js_name = setFaces)]
+    pub fn set_faces(&mut self, faces: &str) -> Result<(), JsError> {
+        let faces: Vec<umi_project::project::FaceKey> = serde_json::from_str(faces).map_err(err)?;
+        if let Some(view) = self.view.as_mut() {
+            view.renderer.set_faces(faces);
+        }
+        Ok(())
+    }
+
     /// An image the edit refers to (background, overlay, logo) under its name in the edit.
     #[wasm_bindgen(js_name = addImage)]
     pub fn add_image(&self, path: &str, width: u32, height: u32, rgba: Vec<u8>) {
@@ -447,5 +457,49 @@ mod random {
     unsafe extern "Rust" fn __getrandom_v03_custom(dest: *mut u8, len: usize) -> Result<(), getrandom::Error> {
         get_random_values(unsafe { std::slice::from_raw_parts_mut(dest, len) });
         Ok(())
+    }
+}
+
+/// Follows a mask's area (`rect`: [[x, y], [w, h]], 0…1) placed at recording time `anchor`
+/// through frames at `times`: `luma` holds them one after another, `width × height` each.
+/// Returns the keyframes as JSON (the same tracker as the Mac app).
+#[wasm_bindgen(js_name = trackRegion)]
+pub fn track_region(rect: &str, anchor: f64, times: Vec<f64>, width: usize, height: usize, luma: Vec<u8>) -> Result<String, JsError> {
+    use umi_project::track::{Gray, track_frames};
+    let rect: Rect = serde_json::from_str(rect).map_err(err)?;
+    let size = width * height;
+    let frames: Vec<(f64, Gray)> =
+        times.iter().enumerate().filter_map(|(i, t)| luma.get(i * size..(i + 1) * size).map(|px| (*t, Gray::new(width, height, px.to_vec())))).collect();
+    serde_json::to_string(&track_frames(&frames, rect, anchor)).map_err(err)
+}
+
+/// GIF export, encoded like the Mac app's (palette per frame, looping forever).
+#[wasm_bindgen]
+pub struct GifEncoder {
+    encoder: gif::Encoder<Vec<u8>>,
+    width: u16,
+    height: u16,
+    delay: u16,
+}
+
+#[wasm_bindgen]
+impl GifEncoder {
+    #[wasm_bindgen(constructor)]
+    pub fn new(width: u16, height: u16, fps: f64) -> Result<GifEncoder, JsError> {
+        let mut encoder = gif::Encoder::new(Vec::new(), width, height, &[]).map_err(err)?;
+        encoder.set_repeat(gif::Repeat::Infinite).map_err(err)?;
+        Ok(GifEncoder { encoder, width, height, delay: (100.0 / fps.max(1.0)).round() as u16 })
+    }
+
+    /// Adds a frame (tightly packed RGBA8).
+    pub fn push(&mut self, mut rgba: Vec<u8>) -> Result<(), JsError> {
+        let mut frame = gif::Frame::from_rgba_speed(self.width, self.height, &mut rgba, 10);
+        frame.delay = self.delay;
+        self.encoder.write_frame(&frame).map_err(err)
+    }
+
+    /// The finished file.
+    pub fn finish(self) -> Result<Vec<u8>, JsError> {
+        self.encoder.into_inner().map_err(err)
     }
 }

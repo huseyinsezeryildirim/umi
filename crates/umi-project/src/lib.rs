@@ -13,6 +13,7 @@ pub mod project;
 pub mod schedule;
 pub mod serde_util;
 pub mod timeline;
+pub mod track;
 pub mod zoom;
 
 pub use edit::EditSettings;
