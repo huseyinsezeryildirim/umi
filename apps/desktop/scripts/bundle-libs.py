@@ -3,7 +3,7 @@
 so it runs on Macs without Homebrew, then signs everything again.
 
 Run after `tauri build` (see `pnpm build:mac`). Signing uses the identity and entitlements in
-src-tauri/tauri.conf.json.
+src-tauri/tauri.conf.json, or $APPLE_SIGNING_IDENTITY when set (the release workflow's Developer ID).
 """
 import json
 import os
@@ -18,7 +18,9 @@ EXE = os.path.join(APP, "Contents/MacOS/umi-desktop")
 FRAMEWORKS = os.path.join(APP, "Contents/Frameworks")
 CONF = json.load(open(os.path.join(HERE, "..", "src-tauri", "tauri.conf.json")))
 MAC = CONF["bundle"].get("macOS", {})
-IDENTITY = MAC.get("signingIdentity") or "-"
+IDENTITY = os.environ.get("APPLE_SIGNING_IDENTITY") or MAC.get("signingIdentity") or "-"
+# Notarization wants a secure timestamp; local development builds skip the round trip to Apple.
+TIMESTAMP = "--timestamp" if IDENTITY.startswith("Developer ID") else "--timestamp=none"
 ENTITLEMENTS = os.path.join(HERE, "..", "src-tauri", MAC.get("entitlements", "Entitlements.plist"))
 
 
@@ -61,8 +63,8 @@ def main():
             sys.exit(f"still linked outside the app: {path}")
     # Sign the libraries, then the app (hardened runtime, with its entitlements).
     for name in names:
-        run("codesign", "--force", "--timestamp=none", "--sign", IDENTITY, os.path.join(FRAMEWORKS, name))
-    run("codesign", "--force", "--timestamp=none", "--options", "runtime", "--entitlements", ENTITLEMENTS, "--sign", IDENTITY, APP)
+        run("codesign", "--force", TIMESTAMP, "--sign", IDENTITY, os.path.join(FRAMEWORKS, name))
+    run("codesign", "--force", TIMESTAMP, "--options", "runtime", "--entitlements", ENTITLEMENTS, "--sign", IDENTITY, APP)
     run("codesign", "--verify", "--deep", "--strict", APP)
     size = sum(os.path.getsize(os.path.join(FRAMEWORKS, n)) for n in names)
     print(f"Bundled {len(names)} libraries ({size / 1e6:.0f} MB) into {os.path.relpath(APP, ROOT)} and signed it.")

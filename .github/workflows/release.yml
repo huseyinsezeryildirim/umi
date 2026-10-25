@@ -1,31 +1,70 @@
 name: Release
 
-# Builds the desktop app for every platform and attaches the installers to a GitHub release.
-# Artifact names match the download site (site/index.html).
+# Builds the desktop app for every platform and attaches the installers to a draft GitHub release.
+# Asset names match the download site (apps/site/components/Download.tsx): Umi_aarch64.dmg, Umi_x64.dmg,
+# Umi_x64-setup.exe, Umi_amd64.AppImage. With the updater key set, the release also gets signed update
+# archives and latest.json, which installed apps read once the draft is published.
+#
+# Signing is optional per platform; without its secrets a platform builds unsigned (docs/DEVOPS.md).
 on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.ref_name }}
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
-  desktop:
+  draft:
+    runs-on: ubuntu-24.04
+    outputs:
+      id: ${{ steps.release.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches the app version
+        run: |
+          version=$(node -p 'require("./apps/desktop/src-tauri/tauri.conf.json").version')
+          if [ "${TAG#v}" != "$version" ]; then
+            echo "::error::Tag $TAG but tauri.conf.json says $version. Bump the version first (docs/DEVOPS.md)."
+            exit 1
+          fi
+      # One draft up front, so the parallel builds don't each create their own.
+      - name: Draft release
+        id: release
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --draft --title "Umi $TAG" --generate-notes --verify-tag
+          echo "id=$(gh release view "$TAG" --json databaseId -q .databaseId)" >> "$GITHUB_OUTPUT"
+
+  # macOS is built by hand rather than with tauri-action: bundle-libs.py has to put Homebrew's FFmpeg
+  # inside Umi.app and sign it again before the DMG is made and notarized.
+  macos:
+    needs: draft
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-26
             target: aarch64-apple-darwin
+            arch: aarch64
           - os: macos-15-intel
             target: x86_64-apple-darwin
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-          - os: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
+            arch: x64
     runs-on: ${{ matrix.os }}
+    env:
+      # Flags only: tauri would import APPLE_CERTIFICATE itself if it saw it, and the keychain below does that.
+      HAS_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE != '' }}
+      CAN_NOTARIZE: ${{ secrets.APPLE_ID != '' && secrets.APPLE_PASSWORD != '' && secrets.APPLE_TEAM_ID != '' }}
+      CAN_SIGN_UPDATES: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+      APP: target/${{ matrix.target }}/release/bundle/macos/Umi.app
+      DMG: Umi_${{ matrix.arch }}.dmg
+      UPDATE: Umi_${{ matrix.arch }}.app.tar.gz
     steps:
       - uses: actions/checkout@v4
       # ScreenCaptureKit's Metal bridge needs the macOS 26 SDK (Xcode 26).
-      - if: runner.os == 'macOS'
-        uses: maxim-lobanov/setup-xcode@v1
+      - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
       - uses: dtolnay/rust-toolchain@stable
@@ -37,16 +76,121 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - name: System libraries (macOS)
-        if: runner.os == 'macOS'
-        run: brew install ffmpeg pkgconf
+      - run: brew install ffmpeg pkgconf
+      - run: pnpm install --frozen-lockfile
+
+      - name: Developer ID certificate into a temporary keychain
+        if: env.HAS_CERTIFICATE == 'true'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          keychain="$RUNNER_TEMP/umi-signing.keychain-db"
+          password=$(openssl rand -base64 24)
+          echo "::add-mask::$password"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -k "$password" "$keychain" >/dev/null
+          # Ahead of the login keychain, which stays in the search list (one path per word).
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/cert.p12"
+          echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY" >> "$GITHUB_ENV"
+      - name: Without a certificate, sign ad hoc
+        if: env.HAS_CERTIFICATE != 'true'
+        run: |
+          echo "::warning::APPLE_CERTIFICATE isn't set: the Mac build is signed ad hoc and Gatekeeper will block it."
+          echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+
+      # Signed with $APPLE_SIGNING_IDENTITY; notarization waits until the libraries are inside.
+      - name: Build Umi.app
+        working-directory: apps/desktop
+        env:
+          UMI_PEXELS_KEY: ${{ secrets.UMI_PEXELS_KEY }}
+        run: pnpm tauri build --target ${{ matrix.target }} --bundles app
+      - name: Bundle FFmpeg into the app and sign again
+        run: python3 apps/desktop/scripts/bundle-libs.py "$APP"
+
+      - name: DMG
+        run: |
+          stage="$RUNNER_TEMP/dmg"
+          mkdir -p "$stage"
+          ditto "$APP" "$stage/Umi.app"
+          ln -s /Applications "$stage/Applications"
+          hdiutil create -volname Umi -srcfolder "$stage" -ov -format UDZO "$DMG"
+          if [ "$APPLE_SIGNING_IDENTITY" != "-" ]; then codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$DMG"; fi
+      - name: Notarize and staple
+        if: env.HAS_CERTIFICATE == 'true' && env.CAN_NOTARIZE == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcrun notarytool submit "$DMG" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait --timeout 1h
+          xcrun stapler staple "$DMG"
+          # The ticket covers the app inside too; staple it for the update archive.
+          xcrun stapler staple "$APP"
+          spctl --assess --type open --context context:primary-signature -v "$DMG"
+
+      - name: Update archive (signed with the updater key)
+        if: env.CAN_SIGN_UPDATES == 'true'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          COPYFILE_DISABLE=1 tar -czf "$UPDATE" -C "$(dirname "$APP")" Umi.app
+          pnpm --dir apps/desktop tauri signer sign "$PWD/$UPDATE"
+
+      - name: Upload to the draft release
+        run: |
+          files=("$DMG")
+          if [ -f "$UPDATE.sig" ]; then files+=("$UPDATE" "$UPDATE.sig"); fi
+          gh release upload "$TAG" "${files[@]}" --clobber
+
+      - name: Remove the temporary keychain
+        if: always() && env.HAS_CERTIFICATE == 'true'
+        run: security delete-keychain "$RUNNER_TEMP/umi-signing.keychain-db" || true
+
+  windows-linux:
+    needs: draft
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            bundles: appimage,deb
+    runs-on: ${{ matrix.os }}
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      CAN_SIGN_UPDATES: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
       - name: System libraries (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config clang libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libavfilter-dev \
             libswscale-dev libswresample-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev \
-            libpipewire-0.3-dev libwayland-dev libxcb1-dev libxcb-randr0-dev libdbus-1-dev libgbm-dev libv4l-dev
+            libpipewire-0.3-dev libwayland-dev libxcb1-dev libxcb-randr0-dev libdbus-1-dev libgbm-dev libv4l-dev xdg-utils
       - name: System libraries (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -57,24 +201,114 @@ jobs:
           $dir = (Get-ChildItem C:\ffmpeg)[0].FullName
           "FFMPEG_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
           "$dir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+      - name: Azure Trusted Signing tool
+        if: runner.os == 'Windows' && env.AZURE_CLIENT_ID != ''
+        run: cargo install trusted-signing-cli --locked
       - run: pnpm install --frozen-lockfile
+
+      # Release-only settings on top of tauri.conf.json (local builds stay as they are).
+      - name: Release config
+        shell: bash
+        env:
+          AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          AZURE_CERTIFICATE_PROFILE: ${{ vars.AZURE_CERTIFICATE_PROFILE }}
+        run: |
+          node - <<'JS'
+          const fs = require("fs");
+          const env = process.env;
+          const bundle = { createUpdaterArtifacts: env.CAN_SIGN_UPDATES === "true" };
+          if (env.RUNNER_OS === "Windows") {
+            // FFmpeg's DLLs next to umi-desktop.exe.
+            const bin = env.FFMPEG_DIR.replace(/\\/g, "/") + "/bin";
+            bundle.resources = Object.fromEntries(fs.readdirSync(bin).filter((f) => f.endsWith(".dll")).map((f) => [`${bin}/${f}`, f]));
+            if (env.AZURE_CLIENT_ID) {
+              bundle.windows = {
+                signCommand: `trusted-signing-cli -e ${env.AZURE_SIGNING_ENDPOINT} -a ${env.AZURE_SIGNING_ACCOUNT} -c ${env.AZURE_CERTIFICATE_PROFILE} -d Umi %1`,
+              };
+            } else {
+              console.log("::warning::AZURE_CLIENT_ID isn't set: the Windows installer is unsigned (SmartScreen will warn).");
+            }
+          }
+          if (env.RUNNER_OS === "Linux") {
+            // The .deb needs the FFmpeg runtime it was linked against (the AppImage carries its own).
+            const { execSync } = require("child_process");
+            const libs = ["avcodec", "avformat", "avutil", "avdevice", "avfilter", "swscale", "swresample"];
+            const installed = (l) => execSync(`dpkg-query -W -f '\${db:Status-Abbrev} \${Package}\\n' 'lib${l}[0-9]*'`).toString().split("\n");
+            const depends = libs.map((l) => installed(l).find((line) => line.startsWith("ii") && !line.endsWith("-dev"))?.split(" ").pop());
+            if (depends.includes(undefined)) throw new Error(`FFmpeg runtime packages not found: ${depends}`);
+            bundle.linux = { deb: { depends } };
+          }
+          fs.writeFileSync("apps/desktop/src-tauri/release.conf.json", JSON.stringify({ bundle }, null, 2));
+          JS
+          cat apps/desktop/src-tauri/release.conf.json
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UMI_PEXELS_KEY: ${{ secrets.UMI_PEXELS_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # linuxdeploy (the AppImage tool) is itself an AppImage; runners have no FUSE.
+          APPIMAGE_EXTRACT_AND_RUN: 1
         with:
           projectPath: apps/desktop
-          args: --target ${{ matrix.target }}
-          tagName: ${{ github.ref_name }}
-          releaseName: Umi ${{ github.ref_name }}
-          releaseDraft: true
+          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config src-tauri/release.conf.json
+          releaseId: ${{ needs.draft.outputs.id }}
+          assetNamePattern: "[name]_[arch][ext]"
+          includeUpdaterJson: false
+
+  # latest.json for the updater, from the signatures the builds uploaded.
+  updater:
+    needs: [draft, macos, windows-linux]
+    if: always() && needs.draft.result == 'success'
+    runs-on: ubuntu-24.04
+    env:
+      CAN_SIGN_UPDATES: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: latest.json
+        if: env.CAN_SIGN_UPDATES == 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/sigs" && cd "$RUNNER_TEMP/sigs"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.sig' --clobber
+          node - <<'JS'
+          const fs = require("fs");
+          const { TAG, GITHUB_REPOSITORY, GITHUB_WORKSPACE } = process.env;
+          const version = require(`${GITHUB_WORKSPACE}/apps/desktop/src-tauri/tauri.conf.json`).version;
+          // Which update file each platform installs.
+          const kinds = [
+            ["darwin-aarch64", /aarch64\.app\.tar\.gz$/],
+            ["darwin-x86_64", /x64\.app\.tar\.gz$/],
+            ["windows-x86_64", /-setup\.exe$/],
+            ["linux-x86_64", /\.AppImage$/],
+          ];
+          const platforms = {};
+          for (const sig of fs.readdirSync(".")) {
+            const file = sig.replace(/\.sig$/, "");
+            const kind = kinds.find(([, re]) => re.test(file));
+            if (!kind) continue;
+            platforms[kind[0]] = {
+              signature: fs.readFileSync(sig, "utf8").trim(),
+              url: `https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${encodeURIComponent(file)}`,
+            };
+          }
+          const missing = kinds.map(([k]) => k).filter((k) => !platforms[k]);
+          if (missing.length) console.log(`::warning::No update for ${missing.join(", ")} (its build failed or wasn't signed).`);
+          const notes = `See https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}`;
+          fs.writeFileSync("latest.json", JSON.stringify({ version, notes, pub_date: new Date().toISOString(), platforms }, null, 2));
+          JS
+          cat latest.json
+          gh release upload "$TAG" latest.json --repo "$GITHUB_REPOSITORY" --clobber
+      - name: No updater key
+        if: env.CAN_SIGN_UPDATES != 'true'
+        run: echo "::warning::TAURI_SIGNING_PRIVATE_KEY isn't set, so this release has no latest.json and installed apps won't see it."
 
   extension:
+    needs: draft
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Pack the Chrome extension
         run: cd extension && zip -r ../umi-chrome.zip . -x "README.md"
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: umi-chrome.zip
-          draft: true
+      - run: gh release upload "$TAG" umi-chrome.zip --clobber
