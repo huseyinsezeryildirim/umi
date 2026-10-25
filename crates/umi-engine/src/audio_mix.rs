@@ -35,6 +35,9 @@ pub struct AudioMixer {
     scratch: Vec<f32>,
     sound: Sound,
     microphone: Option<usize>,
+    /// Output times of mouse clicks (for click sounds) and the click itself.
+    clicks: Vec<f64>,
+    click: Vec<f32>,
 }
 
 impl AudioMixer {
@@ -56,7 +59,19 @@ impl AudioMixer {
         };
         let voices = edit.voiceovers.iter().map(|v| (Voiceover { file: bundle.join(&v.file).to_string_lossy().into_owned(), ..v.clone() }, None)).collect();
         let microphone = umi_project::Bundle::new(bundle).read_project().ok().and_then(|p| p.audio.microphone_track).map(|t| t as usize).filter(|t| *t < tracks);
-        Ok(Self { screen, tracks, readers: HashMap::new(), music, voices, schedule, scratch: vec![], sound: edit.sound.clone(), microphone })
+        let clicks = if edit.sound.click_sounds {
+            let cursor = umi_project::Bundle::new(bundle).read_cursor();
+            let mut times: Vec<f64> = cursor
+                .clicks
+                .iter()
+                .filter_map(|c| schedule.placements.iter().find(|p| c.t >= p.clip.start && c.t <= p.clip.end).map(|p| p.output_start + (c.t - p.clip.start) / p.clip.speed))
+                .collect();
+            times.sort_by(f64::total_cmp);
+            times
+        } else {
+            vec![]
+        };
+        Ok(Self { screen, tracks, readers: HashMap::new(), music, voices, schedule, scratch: vec![], sound: edit.sound.clone(), microphone, clicks, click: click_sound() })
     }
 
     /// Mixes the soundtrack for output time `t0` into `out` (interleaved stereo).
@@ -101,6 +116,7 @@ impl AudioMixer {
         }
         self.mix_music(t0, out)?;
         self.mix_voices(t0, out)?;
+        self.mix_clicks(t0, out);
         for s in out.iter_mut() {
             *s = s.clamp(-1.0, 1.0);
         }
@@ -237,6 +253,41 @@ impl AudioMixer {
         }
         Ok(())
     }
+}
+
+impl AudioMixer {
+    fn mix_clicks(&self, t0: f64, out: &mut [f32]) {
+        let frames = out.len() / CHANNELS;
+        let length = self.click.len() as f64 / RATE;
+        let t1 = t0 + frames as f64 / RATE;
+        let first = self.clicks.partition_point(|t| *t + length < t0);
+        for &at in self.clicks[first..].iter().take_while(|t| **t < t1) {
+            for k in 0..frames {
+                let i = ((t0 + k as f64 / RATE - at) * RATE).round();
+                if i >= 0.0 && (i as usize) < self.click.len() {
+                    let v = self.click[i as usize];
+                    out[k * CHANNELS] += v;
+                    out[k * CHANNELS + 1] += v;
+                }
+            }
+        }
+    }
+}
+
+/// A soft, short mouse click: a damped high tone over a tiny noise burst (made here, so
+/// there's no asset to ship).
+fn click_sound() -> Vec<f32> {
+    let n = (0.045 * RATE) as usize;
+    let mut seed = 12_345u32;
+    (0..n)
+        .map(|i| {
+            let t = i as f64 / RATE;
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            let noise = ((seed >> 9) as f64 / (1u32 << 23) as f64 * 2.0 - 1.0) * (-t / 0.003).exp();
+            let tone = (t * 2_400.0 * std::f64::consts::TAU).sin() * (-t / 0.012).exp() + (t * 1_150.0 * std::f64::consts::TAU).sin() * (-t / 0.02).exp() * 0.5;
+            ((tone * 0.22 + noise * 0.12) * (1.0 - (-t / 0.0006).exp())) as f32
+        })
+        .collect()
 }
 
 /// How loud the rest is under a voiceover, and how long the dip takes.

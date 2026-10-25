@@ -269,6 +269,7 @@ export function Inspector(props: { editor: Editor }) {
               <SwitchRow label="Remove background noise" checked={sound().denoise} onChange={(v) => setSound((x) => (x.denoise = v))} />
               <SwitchRow label="Even out voice volume" checked={sound().levelVoice} onChange={(v) => setSound((x) => (x.levelVoice = v))} />
               <SliderField label="Microphone" value={sound().microphoneVolume} max={2} format={pct} onInput={(v) => setSound((x) => (x.microphoneVolume = v))} {...gesture} />
+              <SwitchRow label="Click sounds" checked={sound().clickSounds ?? false} onChange={(v) => setSound((x) => (x.clickSounds = v))} />
               <SliderField label="Computer sound" value={sound().systemVolume} max={2} format={pct} onInput={(v) => setSound((x) => (x.systemVolume = v))} {...gesture} />
             </Section>
             <Section title="Clips" icon={<Scissors size={15} />} hint="Blends each cut into the next clip.">

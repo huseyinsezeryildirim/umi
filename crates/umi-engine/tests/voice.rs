@@ -94,3 +94,28 @@ fn denoise_keeps_speech_and_removes_noise() {
     assert!(after < before * 0.25, "noise {before} → {after}");
     assert!(speech_level(&out) > speech_level(&clean) * 0.5, "speech kept");
 }
+
+#[test]
+fn click_sounds_land_on_clicks() {
+    let bundle = std::path::Path::new(BUNDLE);
+    if !bundle.exists() {
+        return;
+    }
+    let b = Bundle::new(bundle);
+    let project = b.read_project().unwrap();
+    let Some(click) = b.read_cursor().clicks.first().map(|c| c.t) else { return };
+    let mut edit = project.effective_edit(None);
+    edit.clips.clear();
+    let schedule = Schedule::new(&edit, project.duration);
+    let mut plain = AudioMixer::new(bundle, schedule.clone(), &edit).unwrap();
+    edit.sound.click_sounds = true;
+    let mut clicky = AudioMixer::new(bundle, schedule, &edit).unwrap();
+    let mut a = vec![0f32; 4800 * 2];
+    let mut c = a.clone();
+    plain.render(click - 0.01, &mut a).unwrap();
+    clicky.render(click - 0.01, &mut c).unwrap();
+    let diff: Vec<f32> = a.iter().zip(&c).map(|(x, y)| y - x).collect();
+    // Silent before the click, then the click.
+    assert!(rms(&diff[..2 * 400]) < 1e-4, "{}", rms(&diff[..800]));
+    assert!(rms(&diff[2 * 480..2 * 1500]) > 0.02, "{}", rms(&diff[960..3000]));
+}
