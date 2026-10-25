@@ -21,6 +21,9 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
     const settings = await recorder.settings();
     try {
       await recorder.hide("launcher");
+      // The bubble is up before the screen capture starts, so it's left out from the first frame
+      // (the camera is recorded on its own and added in the editor).
+      if (settings.cameraOn || settings.cameraOnly) await recorder.show("bubble");
       if (settings.notesOn) await recorder.show("prompter");
       // The countdown starts at once; the screen, camera and microphone warm up meanwhile.
       let failed: unknown = null;
@@ -41,7 +44,6 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
       await invoke("record_begin");
       if (settings.flow === "instant") reserved = invoke<string | null>("instant_reserve").catch(() => null);
       await recorder.show("controls");
-      if (settings.cameraOn || settings.cameraOnly) await recorder.show("bubble");
     } catch (e) {
       await recorder.hide("countdown");
       await invoke("record_cancel").catch(() => {});

@@ -19,7 +19,9 @@ export function Controls() {
 
   onMount(() => {
     void recorder.settings().then((s) => setHasCamera(s.cameraOn && !s.cameraOnly));
+    // Made ahead and hidden until a recording starts: only ask while it's showing.
     const timer = window.setInterval(async () => {
+      if (document.hidden) return;
       const s = await recorder.status();
       setElapsed(s.elapsed);
       setPaused(s.paused);

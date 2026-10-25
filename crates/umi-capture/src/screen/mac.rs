@@ -213,7 +213,7 @@ impl ScreenSession for Session {
 
     fn refresh_exclusions(&self) {
         let Some(id) = self.display else { return };
-        let Ok(content) = content() else { return };
+        let Ok(content) = all_content() else { return };
         let Some(display) = content.displays().into_iter().find(|d| d.display_id() == id) else { return };
         let left = left_out_windows(&content, &self.options);
         let refs: Vec<&SCWindow> = left.iter().collect();
@@ -221,6 +221,12 @@ impl ScreenSession for Session {
             let _ = self.stream.update_content_filter(&filter);
         }
     }
+}
+
+/// Windows on screen and off: our floating windows exist hidden before they're shown, and
+/// leaving them out while hidden keeps them out of the very first frame they appear in.
+fn all_content() -> Result<SCShareableContent, CaptureError> {
+    SCShareableContent::create().with_on_screen_windows_only(false).with_exclude_desktop_windows(false).get().map_err(|e| CaptureError::Other(e.to_string()))
 }
 
 /// Our own windows (except the drawing layer) and, when asked, the desktop's icons.
@@ -252,7 +258,7 @@ pub fn start(
     audio: Option<Arc<dyn AudioSink>>,
 ) -> Result<Box<dyn ScreenSession>, CaptureError> {
     let content = content()?;
-    let own_windows = left_out_windows(&content, options);
+    let own_windows = left_out_windows(&all_content().unwrap_or_else(|_| content.clone()), options);
     let own_refs: Vec<&SCWindow> = own_windows.iter().collect();
     let err = |e: SCError| CaptureError::Other(e.to_string());
 

@@ -750,8 +750,9 @@ pub fn run() {
             });
 
             tray::install(app.handle())?;
-            // The countdown's window, made ahead so it shows the moment recording starts.
-            windows::prepare_countdown(app.handle());
+            // The countdown, control bar and camera menu, made ahead (unseen) so they show at
+            // once and stay out of the recording from its first frame.
+            windows::prepare_recording_windows(app.handle());
             let busy = shortcuts::install(app.handle());
             if !busy.is_empty() {
                 // Shown by the main window: another app owns some of our shortcuts.
