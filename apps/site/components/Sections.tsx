@@ -121,18 +121,18 @@ export function Modes() {
 
 /** What the narrator says in the sample video (same timing as the app demo). */
 const NARRATION = (() => {
-  const text = "Good morning. This is the Northwind dashboard. Revenue is up twelve percent this week. To share it, click Share report and copy the link.";
+  const text = "Here’s the new dashboard. Open any card to see more. This week is our best one yet. To share it, click Share and copy the link.";
   const words = text.split(" ");
   const step = 9.2 / words.length;
   return words.map((w, i) => ({ w, start: 0.3 + i * step, end: 0.3 + (i + 0.85) * step }));
 })();
 const CHAPTERS = [
-  { at: 0, title: "The dashboard" },
-  { at: 4.3, title: "This week’s revenue" },
-  { at: 6.6, title: "Sharing the report" },
+  { at: 0, title: "The new dashboard" },
+  { at: 4.2, title: "This week" },
+  { at: 6.6, title: "Sharing it" },
 ];
-const TITLE = "Northwind weekly walkthrough";
-const SUMMARY = "A quick tour of the dashboard: revenue is up 12% this week, and the report is shared with a link.";
+const TITLE = "Dashboard walkthrough";
+const SUMMARY = "A short tour of the new dashboard, this week’s numbers and how to share them with a link.";
 
 /** Types `text` once when `start` turns true. */
 function useTyped(text: string, start: boolean, speed = 22) {
@@ -272,10 +272,10 @@ export function Platforms() {
 const LINES: [string, string][] = [
   ["$", "claude mcp add umi -- umi-mcp"],
   [">", "Remove the ums from my last recording and export it"],
-  ["·", "describe_recording  “Northwind walkthrough”, 0:10"],
+  ["·", "describe_recording  “Dashboard walkthrough”, 0:10"],
   ["·", "edit  remove_fillers → 3 words, 1.4 s"],
   ["·", "export  mp4, 1080p"],
-  ["✓", "Saved to Movies/Umi/Exports/Northwind walkthrough.mp4"],
+  ["✓", "Saved to Movies/Umi/Exports/Dashboard walkthrough.mp4"],
 ];
 
 export function Agents() {

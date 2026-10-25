@@ -57,3 +57,12 @@ export function LoomIcon({ className }: P) {
     </svg>
   );
 }
+
+/** Cap's mark: a blue ring. */
+export function CapIcon({ className }: P) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-label="Cap">
+      <circle cx="12" cy="12" r="8.6" fill="none" stroke="#4785ff" strokeWidth="3.4" />
+    </svg>
+  );
+}

@@ -2,6 +2,7 @@
 
 import { motion, useInView } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { CapIcon, LoomIcon } from "./icons";
 import { Mark } from "./ui";
 import { Rise } from "./Sections";
 
@@ -11,60 +12,74 @@ const EASE = [0.25, 1, 0.5, 1] as const;
 
 /** Free limits and the price for work, from loom.com/pricing and cap.so/pricing (October 25, 2026). */
 const PLANS = [
-  { name: "Loom", price: "$18", per: "per user / month", free: "Free: 25 videos, 5 min each, 720p", h: 22 },
-  { name: "Cap", price: "$29", per: "per year for work", free: "Free: personal use only", h: 48 },
+  { name: "Loom", logo: <LoomIcon className="size-5" />, price: "$18", per: "per user / month", free: ["25 videos", "5 min each", "720p"], h: 150 },
+  { name: "Cap", logo: <CapIcon className="size-5" />, price: "$29", per: "per year for work", free: ["Personal use only", "Links up to 5 min"], h: 290 },
 ];
 
 export function NotJust() {
   const bars = useRef<HTMLDivElement>(null);
-  const inView = useInView(bars, { once: true, amount: 0.4 });
+  const inView = useInView(bars, { once: true, amount: 0.3 });
   return (
     <section className="px-3 pt-40 sm:px-4">
       <div className="relative mx-auto max-w-[1400px] overflow-hidden rounded-[40px] bg-[linear-gradient(180deg,#eaf3fe,#f7fbff_70%,#ffffff)]">
-        <div className="relative mx-auto grid max-w-6xl items-end gap-14 px-6 py-24 sm:px-12 lg:grid-cols-[1fr_1.15fr]">
-          <Rise className="self-center">
-            <h2 className="h-display text-[clamp(36px,5vw,60px)]">
+        <div className="relative mx-auto grid max-w-6xl gap-14 px-6 pt-24 pb-16 sm:px-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+          <Rise className="lg:mb-[220px]">
+            <h2 className="h-display text-[clamp(36px,5vw,64px)]">
               Not just another
               <br />
               screen recorder
             </h2>
-            <p className="lead mt-5 max-w-sm">The others charge to use them for work or cut you off at five minutes. Umi doesn’t.</p>
+            <p className="lead mt-5 max-w-sm">The others charge to use them for work or stop you at five minutes. Umi doesn’t.</p>
             <p className="mt-8 text-[12px] text-faint">Prices from loom.com and cap.so, October 2026.</p>
           </Rise>
-          <div ref={bars} className="flex h-[460px] items-end justify-center gap-4 sm:gap-5">
+          <div ref={bars} className="flex h-[640px] items-end justify-center gap-3 sm:gap-4">
             {PLANS.map((p, i) => (
-              <div key={p.name} className="flex w-[31%] max-w-[170px] flex-col items-center">
-                <motion.div className="mb-3 text-center" initial={{ opacity: 0, y: 8 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ delay: 0.5 + i * 0.25, duration: 0.6 }}>
-                  <b className="block text-[clamp(26px,3vw,38px)] leading-none font-semibold tracking-tight text-[#8ea6c8]">{p.price}</b>
-                  <span className="mt-1.5 block text-[11px] font-semibold tracking-[0.1em] text-[#8ea6c8] uppercase">{p.per}</span>
+              <div key={p.name} className="flex w-1/3 max-w-[210px] flex-col items-center">
+                <motion.div className="mb-4 text-center" initial={{ opacity: 0, y: 10 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ delay: 0.5 + i * 0.25, duration: 0.7 }}>
+                  <b className="block text-[clamp(30px,3.6vw,48px)] leading-none font-semibold tracking-tight text-[#8ea6c8]">{p.price}</b>
+                  <span className="mt-2 block text-[11px] font-semibold tracking-[0.12em] text-[#8ea6c8] uppercase">{p.per}</span>
                 </motion.div>
                 <motion.div
-                  className="flex w-full items-end rounded-t-2xl bg-[linear-gradient(180deg,#cddcf1,#eaf1fa)] p-3"
+                  className="flex w-full flex-col justify-end gap-1 rounded-t-[18px] bg-[linear-gradient(180deg,#c9d9f1,#edf3fb)] p-4"
                   initial={{ height: 0 }}
-                  animate={inView ? { height: `${p.h * 3.6}px` } : {}}
-                  transition={{ delay: 0.2 + i * 0.25, duration: 1.1, ease: EASE }}
+                  animate={inView ? { height: p.h } : {}}
+                  transition={{ delay: 0.2 + i * 0.25, duration: 1.2, ease: EASE }}
                 >
-                  <span className="text-[12px] leading-snug text-[#5d7290]">{p.free}</span>
+                  <span className="text-[11px] font-semibold tracking-[0.1em] text-[#7c93b4] uppercase">Free</span>
+                  {p.free.map((f) => (
+                    <span key={f} className="text-[13px] leading-snug text-[#506685]">
+                      {f}
+                    </span>
+                  ))}
                 </motion.div>
-                <span className="mt-3 text-[14px] text-muted">{p.name}</span>
+                <span className="mt-4 flex items-center gap-2 text-[15px] text-muted">
+                  {p.logo}
+                  {p.name}
+                </span>
               </div>
             ))}
-            <div className="flex w-[34%] max-w-[190px] flex-col items-center">
-              <motion.div className="mb-3 text-center" initial={{ opacity: 0, y: 8 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ delay: 1.2, duration: 0.7 }}>
-                <b className="block text-[clamp(30px,3.6vw,46px)] leading-none font-semibold tracking-tight">$0</b>
-                <span className="mt-1.5 block text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">work included</span>
+            <div className="flex w-1/3 max-w-[230px] flex-col items-center">
+              <motion.div className="mb-4 text-center" initial={{ opacity: 0, y: 10 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ delay: 1.3, duration: 0.8 }}>
+                <b className="block text-[clamp(40px,5vw,72px)] leading-none font-semibold tracking-tight">$0</b>
+                <span className="mt-2 block text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">work included</span>
               </motion.div>
               <motion.div
-                className="relative flex w-full flex-col items-center justify-between overflow-hidden rounded-t-2xl p-4 shadow-[0_30px_60px_-20px_rgb(17_80_180/0.5)]"
+                className="relative flex w-full flex-col items-center justify-between overflow-hidden rounded-t-[18px] p-5 shadow-[0_40px_80px_-25px_rgb(17_80_180/0.55)]"
                 initial={{ height: 0 }}
-                animate={inView ? { height: "340px" } : {}}
-                transition={{ delay: 0.7, duration: 1.3, ease: EASE }}
+                animate={inView ? { height: 480 } : {}}
+                transition={{ delay: 0.7, duration: 1.4, ease: EASE }}
               >
                 <img src="/photos/sky.jpg" alt="" className="absolute inset-0 size-full object-cover" />
-                <Mark className="relative mt-10 size-14 text-white" />
-                <span className="relative rounded-lg bg-white/85 px-2.5 py-1.5 text-center text-[12px] leading-snug font-medium text-ink backdrop-blur">Unlimited videos, any length, 4K</span>
+                <Mark className="relative mt-24 size-16 text-white" />
+                <span className="relative grid gap-0.5 rounded-xl bg-white/85 px-3 py-2 text-center text-[13px] leading-snug font-medium text-ink backdrop-blur">
+                  <span>Unlimited videos</span>
+                  <span className="whitespace-nowrap">Any length, 4K</span>
+                </span>
               </motion.div>
-              <span className="mt-3 text-[14px] font-semibold text-ink">Umi</span>
+              <span className="mt-4 flex items-center gap-2 text-[15px] font-semibold text-ink">
+                <Mark className="size-5" />
+                Umi
+              </span>
             </div>
           </div>
         </div>
@@ -108,13 +123,13 @@ function Skeleton() {
         <i className="ml-auto h-3 w-1/5 rounded bg-accent/70" />
       </div>
       <div className="grid grid-cols-3 gap-1.5">
-        <i className="h-6 rounded bg-[#e3eefc]" />
-        <i className="h-6 rounded bg-[#ece6fd]" />
-        <i className="h-6 rounded bg-[#e2f5ec]" />
+        <i className="h-6 rounded bg-ink/[0.05]" />
+        <i className="h-6 rounded bg-ink/[0.05]" />
+        <i className="h-6 rounded bg-ink/[0.05]" />
       </div>
       <div className="flex h-10 items-end gap-1">
         {[40, 55, 45, 70, 62, 85, 76].map((h, i) => (
-          <i key={i} className="flex-1 rounded-t-[2px] bg-[#9ec3f5]" style={{ height: `${h}%` }} />
+          <i key={i} className="flex-1 rounded-t-[2px] bg-ink/[0.08]" style={{ height: `${h}%` }} />
         ))}
       </div>
     </div>
@@ -127,7 +142,7 @@ const Cursor = ({ className = "" }: { className?: string }) => (
 );
 /** The webcam: a stock portrait (Pexels), as the camera bubble shows it. */
 const Face = ({ className = "", mode = "original" }: { className?: string; mode?: "original" | "blur" | "remove" }) => (
-  <span className={`relative block aspect-square overflow-hidden rounded-full border-2 border-white bg-[linear-gradient(135deg,#9eccfa,#2e5eb8)] shadow-md ${className}`}>
+  <span className={`relative block aspect-square overflow-hidden rounded-full border-2 border-white bg-[linear-gradient(135deg,#e4edf9,#c9daf2)] shadow-md ${className}`}>
     {mode !== "remove" && <video src="/media/camera.mp4" poster="/media/camera.jpg" autoPlay muted loop playsInline className={`absolute inset-0 size-full object-cover transition-[filter] duration-500 ${mode === "blur" ? "blur-[3px]" : ""}`} />}
     {mode !== "original" && (
       <video src="/media/camera.mp4" poster="/media/camera.jpg" autoPlay muted loop playsInline className="absolute inset-0 size-full object-cover [mask-image:radial-gradient(ellipse_34%_46%_at_50%_55%,#000_72%,transparent_100%)]" />
@@ -184,7 +199,7 @@ function LayoutScene() {
   const layouts = ["Default", "Camera only", "Split", "Floating"];
   return (
     <div ref={ref} className="w-[80%]">
-      <div className="relative aspect-[16/9] overflow-hidden rounded-[10px] bg-[linear-gradient(135deg,#9eccfa,#2e5eb8)]">
+      <div className="relative aspect-[16/9] overflow-hidden rounded-[10px] bg-[linear-gradient(135deg,#e4edf9,#c9daf2)]">
         <motion.div className="absolute" animate={{ left: i === 2 ? "4%" : "8%", top: "10%", width: i === 1 ? "0%" : i === 2 ? "56%" : "84%", height: "80%", opacity: i === 1 ? 0 : 1 }} transition={{ duration: 0.7, ease: EASE }}>
           <Win className="h-full" />
         </motion.div>
@@ -216,7 +231,7 @@ function ZoomScene() {
   const i = useBeat(ref, [1300, 2000, 1000]);
   return (
     <div ref={ref} className="w-[78%]">
-      <div className="relative aspect-[16/9] overflow-hidden rounded-[10px] bg-[linear-gradient(135deg,#9eccfa,#2e5eb8)] p-[6%]">
+      <div className="relative aspect-[16/9] overflow-hidden rounded-[10px] bg-[linear-gradient(135deg,#e4edf9,#c9daf2)] p-[6%]">
         <motion.div className="h-full origin-[86%_22%]" animate={{ scale: i === 1 ? 2 : 1 }} transition={{ duration: 0.9, ease: EASE }}>
           <Win className="h-full" />
         </motion.div>
@@ -394,13 +409,13 @@ export function EditorGrid() {
         {CARDS.map(([title, line, Scene], k) => (
           <motion.article
             key={title}
-            className="rounded-[24px] bg-[#f3f7fc] p-2.5 pb-5"
+            className="rounded-[24px] bg-[#f4f6f9] p-2.5 pb-5"
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-40px" }}
             transition={{ duration: 0.8, ease: EASE, delay: (k % 3) * 0.08 }}
           >
-            <div className="grid aspect-[4/3] place-items-center overflow-hidden rounded-[18px] bg-[linear-gradient(160deg,#ffffff,#e6effb)]">
+            <div className="grid aspect-[4/3] place-items-center overflow-hidden rounded-[18px] bg-white shadow-[0_0_0_1px_rgb(17_24_39/0.04)]">
               <Scene />
             </div>
             <h3 className="mt-4 px-2.5 text-[17px] font-semibold tracking-tight">{title}</h3>
