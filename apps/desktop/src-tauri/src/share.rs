@@ -250,6 +250,19 @@ pub async fn share_delete(state: State<'_, AppState>, id: String) -> Result<(), 
     .map_err(|e| e.to_string())?
 }
 
+/// Views, watch time and drop-off for the recording's link.
+#[tauri::command]
+pub async fn share_insights(state: State<'_, AppState>, id: String) -> Result<Option<umi_cloud::Insights>, String> {
+    let bundle = state.editor(&id)?.bundle.clone();
+    let client = client()?;
+    tauri::async_runtime::spawn_blocking(move || match saved(&bundle) {
+        Some(video) => client.insights(&video.id).map(Some).map_err(|e| e.to_string()),
+        None => Ok(None),
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub fn copy_text_to_clipboard(text: String) {
     copy_text(&text);

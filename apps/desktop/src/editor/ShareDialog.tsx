@@ -2,7 +2,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { createEffect, createSignal, For, Match, on, Show, Switch } from "solid-js";
 import { Button, Dialog, Progress, Segmented, SwitchRow, TextField, toast } from "@umi/ui";
-import { Check, Copy, ExternalLink, Link2, Lock, Trash2 } from "lucide-solid";
+import { Check, Copy, Eye, ExternalLink, Link2, Lock, Trash2 } from "lucide-solid";
 import type { Editor } from "./store";
 
 interface Video {
@@ -14,6 +14,15 @@ interface Video {
   hasPassword: boolean;
   allowComments?: boolean;
   expiresAt?: string | null;
+}
+interface Insights {
+  views: number;
+  watchedSeconds: number;
+  averageSeconds: number;
+  completion: number;
+  retention: number[];
+  embeddedViews: number;
+  countries: { country: string; count: number }[];
 }
 type Progress = { stage: string; value: number; video?: Video };
 
@@ -36,6 +45,7 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
   const [embedKind, setEmbedKind] = createSignal<"responsive" | "fixed" | "gif">("responsive");
   const [password, setPassword] = createSignal("");
   const [copied, setCopied] = createSignal<string | null>(null);
+  const [insights, setInsights] = createSignal<Insights | null>(null);
 
   createEffect(
     on(
@@ -45,7 +55,10 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
         const status = await invoke<{ connected: boolean; server: string }>("cloud_status");
         setConnected(status.connected);
         setServer(status.server);
-        setVideo(await invoke<Video | null>("share_state", { id: ed.state().id }));
+        const shared = await invoke<Video | null>("share_state", { id: ed.state().id });
+        setVideo(shared);
+        setInsights(null);
+        if (shared?.status === "ready") invoke<Insights | null>("share_insights", { id: ed.state().id }).then(setInsights, () => {});
       },
     ),
   );
@@ -174,6 +187,7 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
                     {copied() === "link" ? "Copied" : "Copy"}
                   </Button>
                 </div>
+                <Show when={insights()}>{(i) => <ViewerInsights insights={i()} />}</Show>
                 <SwitchRow label={`Start at ${Math.floor(ed.time() / 60)}:${String(Math.floor(ed.time() % 60)).padStart(2, "0")}`} checked={atTime()} onChange={setAtTime} />
                 <SwitchRow label="Viewers can download" checked={v().allowDownload} onChange={(on) => void update({ allowDownload: on })} />
                 <SwitchRow label="Comments" checked={v().allowComments ?? true} onChange={(on) => void update({ allowComments: on })} />
@@ -237,5 +251,37 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
         </Switch>
       </div>
     </Dialog>
+  );
+}
+
+const duration = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`);
+
+/** Views, watch time and where people stop watching (Umi Cloud). */
+function ViewerInsights(props: { insights: Insights }) {
+  const i = () => props.insights;
+  return (
+    <div class="ed-viewers">
+      <div class="ed-viewers__stats">
+        <div>
+          <Eye size={13} />
+          <b>{i().views}</b> {i().views === 1 ? "view" : "views"}
+        </div>
+        <div>
+          <b>{duration(i().averageSeconds)}</b> avg. watch
+        </div>
+        <div>
+          <b>{Math.round(i().completion * 100)}%</b> finished
+        </div>
+      </div>
+      <Show when={i().views > 0}>
+        <div class="ed-viewers__curve" title="Share of viewers who saw each part of the video">
+          <For each={i().retention}>{(r) => <span style={{ height: `${Math.max(4, r * 100)}%` }} />}</For>
+        </div>
+        <div class="umi-section__hint">
+          {i().embeddedViews > 0 ? `${i().embeddedViews} from embeds · ` : ""}
+          {i().countries.slice(0, 3).map((c) => `${c.country} ${c.count}`).join(" · ")}
+        </div>
+      </Show>
+    </div>
   );
 }

@@ -743,6 +743,7 @@ pub fn run() {
             share::share_start,
             share::share_update,
             share::share_delete,
+            share::share_insights,
             share::copy_text_to_clipboard,
             shortcuts::shortcuts_get,
             shortcuts::shortcuts_set,

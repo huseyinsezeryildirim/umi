@@ -116,6 +116,29 @@ pub struct Media<'a> {
     pub gif: Option<Vec<u8>>,
 }
 
+/// What viewers did with a shared video (Umi Cloud).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Insights {
+    pub views: u64,
+    pub watched_seconds: u64,
+    pub average_seconds: u64,
+    /// Share of viewers who reached the end, 0…1.
+    pub completion: f64,
+    /// Share of viewers who saw each twentieth of the video.
+    pub retention: Vec<f64>,
+    #[serde(default)]
+    pub embedded_views: u64,
+    #[serde(default)]
+    pub countries: Vec<Country>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Country {
+    pub country: String,
+    pub count: u64,
+}
+
 pub struct Client {
     pub base: String,
     token: String,
@@ -176,6 +199,10 @@ impl Client {
 
     pub fn update(&self, id: &str, settings: &Settings) -> Result<Video, CloudError> {
         Ok(self.send::<VideoBody>("PATCH", &format!("/api/videos/{id}"), Some(serde_json::to_value(settings).unwrap_or_default()))?.video)
+    }
+
+    pub fn insights(&self, id: &str) -> Result<Insights, CloudError> {
+        self.send("GET", &format!("/api/videos/{id}/insights"), None)
     }
 
     pub fn delete(&self, id: &str) -> Result<(), CloudError> {
