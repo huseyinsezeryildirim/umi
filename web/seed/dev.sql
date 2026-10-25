@@ -9,3 +9,8 @@ VALUES ('acc_free', 'free@umi.local', '5c83a61b2f006f20b404022bc41c177a8f2d3b1b4
 -- Local-only second paid account (workspace tests). Bearer token: umi_team_token
 INSERT OR REPLACE INTO accounts (id, email, token_hash, is_paid, created_at)
 VALUES ('acc_team', 'team@umi.local', 'b5b5b19a9ee94f22d5b720d10d43c7922cf87f568f6d5d677a9243b66db05474', 1, 0);
+
+-- Local-only account for trying the website's sign-in (http://localhost:3210/login).
+-- Email: demo@umi.local  Password: p6vfN4JAUtPFeN
+INSERT OR REPLACE INTO accounts (id, email, token_hash, password_hash, is_paid, created_at)
+VALUES ('acc_demo', 'demo@umi.local', '1fb7d733310422623836ea927edf529e46ff2fa2fecc0fa9feaa3059c9bb3c95', 'pbkdf2-sha256$100000$8fIRbe6iYZkvzoYjuxs4gw$GtFRXL_jzkqz9UZ9Ev30fCjDEPKPbSz4-kCD-vGfVI8', 0, 0);
