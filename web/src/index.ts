@@ -4,7 +4,8 @@ import { cleanup } from "./cleanup";
 import { HttpError, errorResponse, json } from "./http";
 import { handleEmbed, handleOembed } from "./embed";
 import { servePreviewGif, serveThumbnail, serveVideo } from "./media";
-import { getComments, getReactions, postComment, postReaction } from "./social";
+import { postView } from "./insights";
+import { getComments, getReactions, postComment, postReaction, viewableVideo } from "./social";
 import { handleAssetUpload, handlePartUpload } from "./uploads";
 import { handleUnlock, handleViewer } from "./viewer";
 
@@ -34,6 +35,9 @@ async function route(request: Request, env: AppEnv): Promise<Response> {
   if ((m = /^\/v\/([0-9A-Za-z]+)\/reactions$/.exec(pathname))) {
     if (method === "GET") return getReactions(request, env, m[1]!);
     if (method === "POST") return postReaction(request, env, m[1]!);
+  }
+  if ((m = /^\/v\/([0-9A-Za-z]+)\/view$/.exec(pathname)) && method === "POST") {
+    return postView(request, env, await viewableVideo(request, env, m[1]!));
   }
   if ((m = /^\/e\/([0-9A-Za-z]+)\/?$/.exec(pathname)) && method === "GET") return handleEmbed(request, env, m[1]!);
   if (pathname === "/oembed" && method === "GET") return handleOembed(request, env);

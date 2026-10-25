@@ -213,6 +213,22 @@ async function main() {
   check(rs.data?.counts?.["👍"] === 2 && rs.data.counts["❤️"] === 1 && rs.data.counts["😂"] === 0, "reaction counts per emoji");
   check(rs.data?.reactions?.length === 3 && rs.data.reactions.some((r) => r.emoji === "❤️" && r.timeMs === 8000), "reaction markers with times");
 
+  console.log("\nViewer insights");
+  const vPath = `${pagePath}/view`;
+  const sA = "a".repeat(20), sB = "b".repeat(20);
+  check((await viewer("POST", vPath, { session: sA, buckets: "11111000000000000000", watchedMs: 5000 })).status === 200, "view report → 200");
+  check((await viewer("POST", vPath, { session: sA, buckets: "00000111110000000000", watchedMs: 9000 })).status === 200, "same session again (merged)");
+  check((await viewer("POST", vPath, { session: sB, buckets: "11111111111111111111", watchedMs: 20000, embedded: true })).status === 200, "second viewer watched it all (embed)");
+  check((await viewer("POST", vPath, { session: "bad", buckets: "1", watchedMs: 1 })).status === 400, "malformed report → 400");
+  check((await viewer("POST", vPath, { session: "c".repeat(20), buckets: "1".repeat(20), watchedMs: 1e12 })).status === 200, "huge watch time accepted but capped");
+  const ins = await api("GET", `/api/videos/${video.id}/insights`);
+  check(ins.status === 200 && ins.data?.views === 3, `3 views counted (${ins.data?.views})`);
+  check(Math.abs(ins.data?.retention?.[0] - 1) < 1e-9 && Math.abs(ins.data?.retention?.[12] - 2 / 3) < 1e-9, "retention per twentieth (merged buckets)");
+  check(ins.data?.embeddedViews === 1 && Math.abs(ins.data?.completion - 2 / 3) < 1e-9, "embed views + completion");
+  check(ins.data?.watchedSeconds <= 9 + 20 + (video.durationMs ?? 0) * 2 / 1000 + 1, "watch time capped by video length");
+  check((await api("GET", `/api/videos/${video.id}/insights`, undefined, args["free-token"])).status === 404, "other account can't read insights → 404");
+  check(html.includes('"/view"'), "player reports views");
+
   console.log("\nEmbed & oEmbed");
   const embed = await get(`/e/${video.id}?t=5`);
   const embedHtml = await embed.text();

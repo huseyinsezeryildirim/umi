@@ -3,6 +3,7 @@ import { type AppEnv, gifKey, maxUploadBytes, thumbnailKey, videoKey } from "./e
 import { hashPassword, randomId } from "./crypto";
 import { HttpError, json, readJson } from "./http";
 import { deleteSocialData, ownerDeleteComment, ownerListComments } from "./social";
+import { videoInsights } from "./insights";
 import { buildUploadPlan } from "./uploads";
 import { type VideoRow, getVideo, toJson } from "./videos";
 
@@ -260,6 +261,8 @@ export async function handleApi(request: Request, env: AppEnv, path: string): Pr
     if (method === "GET" && !c[2]) return ownerListComments(env, video);
     if (method === "DELETE" && c[2]) return ownerDeleteComment(env, video, c[2]);
   }
+  const ins = /^\/api\/videos\/([0-9A-Za-z]+)\/insights$/.exec(path);
+  if (ins && method === "GET") return videoInsights(env, await ownedVideo(env, account, ins[1]!));
   const m = /^\/api\/videos\/([0-9A-Za-z]+)(\/complete|\/upload-urls)?$/.exec(path);
   if (m) {
     const id = m[1]!;

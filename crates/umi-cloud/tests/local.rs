@@ -32,6 +32,15 @@ fn shares_a_video_end_to_end() {
     let head = ureq::head(&format!("{}/video.mp4", done.url)).call().unwrap();
     assert_eq!(head.headers().get("content-length").unwrap().to_str().unwrap(), size.to_string());
 
+    // A viewer watches the first half; the owner sees it.
+    let beacon = serde_json::json!({ "session": "rusttestsession00001", "buckets": "11111111110000000000", "watchedMs": 5000 });
+    ureq::post(&format!("{}/view", done.url)).send_json(beacon).unwrap();
+    let insights = client.insights(&done.id).unwrap();
+    assert_eq!(insights.views, 1);
+    assert_eq!(insights.watched_seconds, 5);
+    assert_eq!(insights.retention.len(), 20);
+    assert_eq!((insights.retention[9], insights.retention[10]), (1.0, 0.0));
+
     let updated =
         client.update(&done.id, &Settings { password: Some("secret".into()), allow_comments: Some(false), ..Default::default() }).unwrap();
     assert!(updated.has_password && updated.allow_comments == Some(false));

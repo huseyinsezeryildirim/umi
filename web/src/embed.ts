@@ -1,3 +1,4 @@
+import { TRACK_JS } from "./insights";
 import { type AppEnv, baseUrl } from "./env";
 import { resolveAccess } from "./access";
 import { HttpError, json } from "./http";
@@ -39,7 +40,7 @@ export async function handleEmbed(request: Request, env: AppEnv, id: string, wro
         status: 200,
         title: v.title,
         description: "Watch on Umi",
-        body: `${embedBody(v)}<script nonce="${nonce}">${EMBED_SCRIPT}</script>`,
+        body: `${embedBody(v)}<script nonce="${nonce}">${EMBED_SCRIPT}${TRACK_JS}</script>`,
       });
     }
   }

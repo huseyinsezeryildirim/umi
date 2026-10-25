@@ -1,3 +1,4 @@
+import { TRACK_JS } from "./insights";
 import { type AppEnv, baseUrl } from "./env";
 import { resolveAccess, unlockCookie } from "./access";
 import { verifyPassword } from "./crypto";
@@ -136,7 +137,7 @@ export async function handleViewer(request: Request, env: AppEnv, id: string, wr
             }
           : undefined,
         oembed: isPublic ? `${origin}/oembed?url=${encodeURIComponent(canonical)}&format=json` : undefined,
-        body: `${playerBody(v, nonce, social)}<script nonce="${nonce}">${SCRIPT}</script>`,
+        body: `${playerBody(v, nonce, social)}<script nonce="${nonce}">${SCRIPT}${TRACK_JS}</script>`,
       });
     }
   }

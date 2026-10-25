@@ -92,7 +92,7 @@ export async function socialState(env: AppEnv, video: VideoRow) {
 // ------------------------------------------------------------------ public (viewer) endpoints
 
 /** Same rules as the player: password (unlock cookie), expiry, revoked, still uploading. */
-async function viewableVideo(request: Request, env: AppEnv, id: string): Promise<VideoRow> {
+export async function viewableVideo(request: Request, env: AppEnv, id: string): Promise<VideoRow> {
   const access: Access = await resolveAccess(request, env, id);
   switch (access.state) {
     case "ok":
@@ -258,5 +258,6 @@ export async function deleteSocialData(env: AppEnv, videoId: string): Promise<vo
   await env.DB.batch([
     env.DB.prepare("DELETE FROM comments WHERE video_id = ?").bind(videoId),
     env.DB.prepare("DELETE FROM reactions WHERE video_id = ?").bind(videoId),
+    env.DB.prepare("DELETE FROM views WHERE video_id = ?").bind(videoId),
   ]);
 }
