@@ -1,6 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { onCleanup, onMount, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { Button, IconButton, Kbd, Toaster } from "@umi/ui";
 import {
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-solid";
+import { ExportDialog } from "./ExportDialog";
 import { Inspector } from "./Inspector";
 import { Preview } from "./Preview";
 import { formatTime, type Editor as EditorModel } from "./store";
@@ -24,6 +25,7 @@ import "./editor.css";
 
 export function Editor(props: { editor: EditorModel; onBack: () => void }) {
   const ed = props.editor;
+  const [exporting, setExporting] = createSignal(false);
 
   // Keyboard: Space, S, B, Z, ⌫, Esc, ←/→, ⌘Z/⇧⌘Z.
   // ⌘Z / ⇧⌘Z come from the app menu: in a text field they undo typing, otherwise the edit.
@@ -50,6 +52,8 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
       } else if (mod && e.key.toLowerCase() === "a") {
         // Select everything on the timeline.
         ed.setSelected([...document.querySelectorAll<HTMLElement>(".ed-timeline [data-sel]")].map((el) => JSON.parse(el.dataset.sel!)));
+      } else if (mod && e.key.toLowerCase() === "e") {
+        setExporting(true);
       } else if (mod && e.key.toLowerCase() === "j" && ed.selection()?.kind === "clip") {
         void ed.apply({ op: "joinClips", index: (ed.selection() as { id: number }).id });
       } else if (mod) {
@@ -103,7 +107,7 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
           <Button variant="glass" tip="Get a link to this video">
             <Link size={15} /> Share
           </Button>
-          <Button variant="ink">
+          <Button variant="ink" tip="Save a video file" shortcut="⌘E" onClick={() => setExporting(true)}>
             <Share size={15} /> Export
           </Button>
         </div>
@@ -152,6 +156,7 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
         </div>
         <Inspector editor={ed} />
       </main>
+      <ExportDialog editor={ed} open={exporting()} onClose={() => setExporting(false)} />
       <Toaster />
     </div>
   );

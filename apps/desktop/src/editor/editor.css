@@ -677,3 +677,60 @@
   background: rgba(17, 111, 245, 0.1);
   pointer-events: none;
 }
+
+/* Export dialog */
+.ed-export {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ed-export__file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--umi-hairline);
+  border-radius: var(--umi-radius-md, 10px);
+  background: var(--umi-surface, #fff);
+  color: var(--umi-text-1, inherit);
+  font: inherit;
+  font-size: var(--umi-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.ed-export__file span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ed-export__file em {
+  font-style: normal;
+  color: var(--umi-accent);
+  font-weight: var(--umi-weight-medium);
+}
+.ed-export__actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.ed-export__pct {
+  margin-right: auto;
+  color: var(--umi-text-2);
+}
+.ed-export__error {
+  font-size: var(--umi-text-sm);
+  color: #d14343;
+}
+.ed-export__done {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--umi-accent);
+}
+.ed-export__done strong {
+  color: var(--umi-text-1, inherit);
+}
