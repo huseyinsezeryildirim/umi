@@ -211,7 +211,15 @@ export function Footer() {
           </div>
         ))}
       </div>
-      <p className="mx-auto mt-14 max-w-6xl text-xs text-faint">© 2026 Umi</p>
+      <div className="mx-auto mt-14 flex max-w-6xl items-center justify-between text-xs text-faint">
+        <p>© 2026 Umi</p>
+        <p>
+          Created by{" "}
+          <a href="https://sezer.website/" className="text-muted transition-colors hover:text-ink">
+            sezer.website
+          </a>
+        </p>
+      </div>
     </footer>
   );
 }
