@@ -1,0 +1,1 @@
+import{O as e,x as t}from"./web-DO7bYQfM.js";import{D as n}from"./index-BmcFU-2d.js";var r={name:`x`,size:24,node:[[`path`,{d:`M18 6 6 18`,key:`1bl5f8`}],[`path`,{d:`m6 6 12 12`,key:`d8bk6v`}]]};r.node;var i=i=>t(n,e(i,{icon:r}));export{i as t};

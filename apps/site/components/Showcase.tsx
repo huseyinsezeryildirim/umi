@@ -164,30 +164,40 @@ const Pills = ({ items, active, tint = "#116ff5" }: { items: string[]; active: n
 
 function BlurScene() {
   const ref = useRef<HTMLDivElement>(null);
-  const i = useBeat(ref, [1200, 1600, 1600]);
+  // Blur, then pixelate, then spotlight.
+  const i = useBeat(ref, [1800, 1800, 1800]);
   return (
-    <div ref={ref} className="relative w-[78%]">
+    <div ref={ref} className="relative w-[80%]">
       <Win>
-        <div className="grid gap-2 p-3 text-[10px]">
-          <i className="h-2 w-1/3 rounded bg-ink/12" />
-          <div className="relative flex items-center gap-2 rounded-md border border-black/5 px-2 py-1.5 font-mono text-ink">
-            Password <span className="ml-auto tracking-wider">hunter2-prod</span>
-            <motion.span
-              className="absolute inset-y-0.5 right-0.5 left-[48%] rounded border border-dashed border-accent bg-white/30 backdrop-blur-[4px]"
-              style={{ originX: 0 }}
-              animate={{ scaleX: i === 0 ? 0 : 1, opacity: i === 0 ? 0 : 1 }}
-              transition={{ duration: 0.6, ease: EASE }}
-            />
+        <div className="relative grid gap-2 p-3 text-[10.5px]">
+          <i className="h-2 w-1/3 rounded bg-ink/15" />
+          <div className={`relative z-10 flex items-center gap-2 rounded-md border border-black/10 bg-white px-2 py-1.5 font-mono text-ink transition-shadow duration-500 ${i === 2 ? "shadow-[0_0_0_3px_rgb(255_255_255/0.9),0_8px_20px_rgb(0_0_0/0.25)]" : ""}`}>
+            <span className="text-muted">Password</span>
+            <span className="relative ml-auto tracking-wider">
+              hunter2-prod
+              {i === 0 && <motion.span layoutId="mask" className="absolute -inset-1 rounded-[4px] bg-white/10 backdrop-blur-[3.5px]" />}
+              {i === 1 && (
+                <motion.span
+                  layoutId="mask"
+                  className="absolute -inset-1 rounded-[3px]"
+                  style={{ background: "repeating-conic-gradient(#9aa3b2 0 25%, #c9ced8 0 50%) 0 0 / 8px 8px" }}
+                />
+              )}
+            </span>
           </div>
-          <i className="h-2 w-2/3 rounded bg-ink/8" />
-          <i className="h-2 w-1/2 rounded bg-ink/8" />
+          <i className="h-2 w-2/3 rounded bg-ink/10" />
+          <i className="h-2 w-1/2 rounded bg-ink/10" />
+          {/* Spotlight: everything dims except the field. */}
+          <motion.span
+            className="pointer-events-none absolute inset-0 bg-ink/45"
+            style={{ maskImage: "linear-gradient(#000,#000)", WebkitMaskImage: "linear-gradient(#000,#000)" }}
+            animate={{ opacity: i === 2 ? 1 : 0 }}
+            transition={{ duration: 0.5 }}
+          />
         </div>
       </Win>
-      <motion.div className="absolute" animate={{ left: i === 0 ? "48%" : "96%", top: i === 0 ? "52%" : "64%" }} transition={{ duration: 0.9, ease: EASE }}>
-        <Cursor />
-      </motion.div>
       <div className="mt-2.5 flex justify-center">
-        <Pills items={["Blur", "Pixelate", "Spotlight"]} active={i === 2 ? 1 : 0} />
+        <Pills items={["Blur", "Pixelate", "Spotlight"]} active={i} />
       </div>
     </div>
   );
@@ -228,20 +238,43 @@ function LayoutScene() {
 
 function ZoomScene() {
   const ref = useRef<HTMLDivElement>(null);
-  const i = useBeat(ref, [1300, 2000, 1000]);
+  const i = useBeat(ref, [1400, 2200, 1000]);
   return (
-    <div ref={ref} className="w-[78%]">
-      <div className="relative aspect-[16/9] overflow-hidden rounded-[10px] bg-[linear-gradient(135deg,#e4edf9,#c9daf2)] p-[6%]">
-        <motion.div className="h-full origin-[86%_22%]" animate={{ scale: i === 1 ? 2 : 1 }} transition={{ duration: 0.9, ease: EASE }}>
-          <Win className="h-full" />
-        </motion.div>
-        <motion.div className="absolute" animate={{ left: i === 0 ? "40%" : "84%", top: i === 0 ? "62%" : "26%" }} transition={{ duration: 0.8, ease: EASE }}>
-          <Cursor />
+    <div ref={ref} className="w-[80%]">
+      <div className="relative aspect-[16/9] overflow-hidden rounded-[10px] bg-[linear-gradient(135deg,#e4edf9,#c9daf2)]">
+        {/* The whole picture zooms toward the click, like the export does. */}
+        <motion.div className="absolute inset-0 p-[7%]" style={{ transformOrigin: "84% 26%" }} animate={{ scale: i === 1 ? 1.6 : 1 }} transition={{ duration: 0.9, ease: EASE }}>
+          <div className="relative h-full overflow-hidden rounded-[8px] bg-white shadow-[0_0_0_0.5px_rgb(0_0_0/0.12),0_10px_24px_-10px_rgb(20_40_90/0.35)]">
+            <div className="flex gap-[4px] border-b border-black/5 px-2 py-1.5">
+              <i className="size-[6px] rounded-full bg-[#ff5f57]" />
+              <i className="size-[6px] rounded-full bg-[#febc2e]" />
+              <i className="size-[6px] rounded-full bg-[#28c840]" />
+            </div>
+            <div className="grid gap-1.5 p-2.5">
+              <div className="flex items-center gap-2">
+                <i className="h-2 w-1/3 rounded bg-ink/20" />
+                <motion.i className="ml-auto h-3.5 w-[24%] rounded bg-ink" animate={{ scale: i === 1 ? [1, 0.92, 1] : 1 }} transition={{ delay: 0.9, duration: 0.3 }} />
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                <i className="h-5 rounded bg-ink/[0.07]" />
+                <i className="h-5 rounded bg-ink/[0.07]" />
+                <i className="h-5 rounded bg-ink/[0.07]" />
+              </div>
+              <div className="flex h-7 items-end gap-1">
+                {[40, 55, 45, 70, 62, 85, 76].map((h, k) => (
+                  <i key={k} className="flex-1 rounded-t-[2px] bg-accent/45" style={{ height: `${h}%` }} />
+                ))}
+              </div>
+            </div>
+          </div>
+          <motion.div className="absolute" animate={{ left: i === 0 ? "45%" : "82%", top: i === 0 ? "62%" : "27%" }} transition={{ duration: 0.8, ease: EASE }}>
+            <Cursor />
+          </motion.div>
         </motion.div>
       </div>
-      <div className="relative mt-2.5 h-5 rounded-md bg-white shadow-[0_0_0_1px_rgb(17_24_39/0.06)]">
-        <span className="absolute inset-y-1 left-[30%] w-[38%] rounded bg-accent/15 text-center text-[9px] leading-3 font-semibold text-accent">2× zoom</span>
-        <motion.span className="absolute top-0 bottom-0 w-0.5 rounded bg-record" animate={{ left: ["8%", "92%"] }} transition={{ duration: 4.3, repeat: Infinity, ease: "linear" }} />
+      <div className="relative mt-2.5 h-5 rounded-md bg-white shadow-[0_0_0_1px_rgb(17_24_39/0.08)]">
+        <span className="absolute inset-y-1 left-[30%] w-[38%] rounded bg-accent/15 text-center text-[9px] leading-3 font-semibold text-accent">1.6× zoom</span>
+        <motion.span className="absolute top-0 bottom-0 w-0.5 rounded bg-record" animate={{ left: ["8%", "92%"] }} transition={{ duration: 4.6, repeat: Infinity, ease: "linear" }} />
       </div>
     </div>
   );
@@ -269,33 +302,65 @@ function CaptionScene() {
 
 function UmsScene() {
   const ref = useRef<HTMLDivElement>(null);
-  const i = useBeat(ref, [1300, 1200, 1800]);
+  // Found → button pressed → cut.
+  const i = useBeat(ref, [1500, 700, 2300]);
   const words: [string, boolean][] = [
     ["So", false],
-    ["um,", true],
+    ["um", true],
     ["this", false],
     ["is", false],
-    ["uh,", true],
-    ["fast.", false],
+    ["uh", true],
+    ["the", false],
+    ["new", false],
+    ["like", true],
+    ["page.", false],
   ];
+  const cut = i === 2;
   return (
-    <div ref={ref} className="w-[80%] rounded-[10px] bg-white p-3.5 shadow-[0_0_0_0.5px_rgb(0_0_0/0.12),0_12px_30px_-10px_rgb(20_40_90/0.3)]">
-      <p className="text-[15px] font-medium">
+    <div ref={ref} className="w-[84%] overflow-hidden rounded-[10px] bg-white text-left shadow-[0_0_0_0.5px_rgb(0_0_0/0.12),0_12px_30px_-10px_rgb(20_40_90/0.3)]">
+      {/* The editor's Captions panel. */}
+      <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
+        <span className="text-[10.5px] font-semibold">Transcript</span>
+        <motion.span
+          className="rounded-md px-2 py-1 text-[9.5px] font-semibold"
+          animate={{ backgroundColor: i === 1 ? "#0e62d6" : cut ? "rgb(17 24 39 / 0.06)" : "#116ff5", color: cut ? "#6b7280" : "#ffffff", scale: i === 1 ? 0.94 : 1 }}
+          transition={{ duration: 0.25 }}
+        >
+          {cut ? "3 removed · 1.4 s" : "Remove filler words · 3"}
+        </motion.span>
+      </div>
+      <p className="flex flex-wrap gap-x-1 gap-y-1 px-3 py-2.5 text-[12px] leading-tight">
         {words.map(([w, f], k) => (
           <motion.span
             key={k}
-            className="inline-block overflow-hidden align-bottom whitespace-pre"
-            animate={{ width: f && i === 2 ? 0 : "auto", opacity: f && i === 2 ? 0 : 1, color: f && i >= 1 ? "#ff3b30" : "#111827", textDecorationLine: f && i >= 1 ? "line-through" : "none" }}
+            className={`overflow-hidden rounded-[4px] whitespace-nowrap ${f ? "px-1" : ""}`}
+            animate={{
+              backgroundColor: f && !cut ? "rgb(255 59 48 / 0.12)" : "rgb(255 59 48 / 0)",
+              color: f ? "#e5372c" : "#111827",
+              width: f && cut ? 0 : "auto",
+              opacity: f && cut ? 0 : 1,
+              paddingLeft: f && cut ? 0 : f ? 4 : 0,
+              paddingRight: f && cut ? 0 : f ? 4 : 0,
+            }}
             transition={{ duration: 0.5, ease: EASE }}
           >
-            {w}{" "}
+            {w}
           </motion.span>
         ))}
       </p>
-      <div className="mt-3 flex h-4 gap-[3px]">
-        {words.map(([, f], k) => (
-          <motion.i key={k} className="rounded-[3px]" style={{ flexBasis: 0 }} animate={{ flexGrow: f && i === 2 ? 0.0001 : 1, backgroundColor: f && i >= 1 ? "#ffd2cf" : "#c9dcf3" }} transition={{ duration: 0.5, ease: EASE }} />
-        ))}
+      {/* The timeline: the cut stretches close up. */}
+      <div className="border-t border-black/5 bg-[#f7f9fc] px-3 py-2.5">
+        <div className="flex h-5 gap-[3px]">
+          {words.map(([, f], k) => (
+            <motion.i
+              key={k}
+              className="rounded-[3px]"
+              style={{ flexBasis: 0 }}
+              animate={{ flexGrow: f && cut ? 0.0001 : f ? 0.6 : 1, backgroundColor: f ? "#ffc9c4" : "#b9d0f2", marginRight: f && cut ? -3 : 0 }}
+              transition={{ duration: 0.55, ease: EASE }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -351,16 +416,71 @@ function BackgroundScene() {
 
 function CameraScene() {
   const ref = useRef<HTMLDivElement>(null);
-  const i = useBeat(ref, [1500, 1500, 1500]);
+  const i = useBeat(ref, [1800, 1800, 2200]);
   return (
-    <div ref={ref} className="flex w-[78%] flex-col items-center">
-      <div className="relative">
-        <Face className="w-32" mode={i === 0 ? "original" : i === 1 ? "blur" : "remove"} />
+    <div ref={ref} className="w-[82%]">
+      <div className="relative aspect-[16/10]">
+        <Win className="h-full" />
+        {/* The camera sits in the corner of the recording, as in the editor. */}
+        {i < 2 ? (
+          <motion.span
+            key="bubble"
+            className="absolute right-[-4%] bottom-[-6%] aspect-square w-[34%] overflow-hidden rounded-full border-[2.5px] border-white shadow-[0_10px_24px_rgb(0_0_0/0.25)]"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5, ease: EASE }}
+          >
+            <video src="/media/camera.mp4" poster="/media/camera.jpg" autoPlay muted loop playsInline className={`absolute inset-0 size-full object-cover transition-opacity duration-500 ${i === 1 ? "opacity-0" : ""}`} />
+            <video src="/media/camera-blur.mp4" autoPlay muted loop playsInline className={`absolute inset-0 size-full object-cover transition-opacity duration-500 ${i === 1 ? "" : "opacity-0"}`} />
+          </motion.span>
+        ) : (
+          <motion.div key="cutout" className="absolute right-[-2%] bottom-0 w-[44%]" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: EASE }}>
+            <Cutout />
+          </motion.div>
+        )}
       </div>
-      <div className="mt-3">
+      <div className="mt-3 flex justify-center">
         <Pills items={["Original", "Blur", "Remove"]} active={i} tint="#7c4dff" />
       </div>
     </div>
+  );
+}
+
+/** Umi's own cut-out: the camera with its person matte (from Umi's segmentation) as alpha. */
+function Cutout() {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const cam = useRef<HTMLVideoElement>(null);
+  const matte = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const c = canvas.current!;
+    const g = c.getContext("2d", { willReadFrequently: true })!;
+    const off = document.createElement("canvas");
+    off.width = c.width;
+    off.height = c.height;
+    const og = off.getContext("2d", { willReadFrequently: true })!;
+    let frame = requestAnimationFrame(function draw() {
+      const a = cam.current;
+      const m = matte.current;
+      if (a && m && a.readyState >= 2 && m.readyState >= 2) {
+        if (Math.abs(a.currentTime - m.currentTime) > 0.06) m.currentTime = a.currentTime;
+        g.clearRect(0, 0, c.width, c.height);
+        g.drawImage(a, 0, 0, c.width, c.height);
+        og.drawImage(m, 0, 0, c.width, c.height);
+        const px = g.getImageData(0, 0, c.width, c.height);
+        const mk = og.getImageData(0, 0, c.width, c.height).data;
+        for (let k = 0; k < px.data.length; k += 4) px.data[k + 3] = mk[k];
+        g.putImageData(px, 0, 0);
+      }
+      frame = requestAnimationFrame(draw);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return (
+    <>
+      <video ref={cam} src="/media/camera.mp4" autoPlay muted loop playsInline className="hidden" />
+      <video ref={matte} src="/media/camera-matte.mp4" autoPlay muted loop playsInline className="hidden" />
+      <canvas ref={canvas} width={200} height={200} className="block w-full drop-shadow-[0_8px_14px_rgb(0_0_0/0.25)]" />
+    </>
   );
 }
 
@@ -422,6 +542,114 @@ export function EditorGrid() {
             <p className="mt-1 px-2.5 text-[14.5px] text-pretty text-muted">{line}</p>
           </motion.article>
         ))}
+      </div>
+    </section>
+  );
+}
+
+// ───── Where recordings go ─────
+
+const PLACES = [
+  { name: "Your computer", line: "Every recording is a folder on your disk. Free, offline, yours.", icon: "M4 5h16v11H4zM8 20h8M12 16v4", tint: "#116ff5" },
+  { name: "A file", line: "MP4, MOV or GIF, up to 4K. Send it anywhere.", icon: "M7 3h7l5 5v13H7zM14 3v5h5", tint: "#13a874" },
+  { name: "Umi Cloud", line: "A link the moment you stop, with comments and insights.", icon: "M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z", tint: "#7c4dff" },
+  { name: "Self hosted", line: "Umi Cloud is open source: run it on your own account and bucket.", icon: "M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01", tint: "#e8590c" },
+];
+
+export function Storage() {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { amount: 0.4 });
+  const [active, setActive] = useState(0);
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (!inView || held) return;
+    const id = setTimeout(() => setActive((v) => (v + 1) % PLACES.length), 3600);
+    return () => clearTimeout(id);
+  }, [active, inView, held]);
+  // Curves from the recording (left) to each place (right), in a 600×400 box.
+  const ys = [70, 160, 250, 340];
+  const path = (y: number) => `M 205 205 C 300 205 300 ${y} 395 ${y}`;
+
+  return (
+    <section className="px-4 pt-40">
+      <Rise className="mx-auto max-w-3xl text-center">
+        <p className="text-[15px] font-medium text-accent">Open source</p>
+        <h2 className="h-display mt-3 text-[clamp(34px,5vw,60px)]">Your recordings. Actually yours.</h2>
+        <p className="lead mx-auto mt-4 max-w-xl">They live on your computer. Share them through Umi Cloud, or run the cloud yourself.</p>
+      </Rise>
+      <div ref={ref} className="mx-auto mt-14 grid max-w-6xl gap-3 rounded-[32px] bg-panel p-3 lg:grid-cols-[1.25fr_1fr]">
+        <Rise className="relative overflow-hidden rounded-[24px] bg-white">
+          <svg viewBox="0 0 600 410" className="block w-full" aria-hidden>
+            {ys.map((y, k) => (
+              <path key={k} d={path(y)} fill="none" stroke={k === active ? PLACES[k].tint : "#e3e8ef"} strokeWidth={k === active ? 2 : 1.5} strokeDasharray={k === active ? "0" : "4 5"} style={{ transition: "stroke 0.4s" }} />
+            ))}
+            <motion.circle
+              key={active}
+              r="6"
+              fill={PLACES[active].tint}
+              initial={{ offsetDistance: "0%" } as never}
+              animate={{ offsetDistance: "100%" } as never}
+              transition={{ duration: 1.4, ease: EASE, repeat: Infinity, repeatDelay: 0.6 }}
+              style={{ offsetPath: `path("${path(ys[active])}")` } as never}
+            />
+            <circle cx="205" cy="205" r="5" fill="#fff" stroke="#c9d3e1" strokeWidth="2" />
+          </svg>
+          {/* The recording */}
+          <div className="absolute top-1/2 left-[5%] w-[28%] -translate-y-1/2 rounded-2xl bg-white p-2.5 shadow-[0_0_0_1px_rgb(17_24_39/0.06),0_18px_40px_-16px_rgb(20_40_90/0.35)]">
+            <div className="relative aspect-[16/10] overflow-hidden rounded-lg bg-[linear-gradient(135deg,#e4edf9,#c9daf2)] p-[10%]">
+              <div className="h-full rounded-[5px] bg-white shadow-sm">
+                <div className="grid gap-1 p-1.5">
+                  <i className="h-1 w-1/2 rounded bg-ink/15" />
+                  <i className="h-1 w-1/3 rounded bg-ink/10" />
+                </div>
+              </div>
+              <video src="/media/camera.mp4" autoPlay muted loop playsInline className="absolute bottom-[8%] left-[6%] aspect-square w-[24%] rounded-full border border-white object-cover" />
+            </div>
+            <div className="mt-2 flex items-center gap-2 px-0.5">
+              <Mark className="size-4 text-accent" />
+              <div className="min-w-0">
+                <p className="truncate text-[12px] font-semibold">walkthrough.umi</p>
+                <p className="text-[10.5px] text-muted">4K · 1.2 GB</p>
+              </div>
+            </div>
+          </div>
+          {/* The places */}
+          {PLACES.map((p, k) => (
+            <button
+              key={p.name}
+              type="button"
+              onClick={() => (setActive(k), setHeld(true))}
+              className="absolute right-[5%] flex w-[30%] -translate-y-1/2 items-center gap-2.5 rounded-xl bg-white px-2.5 py-2 text-left text-[13px] font-medium transition-all duration-500"
+              style={{
+                top: `${(ys[k] / 410) * 100}%`,
+                boxShadow: k === active ? `0 0 0 2px ${p.tint}55, 0 12px 30px -12px ${p.tint}99` : "0 0 0 1px rgb(17 24 39 / 0.07)",
+              }}
+            >
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg" style={{ background: `${p.tint}14`, color: p.tint }}>
+                <svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d={p.icon} />
+                </svg>
+              </span>
+              {p.name}
+            </button>
+          ))}
+        </Rise>
+        <div className="flex flex-col justify-center gap-1 p-2">
+          {PLACES.map((p, k) => (
+            <button
+              key={p.name}
+              type="button"
+              onClick={() => (setActive(k), setHeld(true))}
+              className={`rounded-2xl px-5 py-4 text-left transition-all duration-500 ${k === active ? "bg-white shadow-[0_0_0_1px_rgb(17_24_39/0.05),0_12px_30px_-16px_rgb(20_40_90/0.3)]" : ""}`}
+            >
+              <span className={`flex items-center gap-2.5 text-[18px] font-semibold tracking-tight transition-colors ${k === active ? "text-ink" : "text-faint"}`}>
+                <i className="size-2 rounded-[2px]" style={{ background: k === active ? p.tint : "#d4dae3" }} />
+                {p.name}
+              </span>
+              <span className={`mt-1 block pl-[18px] text-[14.5px] transition-colors ${k === active ? "text-muted" : "text-faint"}`}>{p.line}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </section>
   );

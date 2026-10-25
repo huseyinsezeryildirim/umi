@@ -78,7 +78,7 @@ function LiveDemo() {
         <img src="/media/editor.jpg" alt="The Umi editor" className="absolute inset-0 size-full object-cover" />
         {live && (
           <iframe
-            src="/demo/index.html?demo&open&tour"
+            src="/demo/index.html?view=desktop&demo&tour"
             title="Umi editor, guided demo"
             onLoad={() => setTimeout(() => setReady(true), 600)}
             style={{ width: 1440, height: 900, transform: `scale(${scale})`, transformOrigin: "0 0" }}

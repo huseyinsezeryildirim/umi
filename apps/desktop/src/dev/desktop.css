@@ -1,0 +1,179 @@
+/* The demo's Mac desktop (website only). */
+.desk {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+.desk__menubar {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 16px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.85);
+  background: rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(24px) saturate(1.6);
+  z-index: 5;
+}
+.desk__apple {
+  width: 15px;
+  height: 15px;
+}
+.desk__spacer {
+  flex: 1;
+}
+.desk__umi {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 22px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+}
+.desk__umi img {
+  width: 16px;
+  height: 16px;
+}
+.desk__umi[data-on="true"] {
+  background: rgba(0, 0, 0, 0.14);
+}
+.desk__rec {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff3b30;
+  animation: desk-blink 1.2s ease-in-out infinite;
+}
+@keyframes desk-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+.desk__app {
+  position: absolute;
+  left: 9%;
+  top: 13%;
+  width: 62%;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.2),
+    0 30px 70px -20px rgba(0, 0, 0, 0.45);
+}
+.desk__app img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.desk__cursor {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  transform: translate(-20%, -12%);
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
+}
+.desk__ring {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border: 2.5px solid #116ff5;
+  border-radius: 50%;
+  background: rgba(17, 111, 245, 0.15);
+  transform: translate(-50%, -50%) scale(calc(0.4 + var(--k) * 1.2));
+  opacity: calc(1 - var(--k));
+}
+/* The app's floating windows use position: fixed; a transform makes them stay in their box. */
+.desk__launcher,
+.desk__controls,
+.desk__countdown {
+  position: absolute;
+  transform: translateZ(0);
+  z-index: 6;
+}
+.desk__launcher {
+  top: 30px;
+  right: 10px;
+  width: 360px;
+  height: 560px;
+  animation: desk-drop 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+@keyframes desk-drop {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0);
+  }
+}
+.desk__countdown {
+  left: calc(50% - 120px);
+  top: calc(50% - 120px);
+  width: 240px;
+  height: 240px;
+}
+.desk__controls {
+  left: calc(50% - 200px);
+  bottom: 96px;
+  width: 400px;
+  height: 64px;
+  animation: desk-drop 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.desk__bubble {
+  position: absolute;
+  left: 4%;
+  bottom: 110px;
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  z-index: 4;
+  animation: desk-pop 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+@keyframes desk-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+.desk__bubble video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.desk__dock {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  display: flex;
+  gap: 8px;
+  padding: 7px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(24px) saturate(1.6);
+  transform: translateX(-50%);
+}
+.desk__dock i {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.desk__dock-umi {
+  display: grid;
+  place-items: center;
+  background: #fff;
+}
+.desk__dock-umi img {
+  width: 30px;
+  height: 30px;
+}

@@ -13,6 +13,20 @@ const ready = (import.meta.env.DEV || import.meta.env.VITE_DEMO) && !("__TAURI_I
 
 void ready.then(async () => {
   const root = document.getElementById("root")!;
+  // The website demo's Mac desktop, with the tour on top.
+  if (view === "desktop" && (import.meta.env.DEV || import.meta.env.VITE_DEMO)) {
+    const [{ DesktopDemo }, { Tour }] = await Promise.all([import("./dev/desktop"), import("./dev/tour")]);
+    render(
+      () => (
+        <>
+          <DesktopDemo />
+          <Tour />
+        </>
+      ),
+      root,
+    );
+    return;
+  }
   if (view === "main") {
     render(() => <App />, root);
     // The website's guided demo.
