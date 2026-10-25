@@ -233,30 +233,19 @@ html.umi-overlay body {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.6);
 }
-/* In the middle, where a round bubble is widest, wrapping onto two rows so nothing is cut. */
+/* Three size dots and mirror, in a small row near the bottom. */
 .bubble__pill {
   position: absolute;
   left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  bottom: 11%;
+  transform: translateX(-50%);
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
   align-items: center;
   gap: 2px;
-  width: max-content;
-  max-width: 76%;
   padding: 4px;
-  border-radius: 14px;
+  border-radius: 999px;
   background: rgba(14, 17, 30, 0.72);
   backdrop-filter: blur(12px);
-}
-.bubble__pill i {
-  display: none;
-  width: 1px;
-  height: 14px;
-  margin: 0 2px;
-  background: rgba(255, 255, 255, 0.2);
 }
 .bubble__pill button {
   display: grid;
@@ -277,29 +266,22 @@ html.umi-overlay body {
   color: #fff;
   background: rgba(255, 255, 255, 0.18);
 }
-.bubble__shape {
-  width: 10px;
-  height: 10px;
-  border: 1.5px solid currentColor;
-}
-.bubble__shape--circle {
+.bubble__dot {
   border-radius: 50%;
-}
-.bubble__shape--squircle {
-  border-radius: 35%;
-}
-.bubble__shape--square {
-  border-radius: 2px;
+  background: currentColor;
 }
 
 /* ───── Control bar ───── */
+/* A column on the left of the screen (the window is tall and narrow). */
 .controls {
   position: fixed;
   inset: 6px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 0 8px;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 0;
   border-radius: 18px;
   color: #fff;
   background: rgba(14, 17, 30, 0.86);
@@ -323,9 +305,10 @@ html.umi-overlay body {
 }
 .controls__time {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 7px;
-  font-size: 15px;
+  gap: 4px;
+  font-size: 12.5px;
   font-weight: 600;
 }
 .controls__time i {
@@ -358,9 +341,9 @@ html.umi-overlay body {
   transform-origin: center;
   transition: transform 90ms;
 }
+/* A small gap between the readouts and the buttons. */
 .controls__spacer {
-  flex: 1;
-  align-self: stretch;
+  height: 2px;
 }
 .controls__btn {
   display: grid;
@@ -402,14 +385,15 @@ html.umi-overlay body {
 }
 
 .controls__text {
-  height: 30px;
-  padding: 0 10px;
+  width: 44px;
+  height: 28px;
+  padding: 0;
   border: 0;
   border-radius: 9px;
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
   font: inherit;
-  font-size: 13px;
+  font-size: 11px;
   cursor: pointer;
 }
 .controls__text--danger {

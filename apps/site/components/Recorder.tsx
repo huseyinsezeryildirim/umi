@@ -9,7 +9,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type BrowserInfo, browserInfo } from "@/lib/browser";
 import type { CameraShape, Corner, Take } from "@/lib/library";
-import { type CameraBackground, cameraWithBackground, loadSegmenter } from "@/lib/segment";
 import { Mark, copyText } from "./ui";
 
 const EASE = [0.25, 1, 0.5, 1] as const;
@@ -30,7 +29,7 @@ const SURFACES: [Surface, string][] = [
 ];
 const SIZES = { S: 150, M: 210, L: 300 } as const;
 type Size = keyof typeof SIZES;
-type Place = { x: number; y: number; size: Size; shape: CameraShape; mirror: boolean; bg: CameraBackground };
+type Place = { x: number; y: number; size: Size; shape: CameraShape; mirror: boolean };
 
 type Session = {
   pause: () => void;
@@ -55,7 +54,7 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
   const [blocked, setBlocked] = useState("");
   const [camera, setCamera] = useState<MediaStream | null>(null);
   const [mic, setMic] = useState<MediaStream | null>(null);
-  const [bubble, setBubble] = useState<Place>({ x: 24, y: -1, size: "M", shape: "circle", mirror: true, bg: "none" });
+  const [bubble, setBubble] = useState<Place>({ x: 24, y: -1, size: "M", shape: "circle", mirror: true });
   const [count, setCount] = useState(3);
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -213,7 +212,6 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
         camSize: b.size === "S" ? 0.18 : b.size === "M" ? 0.24 : 0.32,
         camShape: b.shape,
         mirror: b.mirror,
-        camBg: b.bg,
       });
       setStage("edit");
     };
@@ -305,7 +303,7 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
         )}
       </AnimatePresence>
 
-      {camera && camOn && stage !== "edit" && <Bubble stream={camera} place={bubble} onPlace={setBubble} onClose={stage === "setup" ? () => setCamOn(false) : undefined} />}
+      {camera && camOn && stage !== "edit" && <Bubble stream={camera} place={bubble} onPlace={setBubble} />}
 
       <AnimatePresence>
         {stage === "countdown" && (
@@ -327,7 +325,7 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
 }
 
 /** The camera on the page: drag it anywhere; hover for size, shape, mirror and off. */
-function Bubble({ stream, place, onPlace, onClose }: { stream: MediaStream; place: Place; onPlace: (p: Place) => void; onClose?: () => void }) {
+function Bubble({ stream, place, onPlace }: { stream: MediaStream; place: Place; onPlace: (p: Place) => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const [hover, setHover] = useState(false);
   const [view, setView] = useState({ w: 1200, h: 800 });
@@ -365,18 +363,12 @@ function Bubble({ stream, place, onPlace, onClose }: { stream: MediaStream; plac
       onPointerLeave={() => setHover(false)}
     >
       <video ref={video} autoPlay muted playsInline className={`pointer-events-none size-full object-cover ${place.mirror ? "-scale-x-100" : ""}`} />
-      {place.bg !== "none" && <BubbleEffect video={video} mode={place.bg} mirror={place.mirror} />}
       {hover && (
-        // In the middle, where a round bubble is widest; two rows so nothing is cut off.
-        <div className="absolute top-1/2 left-1/2 flex w-max max-w-[76%] -translate-x-1/2 -translate-y-1/2 flex-wrap items-center justify-center gap-0.5 rounded-[14px] bg-[rgb(14_17_30/0.72)] p-1 backdrop-blur-md">
-          {(Object.keys(SIZES) as Size[]).map((s) => (
-            <PillButton key={s} label={`Size ${s}`} on={place.size === s} onClick={() => onPlace({ ...place, size: s })}>
-              {s}
-            </PillButton>
-          ))}
-          {(["circle", "rounded", "square"] as CameraShape[]).map((shape) => (
-            <PillButton key={shape} label={`Shape ${shape}`} on={place.shape === shape} onClick={() => onPlace({ ...place, shape })}>
-              <span className={`size-2.5 border-[1.5px] border-current ${shape === "circle" ? "rounded-full" : shape === "rounded" ? "rounded-[35%]" : "rounded-[2px]"}`} />
+        // Three dots for the size and mirror, in a small row near the bottom.
+        <div className="absolute bottom-[11%] left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-full bg-[rgb(14_17_30/0.72)] p-1 backdrop-blur-md">
+          {(Object.keys(SIZES) as Size[]).map((s, i) => (
+            <PillButton key={s} label={["Small", "Medium", "Large"][i]} on={place.size === s} onClick={() => onPlace({ ...place, size: s })}>
+              <span className="rounded-full bg-current" style={{ width: 4 + i * 3, height: 4 + i * 3 }} />
             </PillButton>
           ))}
           <PillButton label="Mirror" on={place.mirror} onClick={() => onPlace({ ...place, mirror: !place.mirror })}>
@@ -386,54 +378,10 @@ function Bubble({ stream, place, onPlace, onClose }: { stream: MediaStream; plac
               <path d="M7.298 20.288A1 1 0 008 22h8a1 1 0 00.703-1.712l-3.991-3.99a1 1 0 00-1.424-.001zM7.298 3.712A1 1 0 018 2h8a1 1 0 01.703 1.712l-3.991 3.99a1 1 0 01-1.424.001z" />
             </svg>
           </PillButton>
-          <PillButton
-            label={place.bg === "none" ? "Blur background" : place.bg === "blur" ? "Remove background" : "Original background"}
-            on={place.bg !== "none"}
-            onClick={() => onPlace({ ...place, bg: place.bg === "none" ? "blur" : place.bg === "blur" ? "remove" : "none" })}
-          >
-            <svg viewBox="0 0 24 24" className="size-[13px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              {/* Lucide sparkles, as in the desktop bubble. */}
-              <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594zM20 2v4M22 4h-4" />
-            </svg>
-          </PillButton>
-          {onClose && (
-            <PillButton label="Turn camera off" on={false} onClick={onClose}>
-              <svg viewBox="0 0 24 24" className="size-[13px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </PillButton>
-          )}
         </div>
       )}
     </motion.div>
   );
-}
-
-/** The bubble with its background blurred or removed, live, drawn over the camera. */
-function BubbleEffect({ video, mode, mirror }: { video: React.RefObject<HTMLVideoElement | null>; mode: CameraBackground; mirror: boolean }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    void loadSegmenter().then(() => alive && setReady(true));
-    return () => {
-      alive = false;
-    };
-  }, []);
-  useEffect(() => {
-    if (!ready) return;
-    let frame = requestAnimationFrame(function loop() {
-      const v = video.current;
-      const ctx = canvas.current?.getContext("2d");
-      if (v && ctx && v.readyState >= 2) {
-        const out = cameraWithBackground(v, v.videoWidth, v.videoHeight, 320, mode);
-        if (out) ctx.drawImage(out, 0, 0);
-      }
-      frame = requestAnimationFrame(loop);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [ready, mode, video]);
-  return <canvas ref={canvas} width={320} height={320} className={`pointer-events-none absolute inset-0 size-full transition-opacity ${ready ? "opacity-100" : "opacity-0"} ${mirror ? "-scale-x-100" : ""}`} />;
 }
 
 function PillButton({ label, on, onClick, children }: { label: string; on: boolean; onClick: () => void; children: React.ReactNode }) {

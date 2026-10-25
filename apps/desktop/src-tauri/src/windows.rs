@@ -12,7 +12,8 @@ pub struct Spec {
 
 pub const LAUNCHER: Spec = Spec { view: "launcher", size: (360.0, 560.0), transparent: true, focus: true };
 pub const BUBBLE: Spec = Spec { view: "bubble", size: (240.0, 240.0), transparent: true, focus: false };
-pub const CONTROLS: Spec = Spec { view: "controls", size: (400.0, 64.0), transparent: true, focus: false };
+/// A column on the left, like Loom's: stop, time, sound, pen, pause, start over, discard.
+pub const CONTROLS: Spec = Spec { view: "controls", size: (64.0, 320.0), transparent: true, focus: false };
 pub const COUNTDOWN: Spec = Spec { view: "countdown", size: (240.0, 240.0), transparent: true, focus: false };
 pub const SHOT: Spec = Spec { view: "shot", size: (1120.0, 760.0), transparent: false, focus: true };
 pub const PROMPTER: Spec = Spec { view: "prompter", size: (520.0, 220.0), transparent: true, focus: true };
@@ -39,7 +40,7 @@ pub fn show(app: &AppHandle, spec: &Spec, at: Option<(f64, f64)>) -> tauri::Resu
     let place = at.unwrap_or_else(|| match spec.view {
         "launcher" => (origin.x + display.width - spec.size.0 - 16.0, origin.y + 36.0),
         "bubble" => (origin.x + 40.0, origin.y + display.height - spec.size.1 - 60.0),
-        "controls" => (origin.x + (display.width - spec.size.0) / 2.0, origin.y + display.height - spec.size.1 - 40.0),
+        "controls" => (origin.x + 16.0, origin.y + (display.height - spec.size.1) / 2.0),
         // Just under the menu bar, near the camera, so eyes stay close to the lens.
         "prompter" => (origin.x + (display.width - spec.size.0) / 2.0, origin.y + 34.0),
         "shot" => (origin.x + (display.width - spec.size.0) / 2.0, origin.y + (display.height - spec.size.1) / 2.0),

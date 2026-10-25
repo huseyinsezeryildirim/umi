@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { emit } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { createResource, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { IconButton, Kbd, Menu, Segmented, Toaster, toast, type MenuEntry } from "@umi/ui";
 import { AppWindow, Smartphone, Camera, CameraOff, ChevronDown, Crop, Film, Maximize2, Mic, MicOff, Monitor, MoreHorizontal, ScrollText, ShieldAlert, UserSquare2, Volume2, VolumeX } from "lucide-solid";
@@ -20,12 +20,19 @@ export function Launcher() {
     const ro = new ResizeObserver(() => void recorder.resize(360, Math.ceil(card.getBoundingClientRect().height) + 24));
     ro.observe(card);
     const timer = window.setInterval(async () => setLevel((await recorder.status()).level), 80);
-    const refresh = () => void refetch();
+    // The bubble changes settings too (size, mirror): read them again when it does.
+    const reread = async () => setSettings(await recorder.settings());
+    const refresh = () => {
+      void refetch();
+      void reread();
+    };
     window.addEventListener("focus", refresh);
+    const off = listen("record:settings", () => void reread());
     onCleanup(() => {
       ro.disconnect();
       window.clearInterval(timer);
       window.removeEventListener("focus", refresh);
+      void off.then((f) => f());
       void recorder.meter(null);
     });
   });
@@ -126,6 +133,8 @@ export function Launcher() {
   };
 
   const toggleCamera = async () => {
+    // From what's saved now, not what this window last saw.
+    setSettings(await recorder.settings());
     const s = update((x) => (x.cameraOn = !x.cameraOn));
     if (s.cameraOn) await recorder.show("bubble");
     else await recorder.hide("bubble");
