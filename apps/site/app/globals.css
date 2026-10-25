@@ -216,6 +216,14 @@ html.lenis body {
   }
 }
 
+/* Never show iOS's big play button on the decorative videos. */
+video::-webkit-media-controls,
+video::-webkit-media-controls-start-playback-button,
+video::-webkit-media-controls-overlay-play-button {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
 .mark {
   display: inline-block;
   background: currentColor;
