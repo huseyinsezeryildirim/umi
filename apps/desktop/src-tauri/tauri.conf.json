@@ -41,7 +41,8 @@
     ],
     "macOS": {
       "signingIdentity": "Apple Development: Huseyin Sezer Yildirim (8UJRUX76H4)",
-      "entitlements": "Entitlements.plist"
+      "entitlements": "Entitlements.plist",
+      "minimumSystemVersion": "13.0"
     }
   }
 }
