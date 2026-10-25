@@ -3,8 +3,9 @@
 // The web editor: the Umi look, captions, cutting filler words and pauses, automatic zoom, and a
 // fast export. Everything runs in this browser; nothing is uploaded.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type Corner, type Look, type Word, type Zoom, ASPECTS, GRADIENTS, LOOK, canvasSize, captionLines, paint } from "@/lib/look";
-import { canExportFast, exportFast, findZooms, voice16k } from "@/lib/media";
+import { type CameraShape, type Corner, type Look, type Word, type Zoom, ASPECTS, GRADIENTS, LOOK, canvasSize, captionLines, paint } from "@/lib/look";
+import { NoAudioEncoder, canExportFast, exportFast, findZooms, voice16k } from "@/lib/media";
+import { cameraWithBackground, loadSegmenter } from "@/lib/segment";
 import { type Range, fillerCuts, isFiller, keptRanges, pauseCuts, skipCut, total } from "@/lib/timeline";
 import type { Out as TranscribeOut } from "@/lib/transcribe.worker";
 import { Mark } from "./ui";
@@ -16,9 +17,11 @@ export type Take = {
   width: number;
   height: number;
   hasSound: boolean;
-  /** Where the camera bubble was while recording. */
+  /** How the camera bubble looked while recording. */
   corner?: Corner;
   camSize?: number;
+  camShape?: CameraShape;
+  mirror?: boolean;
 };
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -26,7 +29,8 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60))
 type Job = { phase: "idle" } | { phase: "loading" | "working"; progress: number } | { phase: "done" } | { phase: "error"; message: string };
 
 export function Editor({ take, account, onRestart }: { take: Take; account?: React.ReactNode; onRestart: () => void }) {
-  const [look, setLook] = useState<Look>({ ...LOOK, camera: !!take.camera, corner: take.corner ?? LOOK.corner, camSize: take.camSize ?? LOOK.camSize });
+  const [look, setLook] = useState<Look>({ ...LOOK, camera: !!take.camera, corner: take.corner ?? LOOK.corner, camSize: take.camSize ?? LOOK.camSize, camShape: take.camShape ?? LOOK.camShape, mirror: take.mirror ?? LOOK.mirror });
+  const [bgJob, setBgJob] = useState<Job>({ phase: "idle" });
   const [trim, setTrim] = useState<Range>([0, take.duration]);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -101,8 +105,11 @@ export function Editor({ take, account, onRestart }: { take: Take; account?: Rea
           look,
           screen: s.readyState >= 2 ? s : null,
           screenSize: [s.videoWidth || take.width, s.videoHeight || take.height],
-          camera: c && c.readyState >= 2 ? c : null,
-          cameraSize: [c?.videoWidth || 1, c?.videoHeight || 1],
+          ...(() => {
+            if (!c || c.readyState < 2) return { camera: null, cameraSize: [1, 1] as [number, number] };
+            const fx = look.camera ? cameraWithBackground(c, c.videoWidth, c.videoHeight, 480, look.camBg) : null;
+            return fx ? { camera: fx, cameraSize: [480, 480] as [number, number] } : { camera: c, cameraSize: [c.videoWidth || 1, c.videoHeight || 1] as [number, number] };
+          })(),
           time: s.currentTime,
           zooms,
           lines,
@@ -189,6 +196,11 @@ export function Editor({ take, account, onRestart }: { take: Take; account?: Rea
         setExportNote(`Exported ${clock(total(kept))} of video in ${took < 60 ? `${Math.max(1, Math.round(took))}s` : clock(took)}.`);
       }
     } catch (e) {
+      if (e instanceof NoAudioEncoder) {
+        await file?.abort().catch(() => {});
+        setExporting(null);
+        return exportRealtime();
+      }
       setExportNote(`Export failed: ${(e as Error).message}`);
     }
     setExporting(null);
@@ -368,6 +380,39 @@ export function Editor({ take, account, onRestart }: { take: Take; account?: Rea
                   <div className="mt-3">
                     <Slider label="Size" value={look.camSize} min={0.12} max={0.4} onChange={(v) => set({ camSize: v })} />
                   </div>
+                  <Segmented
+                    className="mt-3"
+                    value={look.camShape}
+                    options={[
+                      ["circle", "Circle"],
+                      ["rounded", "Rounded"],
+                      ["square", "Square"],
+                    ]}
+                    onChange={(v) => set({ camShape: v })}
+                  />
+                  <p className="mt-3 mb-1.5 text-[12px] font-medium text-muted">Background</p>
+                  <Segmented
+                    value={look.camBg}
+                    options={[
+                      ["none", "Original"],
+                      ["blur", "Blur"],
+                      ["remove", "Remove"],
+                    ]}
+                    onChange={(v) => {
+                      set({ camBg: v });
+                      if (v !== "none" && bgJob.phase !== "done") {
+                        setBgJob({ phase: "loading", progress: 0.5 });
+                        loadSegmenter()
+                          .then(() => setBgJob({ phase: "done" }))
+                          .catch((e) => setBgJob({ phase: "error", message: (e as Error).message }));
+                      }
+                    }}
+                  />
+                  {bgJob.phase === "loading" && <Progress label="Loading background removal…" value={0.5} />}
+                  {bgJob.phase === "error" && <p className="mt-2 text-[12px] text-[#b42318]">{bgJob.message}</p>}
+                  <div className="mt-3">
+                    <Option label="Mirror" on={look.mirror} onToggle={() => set({ mirror: !look.mirror })} />
+                  </div>
                 </>
               )}
             </Field>
@@ -400,6 +445,18 @@ export function Option({ label, on, onToggle }: { label: string; on: boolean; on
         <span className={`absolute top-[2px] size-[18px] rounded-full bg-white shadow transition-all ${on ? "left-[18px]" : "left-[2px]"}`} />
       </span>
     </button>
+  );
+}
+
+function Segmented<T extends string>({ value, options, onChange, className = "" }: { value: T; options: [T, string][]; onChange: (v: T) => void; className?: string }) {
+  return (
+    <div className={`grid gap-1 rounded-xl bg-[#f1f3f6] p-1 ${className}`} style={{ gridTemplateColumns: `repeat(${options.length}, 1fr)` }}>
+      {options.map(([k, label]) => (
+        <button key={k} type="button" onClick={() => onChange(k)} className={`h-8 rounded-lg text-[13px] font-medium transition-colors ${value === k ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"}`}>
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }
 

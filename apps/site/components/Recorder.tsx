@@ -7,7 +7,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type BrowserInfo, browserInfo } from "@/lib/browser";
-import type { Corner } from "@/lib/look";
+import type { CameraShape, Corner } from "@/lib/look";
 import { Mark } from "./ui";
 import { Editor, type Take } from "./WebEditor";
 
@@ -29,7 +29,7 @@ const SURFACES: [Surface, string][] = [
 ];
 const SIZES = { S: 150, M: 210, L: 300 } as const;
 type Size = keyof typeof SIZES;
-type Place = { x: number; y: number; size: Size };
+type Place = { x: number; y: number; size: Size; shape: CameraShape; mirror: boolean };
 
 type Session = {
   pause: () => void;
@@ -53,7 +53,7 @@ export function Recorder({ account }: { account?: React.ReactNode }) {
   const [blocked, setBlocked] = useState("");
   const [camera, setCamera] = useState<MediaStream | null>(null);
   const [mic, setMic] = useState<MediaStream | null>(null);
-  const [bubble, setBubble] = useState<Place>({ x: 24, y: -1, size: "M" });
+  const [bubble, setBubble] = useState<Place>({ x: 24, y: -1, size: "M", shape: "circle", mirror: true });
   const [count, setCount] = useState(3);
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -224,6 +224,8 @@ export function Recorder({ account }: { account?: React.ReactNode }) {
         hasSound: screenStream.getAudioTracks().length > 0,
         corner: `${top ? "t" : "b"}${left ? "l" : "r"}` as Corner,
         camSize: b.size === "S" ? 0.18 : b.size === "M" ? 0.24 : 0.32,
+        camShape: b.shape,
+        mirror: b.mirror,
       });
       setStage("edit");
     };
@@ -309,7 +311,7 @@ export function Recorder({ account }: { account?: React.ReactNode }) {
         )}
       </AnimatePresence>
 
-      {camera && camOn && stage !== "edit" && <Bubble stream={camera} place={bubble} onPlace={setBubble} />}
+      {camera && camOn && stage !== "edit" && <Bubble stream={camera} place={bubble} onPlace={setBubble} onClose={stage === "setup" ? () => setCamOn(false) : undefined} />}
 
       <AnimatePresence>
         {stage === "countdown" && (
@@ -330,8 +332,8 @@ export function Recorder({ account }: { account?: React.ReactNode }) {
   );
 }
 
-/** The camera on the page: drag it anywhere; hover for S / M / L. */
-function Bubble({ stream, place, onPlace }: { stream: MediaStream; place: Place; onPlace: (p: Place) => void }) {
+/** The camera on the page: drag it anywhere; hover for size, shape, mirror and off. */
+function Bubble({ stream, place, onPlace, onClose }: { stream: MediaStream; place: Place; onPlace: (p: Place) => void; onClose?: () => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const [hover, setHover] = useState(false);
   const [view, setView] = useState({ w: 1200, h: 800 });
@@ -359,8 +361,8 @@ function Bubble({ stream, place, onPlace }: { stream: MediaStream; place: Place;
   };
   return (
     <motion.div
-      className="fixed z-50 cursor-grab touch-none overflow-hidden rounded-full bg-[#1a1d29] shadow-[0_0_0_3px_rgb(255_255_255/0.95),0_20px_50px_-12px_rgb(0_0_0/0.45)] select-none active:cursor-grabbing"
-      style={{ left: x, top: y, width: d, height: d, transition: "width .3s, height .3s" }}
+      className="fixed z-50 cursor-grab touch-none overflow-hidden bg-[#1a1d29] shadow-[0_0_0_3px_rgb(255_255_255/0.95),0_20px_50px_-12px_rgb(0_0_0/0.45)] select-none active:cursor-grabbing"
+      style={{ left: x, top: y, width: d, height: d, borderRadius: place.shape === "circle" ? "50%" : place.shape === "rounded" ? "28%" : "8%", transition: "width .3s, height .3s, border-radius .3s" }}
       initial={{ opacity: 0, scale: 0.7 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4, ease: EASE }}
@@ -368,17 +370,43 @@ function Bubble({ stream, place, onPlace }: { stream: MediaStream; place: Place;
       onPointerEnter={() => setHover(true)}
       onPointerLeave={() => setHover(false)}
     >
-      <video ref={video} autoPlay muted playsInline className="pointer-events-none size-full -scale-x-100 object-cover" />
+      <video ref={video} autoPlay muted playsInline className={`pointer-events-none size-full object-cover ${place.mirror ? "-scale-x-100" : ""}`} />
       {hover && (
-        <div className="absolute bottom-[12%] left-1/2 flex -translate-x-1/2 gap-0.5 rounded-full bg-ink/75 p-1 backdrop-blur">
+        // In the middle, where a round bubble is widest; two rows so nothing is cut off.
+        <div className="absolute top-1/2 left-1/2 flex w-max max-w-[82%] -translate-x-1/2 -translate-y-1/2 flex-wrap justify-center gap-0.5 rounded-2xl bg-ink/75 p-1 backdrop-blur">
           {(Object.keys(SIZES) as Size[]).map((s) => (
-            <button key={s} type="button" aria-label={`Size ${s}`} onClick={() => onPlace({ ...place, size: s })} className={`grid size-7 place-items-center rounded-full text-[11px] font-semibold ${place.size === s ? "bg-white/25 text-white" : "text-white/70 hover:text-white"}`}>
-              {s}
-            </button>
+            <PillButton key={s} label={`Size ${s}`} on={place.size === s} onClick={() => onPlace({ ...place, size: s })}>
+              <span className="text-[11px] font-semibold">{s}</span>
+            </PillButton>
           ))}
+          {(["circle", "rounded", "square"] as CameraShape[]).map((shape) => (
+            <PillButton key={shape} label={`Shape ${shape}`} on={place.shape === shape} onClick={() => onPlace({ ...place, shape })}>
+              <span className={`size-3 border-[1.5px] border-current ${shape === "circle" ? "rounded-full" : shape === "rounded" ? "rounded-[4px]" : "rounded-[1px]"}`} />
+            </PillButton>
+          ))}
+          <PillButton label="Mirror" on={place.mirror} onClick={() => onPlace({ ...place, mirror: !place.mirror })}>
+            <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v18M8 7 3 12l5 5zM16 7l5 5-5 5z" />
+            </svg>
+          </PillButton>
+          {onClose && (
+            <PillButton label="Turn camera off" on={false} onClick={onClose}>
+              <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </PillButton>
+          )}
         </div>
       )}
     </motion.div>
+  );
+}
+
+function PillButton({ label, on, onClick, children }: { label: string; on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" aria-label={label} title={label} onClick={onClick} className={`grid size-7 place-items-center rounded-full ${on ? "bg-white/25 text-white" : "text-white/70 hover:text-white"}`}>
+      {children}
+    </button>
   );
 }
 
