@@ -13,6 +13,7 @@ import {
   Merge,
   Mic,
   Image,
+  Keyboard,
   Monitor,
   MousePointer2,
   Palette,
@@ -49,6 +50,12 @@ export function Inspector(props: { editor: Editor }) {
   const ed = props.editor;
   const [tab, setTab] = createSignal<Tab>("background");
   const [cropping, setCropping] = createSignal(false);
+  const keys = () => edit().keystrokes ?? { enabled: false, includeTyping: false, size: 0.045, position: 0.82 };
+  const setKeys = (change: (k: NonNullable<EditSettings["keystrokes"]>) => void) =>
+    set((e) => {
+      e.keystrokes ??= { enabled: false, includeTyping: false, size: 0.045, position: 0.82 };
+      change(e.keystrokes);
+    });
   const sound = () => edit().sound ?? { denoise: false, levelVoice: false, microphoneVolume: 1, systemVolume: 1 };
   const setSound = (change: (s: NonNullable<EditSettings["sound"]>) => void) =>
     set((e) => {
@@ -168,6 +175,14 @@ export function Inspector(props: { editor: Editor }) {
               <SwitchRow label="Click rings" checked={edit().cursor.clickRings} onChange={(v) => set((e) => (e.cursor.clickRings = v))} />
               <SwitchRow label="Motion blur" checked={edit().cursor.motionBlur} onChange={(v) => set((e) => (e.cursor.motionBlur = v))} />
               <SwitchRow label="Hide when idle" checked={edit().cursor.hideWhenIdle} onChange={(v) => set((e) => (e.cursor.hideWhenIdle = v))} />
+            </Section>
+            <Section title="Keystrokes" icon={<Keyboard size={15} />} hint={ed.state().recording.hasKeys ? "Shows keyboard shortcuts on screen as you press them." : "This recording has no key presses. New recordings save them."}>
+              <SwitchRow label="Show shortcuts" checked={keys().enabled} onChange={(v) => setKeys((k) => (k.enabled = v))} />
+              <Show when={keys().enabled}>
+                <SwitchRow label="Show typing too" checked={keys().includeTyping} onChange={(v) => setKeys((k) => (k.includeTyping = v))} />
+                <SliderField label="Size" value={keys().size} min={0.03} max={0.09} format={(v) => `${Math.round(v * 1000) / 10}%`} onInput={(v) => setKeys((k) => (k.size = v))} {...gesture} />
+                <SliderField label="Position" value={keys().position} min={0.1} max={0.95} format={pct} onInput={(v) => setKeys((k) => (k.position = v))} {...gesture} />
+              </Show>
             </Section>
           </Match>
 

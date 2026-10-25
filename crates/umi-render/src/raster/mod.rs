@@ -43,6 +43,8 @@ pub trait Assets: SizeSource {
     fn text_card(&mut self, text: &TextOverlay, characters: usize, canvas_height: f64) -> Option<(String, (u32, u32))>;
     fn caption(&mut self, words: &[String], active: Option<usize>, height: f64, accent: [f32; 4]) -> Option<(String, (u32, u32))>;
     fn cursor_arrow(&mut self) -> CursorRaster;
+    /// Keycaps for the keystroke overlay.
+    fn keycaps(&mut self, keys: &[String], height: f64) -> Option<(String, (u32, u32))>;
 }
 
 /// Shared cache of rasters (kept across frames and renderers).
@@ -116,6 +118,12 @@ impl Assets for FrameAssets<'_> {
     fn caption(&mut self, words: &[String], active: Option<usize>, height: f64, accent: [f32; 4]) -> Option<(String, (u32, u32))> {
         let key = format!("caption:{}:{active:?}:{}", words.join(" "), height as u32);
         let image = self.cache.get_or_insert(&key, || text::caption(words, active, height, accent))?;
+        Some((key, size_of(&image)))
+    }
+
+    fn keycaps(&mut self, keys: &[String], height: f64) -> Option<(String, (u32, u32))> {
+        let key = format!("keys:{}:{}", keys.join("\u{1f}"), height as u32);
+        let image = self.cache.get_or_insert(&key, || text::keycaps(keys, height))?;
         Some((key, size_of(&image)))
     }
 

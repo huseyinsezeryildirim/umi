@@ -82,6 +82,33 @@ pub struct EditSettings {
     /// Voice clean-up and levels.
     #[serde(default, deserialize_with = "t", skip_serializing_if = "Sound::is_default")]
     pub sound: Sound,
+    /// Keyboard shortcuts and typing shown on screen.
+    #[serde(default, deserialize_with = "t", skip_serializing_if = "Keystrokes::is_default")]
+    pub keystrokes: Keystrokes,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Keystrokes {
+    pub enabled: bool,
+    /// Shortcuts only (⌘C, ⇧⌘K…), or typed text too.
+    pub include_typing: bool,
+    /// Key height, fraction of the canvas height.
+    pub size: f64,
+    /// Vertical center, normalized (top-left origin).
+    pub position: f64,
+}
+
+impl Default for Keystrokes {
+    fn default() -> Self {
+        Self { enabled: false, include_typing: false, size: 0.045, position: 0.82 }
+    }
+}
+
+impl Keystrokes {
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
 }
 
 /// How the recording's own sound is treated.
@@ -176,6 +203,7 @@ impl Default for EditSettings {
             watermark: None,
             voiceovers: vec![],
             sound: Sound::default(),
+            keystrokes: Keystrokes::default(),
         }
     }
 }
