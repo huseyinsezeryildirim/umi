@@ -457,6 +457,43 @@ async fn import_videos(paths: Vec<PathBuf>) -> Result<Vec<PathBuf>, String> {
         .map_err(|e| e.to_string())?
 }
 
+/// Several recordings (each with its edits) → one new recording, in the given order.
+#[tauri::command]
+async fn library_combine(state: State<'_, AppState>, paths: Vec<PathBuf>, progress: tauri::ipc::Channel<f64>) -> Result<PathBuf, String> {
+    let gpu = state.gpu()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        if paths.len() < 2 {
+            return Err("Pick two or more recordings.".to_string());
+        }
+        let folder = std::env::temp_dir().join(format!("umi-combine-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
+        // Every take the same shape and size: the first one's shape, 1080p, 30 fps.
+        let first_aspect = umi_project::Bundle::new(&paths[0]).read_project().map_err(|e| e.to_string())?.effective_edit(None).aspect;
+        let aspect = if first_aspect == umi_project::edit::AspectRatio::Auto { umi_project::edit::AspectRatio::Wide } else { first_aspect };
+        let mut files = vec![];
+        let n = paths.len() as f64;
+        for (i, path) in paths.iter().enumerate() {
+            let project = umi_project::Bundle::new(path).read_project().map_err(|e| e.to_string())?;
+            let mut edit = project.effective_edit(crate::presets::load().default_preset());
+            edit.aspect = aspect;
+            let out = folder.join(format!("take-{i}.mp4"));
+            let settings = umi_engine::ExportSettings { format: umi_engine::Format::Mp4, resolution: 1080, fps: 30, hardware: true };
+            let cancel = AtomicBool::new(false);
+            umi_engine::export(gpu.clone(), path, edit, &settings, &out, &|p| { let _ = progress.send((i as f64 + p) / n * 0.8); }, &cancel).map_err(|e| e.to_string())?;
+            files.push(out);
+        }
+        let joined = folder.join("Combined.mp4");
+        let refs: Vec<&std::path::Path> = files.iter().map(PathBuf::as_path).collect();
+        umi_engine::combine::concatenate(&refs, &joined, 30, &|p| { let _ = progress.send(0.8 + p * 0.2); }).map_err(|e| e.to_string())?;
+        let name = format!("Combined {}", chrono::Local::now().format("%Y-%m-%d at %H.%M"));
+        let bundle = import::import_file(&library_folder(), &joined, Some(&name));
+        let _ = std::fs::remove_dir_all(&folder);
+        bundle
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// A Loom share link → a new recording (downloaded); progress 0…1.
 #[tauri::command]
 async fn import_loom(link: String, progress: tauri::ipc::Channel<f64>) -> Result<PathBuf, String> {
@@ -630,6 +667,7 @@ pub fn run() {
             recording::record_cancel,
             recording::copy_file_to_clipboard,
             import_videos,
+            library_combine,
             import_loom,
             editor_transcribe,
             editor_camera_effect,

@@ -2,7 +2,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Button, Dialog, IconButton, Menu, Progress, Spinner, toast } from "@umi/ui";
-import { Circle, Download, Film, FolderOpen, MoreHorizontal, Trash2, Upload } from "lucide-solid";
+import { Circle, Combine, Download, Film, FolderOpen, MoreHorizontal, Trash2, Upload } from "lucide-solid";
 import { Editor } from "./editor/Editor";
 import { installRecordingFlow } from "./recorder/flow";
 import { createEditor, formatTime, type Editor as EditorModel } from "./editor/store";
@@ -47,6 +47,25 @@ export function App() {
 
 function Library(props: { recordings: RecordingSummary[]; loading: boolean; opening: string | null; onOpen: (path: string) => void; onChanged: () => void }) {
   const [loom, setLoom] = createSignal(false);
+  /** Recordings picked with Shift/⌘-click, in the order picked (for combining). */
+  const [picked, setPicked] = createSignal<string[]>([]);
+  const [combining, setCombining] = createSignal<number | null>(null);
+  const togglePick = (path: string) => setPicked((list) => (list.includes(path) ? list.filter((p) => p !== path) : [...list, path]));
+  const combine = async () => {
+    const channel = new Channel<number>();
+    channel.onmessage = setCombining;
+    setCombining(0);
+    try {
+      await invoke("library_combine", { paths: picked(), progress: channel });
+      toast("Combined into a new recording");
+      setPicked([]);
+      props.onChanged();
+    } catch (e) {
+      toast(String(e));
+    } finally {
+      setCombining(null);
+    }
+  };
   const importFiles = async () => {
     const picked = await openDialog({ title: "Import videos", multiple: true, filters: [{ name: "Videos", extensions: ["mp4", "mov", "m4v", "webm", "mkv"] }] });
     const paths = Array.isArray(picked) ? picked : picked ? [picked] : [];
@@ -76,10 +95,39 @@ function Library(props: { recordings: RecordingSummary[]; loading: boolean; open
         </div>
       </header>
       <LoomImport open={loom()} onClose={() => setLoom(false)} onDone={props.onChanged} />
+      <Show when={picked().length}>
+        <div class="lib__pickbar umi-floating">
+          <span>
+            {picked().length} selected · in the order you picked
+          </span>
+          <Show when={combining() !== null} fallback={
+            <>
+              <Button size="sm" variant="ink" disabled={picked().length < 2} onClick={() => void combine()}>
+                <Combine size={14} /> Combine into one video
+              </Button>
+              <Button size="sm" onClick={() => setPicked([])}>
+                Clear
+              </Button>
+            </>
+          }>
+            <span class="lib__pickbar-progress">Combining… {Math.round((combining() ?? 0) * 100)}%</span>
+          </Show>
+        </div>
+      </Show>
       <Show when={!props.loading} fallback={<Spinner />}>
         <div class="lib__grid">
           <For each={props.recordings} fallback={<p class="lib__empty">No recordings yet.</p>}>
-            {(r, i) => <RecordingCard recording={r} index={i()} opening={props.opening === r.path} onOpen={() => props.onOpen(r.path)} onChanged={props.onChanged} />}
+            {(r, i) => (
+              <RecordingCard
+                recording={r}
+                index={i()}
+                opening={props.opening === r.path}
+                picked={picked().indexOf(r.path)}
+                onOpen={() => props.onOpen(r.path)}
+                onPick={() => togglePick(r.path)}
+                onChanged={props.onChanged}
+              />
+            )}
           </For>
         </div>
       </Show>
@@ -88,7 +136,7 @@ function Library(props: { recordings: RecordingSummary[]; loading: boolean; open
 }
 
 /** A recording: poster, and on hover short snippets from across it (not the whole video). */
-function RecordingCard(props: { recording: RecordingSummary; index: number; opening: boolean; onOpen: () => void; onChanged: () => void }) {
+function RecordingCard(props: { recording: RecordingSummary; index: number; opening: boolean; picked: number; onOpen: () => void; onPick: () => void; onChanged: () => void }) {
   const [confirm, setConfirm] = createSignal(false);
   const trash = async () => {
     try {
@@ -116,7 +164,13 @@ function RecordingCard(props: { recording: RecordingSummary; index: number; open
   });
   const segment = () => Math.floor(frame() / 6);
   return (
-    <div role="button" tabIndex={0} class="lib__card umi-card" onClick={props.onOpen} onKeyDown={(e) => e.key === "Enter" && props.onOpen()} onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)}>
+    <div
+      role="button"
+      tabIndex={0}
+      class="lib__card umi-card"
+      data-picked={props.picked >= 0 ? "true" : "false"}
+      title="Click to open · Shift-click to select"
+      onClick={(e) => (e.shiftKey || e.metaKey || e.ctrlKey ? props.onPick() : props.onOpen())} onKeyDown={(e) => e.key === "Enter" && props.onOpen()} onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)}>
       <div class="lib__thumb">
         <Show when={frames().length} fallback={<Film size={28} />}>
           <img src={frames()[frame()]} alt="" draggable={false} />
@@ -132,6 +186,9 @@ function RecordingCard(props: { recording: RecordingSummary; index: number; open
           </div>
         </Show>
         <span class="lib__duration">{formatTime(props.recording.duration, false)}</span>
+        <Show when={props.picked >= 0}>
+          <span class="lib__pick">{props.picked + 1}</span>
+        </Show>
         <div class="lib__more" onClick={(e) => e.stopPropagation()}>
           <Menu
             align="end"

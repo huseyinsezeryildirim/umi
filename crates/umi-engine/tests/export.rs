@@ -44,3 +44,27 @@ fn exports_real_recording() {
     let _ = d;
     assert!(Path::new("/tmp/umi-golden/export-v2.gif").metadata().unwrap().len() > 10_000);
 }
+
+#[test]
+fn joins_takes_end_to_end() {
+    if !Path::new(BUNDLE).exists() {
+        return;
+    }
+    let project = Bundle::new(BUNDLE).read_project().unwrap();
+    let mut a = project.effective_edit(None);
+    a.clips = vec![Clip::new(0.0, 2.0, 1.0)];
+    let mut b = a.clone();
+    b.clips = vec![Clip::new(4.0, 7.0, 1.0)];
+    run("take-a.mp4", a, Format::Mp4, 720, 30);
+    run("take-b.mp4", b, Format::Mp4, 720, 30);
+    let dir = Path::new("/tmp/umi-golden");
+    let out = dir.join("takes.mp4");
+    let total = umi_engine::combine::concatenate(&[&dir.join("take-a.mp4"), &dir.join("take-b.mp4")], &out, 30, &|_| {}).unwrap();
+    let d = umi_media::duration(&out).unwrap();
+    assert!((total - 5.0).abs() < 0.15 && (d - 5.0).abs() < 0.2, "{total} {d}");
+    // Sound runs the whole length.
+    let mut reader = umi_media::AudioReader::open(&out, 0).unwrap();
+    let mut buf = vec![0f32; 48_000 * 2 * 6];
+    let n = reader.read(&mut buf).unwrap() / 2;
+    assert!((n as f64 / 48_000.0 - 5.0).abs() < 0.15, "{}", n as f64 / 48_000.0);
+}

@@ -2,6 +2,7 @@
 //! using `umi-media` for decoding/encoding and `umi-render` for drawing.
 
 pub mod audio_mix;
+pub mod combine;
 pub mod compose;
 pub mod export;
 pub mod schedule;
