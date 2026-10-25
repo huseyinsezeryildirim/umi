@@ -107,8 +107,27 @@ fn build(app: &AppHandle, spec: &Spec, place: (f64, f64), visible: bool) -> taur
         .build()?;
     if spec.transparent {
         float_over_full_screen(&window, 25);
+        keep_out_of_recordings(&window);
     }
     Ok(window)
+}
+
+/// Windows: the floating windows (bar, bubble, menus, countdown) never show in a recording,
+/// from the moment they exist (the drawing layer is made elsewhere and stays recordable).
+/// macOS leaves them out through the capture's filter instead (see umi-capture).
+#[allow(unsafe_code)]
+fn keep_out_of_recordings(window: &WebviewWindow) {
+    #[cfg(windows)]
+    if let Ok(hwnd) = window.hwnd() {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE};
+        // SAFETY: a valid window handle owned by this window (Windows 10 2004+; older
+        // versions just ignore the flag).
+        unsafe {
+            SetWindowDisplayAffinity(hwnd.0 as _, WDA_EXCLUDEFROMCAPTURE);
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = window;
 }
 
 /// The floating windows (bubble, control bar, countdown, prompter) stay visible when another
