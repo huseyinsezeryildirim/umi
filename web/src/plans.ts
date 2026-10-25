@@ -23,7 +23,8 @@ export interface Entitlements {
 }
 
 export const PLANS: Record<Plan, Entitlements> = {
-  free: { cloudLinks: true, maxVideoMinutes: 10, storageGB: 10, umiBadge: true, insights: false, linkControls: true, workspaces: false, customDomain: false },
+  // Storage is the only real cost (see docs/business-model.md), so Free limits storage, not length.
+  free: { cloudLinks: true, maxVideoMinutes: null, storageGB: 10, umiBadge: true, insights: false, linkControls: true, workspaces: false, customDomain: false },
   pro: { cloudLinks: true, maxVideoMinutes: null, storageGB: 1000, umiBadge: false, insights: true, linkControls: true, workspaces: false, customDomain: true },
   team: { cloudLinks: true, maxVideoMinutes: null, storageGB: null, umiBadge: false, insights: true, linkControls: true, workspaces: true, customDomain: true },
 };

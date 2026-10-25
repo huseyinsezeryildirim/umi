@@ -21,16 +21,39 @@ What this says: people pay for **sharing and teams** (links, viewers, comments, 
 workspaces), not for recording. Loom limits recording to push upgrades. Cap limits commercial use.
 Both are where Umi can be more generous.
 
-## What it costs Umi to serve someone
+## What a share link costs (Cloudflare R2 + Workers, October 2026 prices)
 
-- **Storage:** Cloudflare R2 costs $0.015 per GB per month. Viewing (egress) is free.
-  - A 3-minute 1080p video is about 60 MB, so 100 videos cost about $0.09 per month.
-- **Processing:** videos are rendered on the user's computer and uploaded as finished MP4. There's no server transcoding, which is the expensive part for others.
-- **AI:** captions, filler-word cutting, background blur and summaries run on the user's computer, so they cost Umi nothing.
-- **Fixed:** Workers Paid is $5/month. Email through Resend is free up to 3,000 a month.
+Assumptions:
+- A 1080p screen recording is about 30 MB per minute (~4 Mbps).
+- A view makes about 10 range requests; each one is a Worker request plus an R2 read.
+- Uploads go in 10 MB parts.
 
-So a free user with share links costs cents a month. The real risk is abuse (hosting large or
-pirated files), which length and storage limits handle.
+| | Cost |
+|---|---|
+| Storing 1 minute of video for a month | $0.00045 |
+| Storing a 10-minute link for a month (a year) | $0.0045 ($0.054) |
+| A free account full at 10 GB, per month | $0.15 |
+| One view | $0.0000066 |
+| 1 million views | $6.60 |
+| Uploading a 10-minute video | $0.00015 |
+| Fixed: Workers Paid (includes 10M requests) | $5 / month |
+
+Prices behind the table:
+- **R2:** $0.015 per GB-month, $4.50 per million writes, $0.36 per million reads. Viewing (egress) is free. The first 10 GB, 1M writes and 10M reads each month are free.
+- **Workers:** $0.30 per million requests after the first 10 million.
+
+Example: 10,000 free users with 2 GB each and 2 million views a month cost about **$318 a month, or
+$0.03 per user**. 40 Pro subscriptions at $8 cover all of it.
+
+What follows:
+- **Storage is the only cost that matters, and it adds up over time.** Views and uploads are close to free, and video length only matters through the storage it uses. So Free limits storage, not length.
+- **No server-side processing:** videos are rendered on the user's computer and AI runs there too, so there's no transcoding or GPU bill. That's what makes free sharing affordable.
+- **Alternatives cost more:**
+  - Cloudflare Stream charges per minute stored and per minute watched ($5 and $1 per 1,000 minutes). That's far more for the same videos.
+  - S3 or GCS charge for every view through egress.
+- **Keeping storage in check:**
+  - Free accounts that haven't signed in for 12 months get two emails, then their videos are archived.
+  - Abuse (hosting large or unrelated files) is caught by the 10 GB cap and the 5 GB per-file limit.
 
 ## Proposal
 
@@ -43,7 +66,7 @@ and Cap don't cross.
 | Full editor, zooms, captions, cut the ums, camera blur | ✓ | ✓ | ✓ |
 | Export MP4/GIF, your own storage, self-hosted cloud | ✓ | ✓ | ✓ |
 | Commercial use | ✓ | ✓ | ✓ |
-| Share links on Umi Cloud | Unlimited links, up to **10 min** each, **10 GB** | No length limit, 1 TB | No limits |
+| Share links on Umi Cloud | Unlimited links, **any length**, **10 GB** in total (about 5 hours of 1080p) | 1 TB | No limits |
 | Views, reactions, comments, password, expiry | ✓ | ✓ | ✓ |
 | "Made with Umi" on the share page | shown | removed | removed |
 | Viewer insights (retention, countries, embeds) | | ✓ | ✓ |
@@ -51,7 +74,7 @@ and Cap don't cross.
 | Shared workspaces, admin, SSO later | | | ✓ |
 
 Why these numbers:
-- **Free beats both:** Loom gives 25 videos of 5 minutes at 720p. Cap's free tier is personal use only, with 5-minute links. Umi gives unlimited links of 10 minutes, and unlimited local recording for any use.
+- **Free beats both:** Loom gives 25 videos of 5 minutes at 720p. Cap's free tier is personal use only, with 5-minute links. Umi gives unlimited links of any length up to 10 GB, and unlimited local recording for any use. At most that costs Umi $0.15 a month per free user.
 - **Pro is the cheapest paid plan:** it undercuts Cap Pro ($12) and Loom ($18). Most people never need more than Free, and that's fine: the free plan is the marketing.
 - **Team is where the money is,** as with Loom. Companies pay per seat for shared libraries and admin.
 - **Self-hosting stays free.** Later, enterprises can pay for support and an SLA (a contract, not a feature lock).
@@ -71,6 +94,6 @@ Other income later, all optional:
 ## Decisions needed
 
 1. Prices: $8 / $12 yearly, or different?
-2. Free share-link limits: 10 min and 10 GB?
+2. Free share links: any length, 10 GB in total?
 3. License: AGPL for everything, or AGPL cloud + MIT apps?
 4. Clean the git history, then create the public GitHub repo (name, organization)?
