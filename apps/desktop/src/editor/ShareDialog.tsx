@@ -2,7 +2,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { createEffect, createSignal, For, Match, on, Show, Switch } from "solid-js";
 import { Button, Dialog, Progress, Segmented, SwitchRow, TextField, toast } from "@umi/ui";
-import { Check, Copy, Eye, ExternalLink, Link2, Lock, Trash2 } from "lucide-solid";
+import { Check, Copy, ExternalLink, Link2, Lock, Trash2 } from "lucide-solid";
 import type { Editor } from "./store";
 
 interface Video {
@@ -274,31 +274,65 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
 
 const duration = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`);
 
+/** "TR" → 🇹🇷 and the country's name in the reader's language. */
+const flag = (code: string) => String.fromCodePoint(...[...code.toUpperCase()].map((c) => 0x1f1a5 + c.charCodeAt(0)));
+const countryName = (code: string) => {
+  try {
+    return new Intl.DisplayNames(undefined, { type: "region" }).of(code.toUpperCase()) ?? code;
+  } catch {
+    return code;
+  }
+};
+
 /** Views, watch time and where people stop watching (Umi Cloud). */
 function ViewerInsights(props: { insights: Insights }) {
   const i = () => props.insights;
+  const top = () => i().countries.slice(0, 4);
+  const most = () => Math.max(1, ...top().map((c) => c.count));
   return (
     <div class="ed-viewers">
       <div class="ed-viewers__stats">
         <div>
-          <Eye size={13} />
-          <b>{i().views}</b> {i().views === 1 ? "view" : "views"}
+          <b>{i().views}</b>
+          <span>{i().views === 1 ? "view" : "views"}</span>
         </div>
         <div>
-          <b>{duration(i().averageSeconds)}</b> avg. watch
+          <b>{duration(i().averageSeconds)}</b>
+          <span>avg. watch</span>
         </div>
         <div>
-          <b>{Math.round(i().completion * 100)}%</b> finished
+          <b>{Math.round(i().completion * 100)}%</b>
+          <span>finished</span>
+        </div>
+        <div>
+          <b>{i().embeddedViews}</b>
+          <span>from embeds</span>
         </div>
       </div>
       <Show when={i().views > 0}>
-        <div class="ed-viewers__curve" title="Share of viewers who saw each part of the video">
-          <For each={i().retention}>{(r) => <span style={{ height: `${Math.max(4, r * 100)}%` }} />}</For>
+        <div class="ed-viewers__block">
+          <span class="ed-viewers__label">Where people stop watching</span>
+          <div class="ed-viewers__curve">
+            <For each={i().retention}>{(r) => <span style={{ height: `${Math.max(4, r * 100)}%` }} title={`${Math.round(r * 100)}% still watching`} />}</For>
+          </div>
         </div>
-        <div class="umi-section__hint">
-          {i().embeddedViews > 0 ? `${i().embeddedViews} from embeds · ` : ""}
-          {i().countries.slice(0, 3).map((c) => `${c.country} ${c.count}`).join(" · ")}
-        </div>
+        <Show when={top().length}>
+          <div class="ed-viewers__block">
+            <span class="ed-viewers__label">Where they watched from</span>
+            <For each={top()}>
+              {(c) => (
+                <div class="ed-viewers__country">
+                  <span class="ed-viewers__flag">{flag(c.country)}</span>
+                  <span class="ed-viewers__name">{countryName(c.country)}</span>
+                  <span class="ed-viewers__bar">
+                    <i style={{ width: `${(c.count / most()) * 100}%` }} />
+                  </span>
+                  <b>{c.count}</b>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
       </Show>
     </div>
   );

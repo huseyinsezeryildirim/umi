@@ -1,0 +1,130 @@
+"use client";
+
+import { AnimatePresence, motion, useScroll, useSpring, useTransform } from "motion/react";
+import { useEffect, useRef, useState } from "react";
+import { DownloadButton } from "./Download";
+import { ChromeIcon, LinuxIcon, WindowsIcon } from "./icons";
+
+const EASE = [0.25, 1, 0.5, 1] as const;
+
+export function Hero() {
+  const stage = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: stage, offset: ["start end", "center center"] });
+  const p = useSpring(scrollYProgress, { stiffness: 140, damping: 32 });
+  const scale = useTransform(p, [0, 1], [0.92, 1]);
+  const y = useTransform(p, [0, 1], [60, 0]);
+
+  return (
+    <section id="top" className="px-4 pt-36 text-center sm:pt-44">
+      <motion.h1
+        className="h-display mx-auto max-w-4xl text-[clamp(44px,7.6vw,84px)]"
+        initial={{ opacity: 0, y: 24, filter: "blur(10px)" }}
+        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+        transition={{ duration: 1.2, ease: EASE }}
+      >
+        Screen recordings
+        <br />
+        that look edited.
+      </motion.h1>
+      <motion.p className="lead mx-auto mt-6 max-w-md" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: EASE, delay: 0.2 }}>
+        Record. Umi does the zooms, captions and sound. Free forever.
+      </motion.p>
+      <motion.div className="mt-9 flex flex-col items-center gap-6" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: EASE, delay: 0.35 }}>
+        <DownloadButton />
+        <a href="#loom" className="group flex items-center gap-2 text-[15px] text-muted">
+          <motion.svg viewBox="0 0 24 24" className="size-4 text-[#625df5]" animate={{ rotate: 360 }} transition={{ duration: 12, repeat: Infinity, ease: "linear" }} aria-hidden>
+            <path fill="currentColor" d="M12 2l1.6 6.4L20 10l-6.4 1.6L12 18l-1.6-6.4L4 10l6.4-1.6z" />
+          </motion.svg>
+          Switching from Loom?
+          <span className="border-b border-ink/30 text-ink transition-colors group-hover:border-ink">Import your library</span>
+          <span className="transition-transform duration-300 group-hover:translate-x-0.5">→</span>
+        </a>
+        <div className="flex items-center gap-4 text-[15px] text-faint">
+          Also on
+          <span className="flex items-center gap-3.5 text-[#5f6673]">
+            <WindowsIcon className="size-[18px]" />
+            <LinuxIcon className="size-5" />
+            <ChromeIcon className="size-5" />
+          </span>
+        </div>
+      </motion.div>
+
+      <motion.div ref={stage} style={{ scale, y }} className="mx-auto mt-16 max-w-6xl sm:mt-20">
+        <LiveDemo />
+      </motion.div>
+    </section>
+  );
+}
+
+/**
+ * The real Umi editor. A picture until asked; then the app itself loads in place (the
+ * same interface, running in the browser on a sample recording).
+ */
+function LiveDemo() {
+  const [live, setLive] = useState(false);
+  const [ready, setReady] = useState(false);
+  // The app is laid out at a desktop size and scaled to fit, so it looks like the picture.
+  const box = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setScale(el.clientWidth / 1440));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div className="relative overflow-hidden rounded-[28px] p-[3%] shadow-[0_50px_120px_-40px_rgb(20_60_130/0.45)] sm:rounded-[36px]">
+      <img src="/photos/sky.jpg" alt="" className="absolute inset-0 size-full object-cover" />
+      <div ref={box} className="relative aspect-[16/10] overflow-hidden rounded-xl bg-white shadow-[0_0_0_0.5px_rgb(0_0_0/0.2),0_30px_70px_-20px_rgb(0_0_0/0.4)] sm:rounded-2xl">
+        <img src="/media/editor.jpg" alt="The Umi editor" className="absolute inset-0 size-full object-cover" />
+        {live && (
+          <iframe
+            src="/demo/index.html?demo&open"
+            title="Umi editor, interactive demo"
+            onLoad={() => setTimeout(() => setReady(true), 600)}
+            style={{ width: 1440, height: 900, transform: `scale(${scale})`, transformOrigin: "0 0" }}
+            className={`absolute top-0 left-0 border-0 transition-opacity duration-700 ${ready ? "opacity-100" : "opacity-0"}`}
+          />
+        )}
+        <AnimatePresence>
+          {!live && (
+            <motion.div
+              className="absolute inset-0 hidden place-items-center bg-ink/5 md:grid"
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <motion.button
+                type="button"
+                onClick={() => setLive(true)}
+                className="btn-glass"
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8, ease: EASE, delay: 0.3 }}
+              >
+                <span className="relative grid size-6 place-items-center">
+                  <span className="absolute inset-0 animate-ping rounded-full bg-accent/30" />
+                  <span className="relative size-2.5 rounded-full bg-accent" />
+                </span>
+                Try the editor
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+      <AnimatePresence>
+        {live && (
+          <motion.p
+            className="relative mt-3 text-[13px] text-white/90"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.6 }}
+          >
+            This is the real app, running on a sample recording. Change the background, press play.
+          </motion.p>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

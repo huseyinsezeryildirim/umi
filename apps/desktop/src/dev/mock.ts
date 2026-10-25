@@ -23,6 +23,15 @@ const screens: [number, string][] = [
   [0, screenA],
   [6, screenB],
 ];
+/** What the narrator of the sample recording says. */
+const SAMPLE_WORDS = (() => {
+  const text = "Good morning. This is the Northwind dashboard. Revenue is up twelve percent this week. To share it, click Share report and copy the link.";
+  const words = text.split(" ");
+  const start = 0.3;
+  const step = 9.2 / words.length;
+  return words.map((w, i) => ({ id: `W${i}`, start: start + i * step, end: start + (i + 0.85) * step, text: w }));
+})();
+
 /** Where the cursor was (0…1 of the screen) — the same path the sample recording used. */
 const CURSOR_KEYS: [number, number, number][] = [
   [0, 0.55, 0.62],
@@ -77,6 +86,7 @@ let state: EditorState = {
     { id: "Z2", start: 4.9, end: 7.8, scale: 2 },
   ];
   state.recording.duration = 10;
+  state.edit.captions = { ...state.edit.captions, enabled: true, words: SAMPLE_WORDS, language: "en" };
   state.name = "Northwind walkthrough";
   state.recording.hasCamera = false;
   state.edit.camera.visible = false;
@@ -190,6 +200,33 @@ function frameAt(time: number, width: number, height: number): ArrayBuffer {
     g.fill(p);
   }
   g.restore();
+
+  // Captions: the current line, the spoken word bright.
+  const caps = edit.captions;
+  if (caps.enabled && caps.words.length) {
+    const i = caps.words.findIndex((w) => time >= w.start && time <= w.end + 0.25);
+    if (i >= 0) {
+      const from = Math.floor(i / 6) * 6;
+      const line = caps.words.slice(from, from + 6);
+      const size = Math.round(height * (caps.size || 0.045));
+      g.font = `600 ${size}px -apple-system, "SF Pro Text", sans-serif`;
+      const gap = size * 0.3;
+      const widths = line.map((w) => g.measureText(w.text).width);
+      const total = widths.reduce((a, b) => a + b, 0) + gap * (line.length - 1);
+      const py = height * (caps.position ?? 0.88);
+      const px = (width - total) / 2;
+      g.fillStyle = "rgba(0,0,0,0.72)";
+      g.beginPath();
+      g.roundRect(px - size * 0.6, py - size * 0.95, total + size * 1.2, size * 1.45, size * 0.35);
+      g.fill();
+      let x = px;
+      line.forEach((w, k) => {
+        g.fillStyle = caps.highlightActiveWord && from + k === i ? "#ffd60a" : "#fff";
+        g.fillText(w.text, x, py);
+        x += widths[k] + gap;
+      });
+    }
+  }
 
   const pixels = g.getImageData(0, 0, width, height).data;
   const out = new Uint8Array(8 + pixels.length);
@@ -343,7 +380,7 @@ mockIPC(
       case "share_update":
         return { id: "s2Zty2QoHiLz", url: "https://umi.cam/v/s2Zty2QoHiLz", title: "Product demo", status: "ready", allowDownload: true, hasPassword: false, allowComments: true, expiresAt: null };
       case "share_insights":
-        return { views: 42, watchedSeconds: 2310, averageSeconds: 55, completion: 0.62, retention: [1, 0.97, 0.95, 0.93, 0.9, 0.88, 0.86, 0.85, 0.83, 0.82, 0.8, 0.79, 0.77, 0.75, 0.74, 0.72, 0.7, 0.68, 0.65, 0.62], embeddedViews: 9, countries: [{ country: "TR", count: 30 }, { country: "DE", count: 8 }, { country: "US", count: 4 }] };
+        return { views: 42, watchedSeconds: 2310, averageSeconds: 55, completion: 0.62, retention: [1, 0.97, 0.95, 0.93, 0.9, 0.88, 0.86, 0.85, 0.83, 0.82, 0.8, 0.79, 0.77, 0.75, 0.74, 0.72, 0.7, 0.68, 0.65, 0.62], embeddedViews: 9, countries: [{ country: "TR", count: 21 }, { country: "DE", count: 9 }, { country: "US", count: 7 }, { country: "NL", count: 5 }] };
       case "team_list":
         return [{ id: "W1", name: "Umi Team", role: "owner", members: 3, inviteCode: "k3Jd9aQpLx2mZt7RbV0c" }];
       case "team_detail":
@@ -405,6 +442,9 @@ mockIPC(
       case "plugin:event|listen":
       case "plugin:event|unlisten":
         return null;
+      case "editor_transcribe":
+        state = { ...state, edit: { ...state.edit, captions: { ...state.edit.captions, enabled: true, words: SAMPLE_WORDS } } };
+        return state;
       default:
         console.info("mock: unhandled", cmd, p);
         return null;
