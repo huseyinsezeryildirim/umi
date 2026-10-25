@@ -160,9 +160,14 @@ export function Ending() {
         <div className="absolute inset-0 bg-white/30" />
         <Rise className="relative">
           <h2 className="h-display text-[clamp(40px,6.4vw,72px)]">
-            Press <kbd>⌥</kbd>
-            <kbd>⇧</kbd>
-            <kbd>L</kbd>
+            Press{" "}
+            <span className="keys">
+              {["⌥", "⇧", "L"].map((k, i) => (
+                <span key={k} className="keycap" style={{ animationDelay: `${i * 0.16}s` }}>
+                  {k}
+                </span>
+              ))}
+            </span>
             <br />
             and start recording.
           </h2>
