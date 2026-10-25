@@ -2,3 +2,8 @@
 # (VideoFrame, which the WebGL2 path needs for copying decoded frames) are turned on.
 [target.wasm32-unknown-unknown]
 rustflags = ["--cfg", 'getrandom_backend="custom"', "--cfg=web_sys_unstable_apis"]
+
+# Windows gives a program's main thread 1 MB of stack: FFmpeg's binding generator (a build
+# script) needs more.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "link-arg=/STACK:8388608"]
