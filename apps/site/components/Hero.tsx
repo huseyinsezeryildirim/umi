@@ -3,52 +3,30 @@
 import { AnimatePresence, motion, useScroll, useSpring, useTransform } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { DownloadButton } from "./Download";
+import { Headline } from "./Headline";
 import { BrowserIcon, LinuxIcon, LoomIcon, WindowsIcon } from "./icons";
 
 const EASE = [0.25, 1, 0.5, 1] as const;
 
-const LINES = ["that look edited.", "with captions built in.", "that zoom on their own.", "that sound like a studio.", "that cost nothing."];
-
-/** The second line of the headline rewrites itself: erase back to the caret, type the next one. */
-function Typed() {
-  const [text, setText] = useState(LINES[0]);
-  useEffect(() => {
-    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let line = 0;
-    let timer = 0;
-    const wait = (ms: number) => new Promise<void>((r) => (timer = window.setTimeout(r, ms)));
-    let alive = true;
-    (async () => {
-      while (alive) {
-        await wait(2800);
-        const next = LINES[(line + 1) % LINES.length];
-        if (still) {
-          line = (line + 1) % LINES.length;
-          setText(next);
-          continue;
-        }
-        for (let n = LINES[line].length; n >= 0 && alive; n--) {
-          setText(LINES[line].slice(0, n));
-          await wait(28);
-        }
-        await wait(250);
-        line = (line + 1) % LINES.length;
-        for (let n = 1; n <= next.length && alive; n++) {
-          setText(next.slice(0, n));
-          await wait(55);
-        }
-      }
-    })();
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-    };
-  }, []);
-  return (
-    <span className="whitespace-nowrap" aria-live="off">
-      {text}
-      <span aria-hidden className="ml-[0.04em] inline-block h-[0.86em] w-[0.06em] translate-y-[0.1em] animate-[caret_1s_steps(1)_infinite] rounded-full bg-accent" />
-      {!text && "\u200b"}
+/** An icon with its name shown under it on hover or keyboard focus. */
+function Tip({ label, href, children }: { label: string; href?: string; children: React.ReactNode }) {
+  const tip = (
+    <span
+      role="tooltip"
+      className="pointer-events-none absolute top-full left-1/2 mt-2 -translate-x-1/2 -translate-y-1 rounded-lg bg-ink px-2.5 py-1 text-[12.5px] font-medium whitespace-nowrap text-white opacity-0 shadow-lg transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100"
+    >
+      {label}
+    </span>
+  );
+  return href ? (
+    <a href={href} aria-label={label} className="group relative grid place-items-center transition-colors hover:text-ink">
+      {children}
+      {tip}
+    </a>
+  ) : (
+    <span tabIndex={0} aria-label={label} className="group relative grid place-items-center outline-none">
+      {children}
+      {tip}
     </span>
   );
 }
@@ -70,7 +48,7 @@ export function Hero() {
       >
         Screen recordings
         <br />
-        <Typed />
+        <Headline />
       </motion.h1>
       <motion.p className="lead mx-auto mt-6 max-w-md" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: EASE, delay: 0.2 }}>
         Record. Umi does the zooms, captions and sound. Free forever.
@@ -86,11 +64,15 @@ export function Hero() {
         <div className="flex items-center gap-4 text-[15px] text-faint">
           Also on
           <span className="flex items-center gap-3.5 text-[#5f6673]">
-            <WindowsIcon className="size-[18px]" />
-            <LinuxIcon className="size-5" />
-            <a href="/signup" title="Record in your browser" className="transition-colors hover:text-ink">
+            <Tip label="Windows">
+              <WindowsIcon className="size-[18px]" />
+            </Tip>
+            <Tip label="Linux">
+              <LinuxIcon className="size-5" />
+            </Tip>
+            <Tip label="Record in your browser" href="/signup">
               <BrowserIcon className="size-5" />
-            </a>
+            </Tip>
           </span>
         </div>
       </motion.div>
@@ -152,7 +134,7 @@ function LiveDemo() {
                 transition={{ duration: 0.8, ease: EASE, delay: 0.3 }}
               >
                 <span className="relative grid size-6 place-items-center">
-                  <span className="absolute inset-0 animate-ping rounded-full bg-accent/30" />
+                  <span className="absolute inset-0 animate-[ping_1s_cubic-bezier(0,0,0.2,1)_4] rounded-full bg-accent/30 opacity-0" />
                   <span className="relative size-2.5 rounded-full bg-accent" />
                 </span>
                 Start interactive demo

@@ -80,13 +80,8 @@ export function Modes() {
                   )}
                 </AnimatePresence>
                 {i === active && !held && inView && (
-                  <motion.span
-                    key={`p${active}`}
-                    className="absolute -top-px left-0 h-px origin-left bg-ink"
-                    initial={{ width: "0%" }}
-                    animate={{ width: "100%" }}
-                    transition={{ duration: CYCLE / 1000, ease: "linear" }}
-                  />
+                  // Grows with a transform (no layout work each frame).
+                  <span key={`p${active}`} className="progress-line absolute -top-px left-0 h-px w-full bg-ink" style={{ animationDuration: `${CYCLE}ms` }} />
                 )}
               </button>
             ))}
@@ -235,7 +230,7 @@ export function Ai() {
                         )}
                       </div>
                       <div className="absolute inset-x-[3%] bottom-[2%] h-1 overflow-hidden rounded bg-white/40">
-                        <i className="block h-full bg-white" style={{ width: `${(t / 10) * 100}%` }} />
+                        <i className="block h-full origin-left bg-white" style={{ transform: `scaleX(${Math.min(1, t / 10)})` }} />
                       </div>
                     </div>
                     <div className="mt-3 flex items-center gap-2 text-[12px]">
@@ -332,7 +327,7 @@ export function Ai() {
                     )}
                   </AnimatePresence>
                   {i === active && !held && inView && (
-                    <motion.span key={`a${active}`} className="absolute -top-px left-0 h-px origin-left bg-ink" initial={{ width: "0%" }} animate={{ width: "100%" }} transition={{ duration: 6.5, ease: "linear" }} />
+                    <span key={`a${active}`} className="progress-line absolute -top-px left-0 h-px w-full bg-ink" style={{ animationDuration: "6500ms" }} />
                   )}
                 </button>
               ))}
