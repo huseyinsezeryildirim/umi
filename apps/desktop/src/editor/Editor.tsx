@@ -1,3 +1,4 @@
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { onCleanup, onMount, Show } from "solid-js";
 import { Button, IconButton, Kbd, Toaster } from "@umi/ui";
@@ -25,13 +26,29 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
   const ed = props.editor;
 
   // Keyboard: Space, S, B, Z, ⌫, Esc, ←/→, ⌘Z/⇧⌘Z.
+  // ⌘Z / ⇧⌘Z come from the app menu: in a text field they undo typing, otherwise the edit.
+  onMount(() => {
+    const unlisten = listen<string>("menu", (event) => {
+      const typing = document.activeElement?.closest("input, textarea, [contenteditable]");
+      if (typing) document.execCommand(event.payload);
+      else void (event.payload === "redo" ? ed.redo() : ed.undo());
+    });
+    onCleanup(() => void unlisten.then((f) => f()));
+  });
+
   onMount(() => {
     const key = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.closest("input, textarea, [contenteditable]")) return;
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key.toLowerCase() === "z") {
+      // ⌘Z is handled by the menu on macOS; Ctrl+Z (Windows/Linux, or Ctrl on a Mac) here.
+      const mac = navigator.platform.toLowerCase().includes("mac");
+      if (mac && e.ctrlKey && !e.metaKey && e.key.toLowerCase() === "z") {
         void (e.shiftKey ? ed.redo() : ed.undo());
+      } else if (e.ctrlKey && !e.metaKey && e.key.toLowerCase() === "y") {
+        void ed.redo();
+      } else if (mod && e.key.toLowerCase() === "j" && ed.selection()?.kind === "clip") {
+        void ed.apply({ op: "joinClips", index: (ed.selection() as { id: number }).id });
       } else if (mod) {
         return;
       } else if (e.key === " ") {

@@ -187,6 +187,22 @@ impl Document {
         true
     }
 
+    /// Joins a clip with the next one, bringing back anything cut out between them (undoes a
+    /// split or a cut). Only clips in recording order can be joined.
+    pub fn join_clips(&mut self, index: usize) -> bool {
+        let mut kept = self.kept();
+        if index + 1 >= kept.len() {
+            return false;
+        }
+        let (a, b) = (kept[index], kept[index + 1]);
+        if b.start < a.start {
+            return false;
+        }
+        kept.splice(index..=index + 1, [Clip::new(a.start, a.end.max(b.end), a.speed)]);
+        self.edit.clips = kept;
+        true
+    }
+
     pub fn delete_clip(&mut self, index: usize) -> bool {
         let mut kept = self.kept();
         if kept.len() <= 1 || index >= kept.len() {
@@ -520,6 +536,19 @@ mod tests {
         assert!((d.placements()[0].clip.start - 2.0).abs() < 1e-9);
         assert!(d.delete_clip(0));
         assert!((d.output_duration() - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn join_undoes_split_and_cut() {
+        let mut d = doc(10.0);
+        d.split(4.0);
+        assert!(d.join_clips(0));
+        assert_eq!(d.placements().len(), 1);
+        assert!((d.output_duration() - 10.0).abs() < 1e-9);
+        d.cut((3.0, 5.0));
+        assert_eq!(d.placements().len(), 2);
+        assert!(d.join_clips(0));
+        assert!((d.output_duration() - 10.0).abs() < 1e-9);
     }
 
     #[test]

@@ -1,6 +1,6 @@
-import { createEffect, createMemo, createSignal, on, For, onCleanup, onMount, Show } from "solid-js";
-import { Menu, tokens } from "@umi/ui";
-import { Clapperboard, Cuboid, EyeOff, Layers, Plus, Type, ZoomIn } from "lucide-solid";
+import { createEffect, createMemo, createSignal, Index, on, For, onCleanup, onMount, Show } from "solid-js";
+import { Menu, tokens, toast } from "@umi/ui";
+import { Clapperboard, Cuboid, EyeOff, Layers, Link2, Plus, Type, ZoomIn } from "lucide-solid";
 import { formatTime, type Editor } from "./store";
 import { placementEnd, type Placement, type Selection } from "./types";
 
@@ -44,6 +44,7 @@ export function Timeline(props: { editor: Editor }) {
   let scroller!: HTMLDivElement;
   const [width, setWidth] = createSignal(800);
   const [hoverX, setHoverX] = createSignal<number | null>(null);
+  const [magnet, setMagnet] = createSignal<{ index: number; mode: "start" | "end" } | null>(null);
 
   let content!: HTMLDivElement;
   onMount(() => {
@@ -181,6 +182,11 @@ export function Timeline(props: { editor: Editor }) {
     const oy = e.clientY;
     const target = e.currentTarget as HTMLElement;
     let started = false;
+    // Magnet join: dragging an edge onto the cut next to it snaps there; releasing joins.
+    const placements = ed.state().placements;
+    const neighbour = mode === "end" ? placements[index + 1] : mode === "start" ? placements[index - 1] : undefined;
+    const joinable = !!neighbour && (mode === "end" ? neighbour.clip.start >= p.clip.end - 1e-6 : neighbour.clip.end <= p.clip.start + 1e-6);
+    let armed = false;
     const move = (m: PointerEvent) => {
       const dx = m.clientX - ox;
       if (!started) {
@@ -193,7 +199,17 @@ export function Timeline(props: { editor: Editor }) {
         target.dataset.lifted = m.clientY - oy > CLIP_H * 0.7 ? "true" : "false";
       } else {
         const dt = (dx / scale()) * p.clip.speed;
-        void ed.apply({ op: "trimClip", index, ...(mode === "start" ? { start: p.clip.start + dt } : { end: p.clip.end + dt }) });
+        let value = mode === "start" ? p.clip.start + dt : p.clip.end + dt;
+        if (joinable && neighbour) {
+          const seam = mode === "end" ? neighbour.clip.start : neighbour.clip.end;
+          const snapPx = 12;
+          const near = Math.abs(value - seam) * (scale() / p.clip.speed) < snapPx;
+          const past = mode === "end" ? value >= seam : value <= seam;
+          armed = near || past;
+          if (armed) value = seam;
+          setMagnet(armed ? { index, mode } : null);
+        }
+        void ed.apply({ op: "trimClip", index, ...(mode === "start" ? { start: value } : { end: value }) });
       }
     };
     const up = (u: PointerEvent) => {
@@ -211,7 +227,12 @@ export function Timeline(props: { editor: Editor }) {
         }
         delete target.dataset.lifted;
       }
-      if (started) void ed.gestureEnd();
+      if (armed) {
+        // The two clips now meet at the cut: make them one.
+        void ed.apply({ op: "joinClips", index: mode === "end" ? index : index - 1 }).then(() => void ed.gestureEnd());
+        toast("Clips joined");
+      } else if (started) void ed.gestureEnd();
+      setMagnet(null);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -295,31 +316,52 @@ export function Timeline(props: { editor: Editor }) {
 
           {/* Clips */}
           <div class="ed-lane ed-lane--clips" style={{ height: `${CLIP_H}px` }} onPointerDown={seek}>
-            <For each={ed.state().placements}>
+            <Index each={ed.state().placements}>
               {(p, i) => {
-                const selected = () => sameSelection(ed.selection(), { kind: "clip", id: i() });
+                // Index keeps each clip's element while its placement changes (smooth trims).
+                const selected = () => sameSelection(ed.selection(), { kind: "clip", id: i });
+                const width = () => Math.max(x(placementEnd(p()) - p().outputStart) - 2, 8);
                 return (
                   <div
                     class="ed-clip"
                     data-selected={selected() ? "true" : "false"}
-                    style={{ left: `${12 + x(p.outputStart)}px`, width: `${Math.max(x(placementEnd(p) - p.outputStart) - 2, 8)}px` }}
-                    onPointerDown={(e) => dragClip(i(), p, "move", e)}
+                    data-magnet={magnet()?.index === i ? magnet()!.mode : ""}
+                    style={{ left: `${12 + x(p().outputStart)}px`, width: `${width()}px` }}
+                    onPointerDown={(e) => dragClip(i, p(), "move", e)}
                   >
-                    <Filmstrip editor={ed} placement={p} width={Math.max(x(placementEnd(p) - p.outputStart) - 2, 8)} />
-                    <Waveform editor={ed} placement={p} width={Math.max(x(placementEnd(p) - p.outputStart) - 2, 8)} />
+                    <Filmstrip editor={ed} placement={p()} width={width()} />
+                    <Waveform editor={ed} placement={p()} width={width()} />
                     <span class="ed-clip__label">
-                      Clip {i() + 1}
-                      <Show when={p.clip.speed !== 1}>
-                        <b>{p.clip.speed}×</b>
+                      Clip {i + 1}
+                      <Show when={p().clip.speed !== 1}>
+                        <b>{p().clip.speed}×</b>
                       </Show>
                     </span>
-                    <div class="ed-trim ed-trim--start" onPointerDown={(e) => dragClip(i(), p, "start", e)} />
-                    <div class="ed-trim ed-trim--end" onPointerDown={(e) => dragClip(i(), p, "end", e)} />
+                    <div class="ed-trim ed-trim--start" onPointerDown={(e) => dragClip(i, p(), "start", e)} />
+                    <div class="ed-trim ed-trim--end" onPointerDown={(e) => dragClip(i, p(), "end", e)} />
                   </div>
                 );
               }}
-            </For>
+            </Index>
           </div>
+
+          {/* Join buttons on the seams between clips (undo a split or a cut). */}
+          <For each={ed.state().placements.slice(0, -1)}>
+            {(p, i) => (
+              <Show when={!ed.blade()}>
+                <button
+                  type="button"
+                  class="ed-seam"
+                  title="Join these clips"
+                  style={{ left: `${12 + x(placementEnd(p))}px`, top: `${RULER_H + 6 + CLIP_H / 2}px` }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => void ed.apply({ op: "joinClips", index: i() })}
+                >
+                  <Link2 size={12} />
+                </button>
+              </Show>
+            )}
+          </For>
 
           {/* Lanes */}
           <For each={lanes()}>
