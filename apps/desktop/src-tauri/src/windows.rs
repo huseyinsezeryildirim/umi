@@ -14,6 +14,7 @@ pub const LAUNCHER: Spec = Spec { view: "launcher", size: (360.0, 560.0), transp
 pub const BUBBLE: Spec = Spec { view: "bubble", size: (240.0, 240.0), transparent: true, focus: false };
 pub const CONTROLS: Spec = Spec { view: "controls", size: (340.0, 64.0), transparent: true, focus: false };
 pub const COUNTDOWN: Spec = Spec { view: "countdown", size: (240.0, 240.0), transparent: true, focus: false };
+pub const SHOT: Spec = Spec { view: "shot", size: (1120.0, 760.0), transparent: false, focus: true };
 pub const PROMPTER: Spec = Spec { view: "prompter", size: (520.0, 220.0), transparent: true, focus: true };
 
 /// The main display's frame in points (position, size).
@@ -38,6 +39,7 @@ pub fn show(app: &AppHandle, spec: &Spec, at: Option<(f64, f64)>) -> tauri::Resu
         "controls" => (origin.x + (display.width - spec.size.0) / 2.0, origin.y + display.height - spec.size.1 - 40.0),
         // Just under the menu bar, near the camera, so eyes stay close to the lens.
         "prompter" => (origin.x + (display.width - spec.size.0) / 2.0, origin.y + 34.0),
+        "shot" => (origin.x + (display.width - spec.size.0) / 2.0, origin.y + (display.height - spec.size.1) / 2.0),
         _ => (origin.x + (display.width - spec.size.0) / 2.0, origin.y + (display.height - spec.size.1) / 2.0),
     });
     if let Some(w) = app.get_webview_window(spec.view) {
@@ -52,12 +54,12 @@ pub fn show(app: &AppHandle, spec: &Spec, at: Option<(f64, f64)>) -> tauri::Resu
         .title("Umi")
         .inner_size(spec.size.0, spec.size.1)
         .position(place.0, place.1)
-        .decorations(false)
+        .decorations(!spec.transparent)
         .transparent(spec.transparent)
-        .always_on_top(true)
-        .resizable(false)
-        .skip_taskbar(true)
-        .shadow(false)
+        .always_on_top(spec.transparent)
+        .resizable(!spec.transparent)
+        .skip_taskbar(spec.transparent)
+        .shadow(!spec.transparent)
         .visible_on_all_workspaces(true)
         .focused(spec.focus)
         .build()?;
@@ -100,6 +102,7 @@ pub fn window_show(app: AppHandle, view: String, x: Option<f64>, y: Option<f64>)
         "bubble" => show(&app, &BUBBLE, at).map(|_| ()),
         "controls" => show(&app, &CONTROLS, at).map(|_| ()),
         "prompter" => show(&app, &PROMPTER, at).map(|_| ()),
+        "shot" => show(&app, &SHOT, at).map(|_| ()),
         "countdown" => show(&app, &COUNTDOWN, at).map(|w| {
             let _ = w.set_ignore_cursor_events(true);
         }),

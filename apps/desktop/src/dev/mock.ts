@@ -207,6 +207,8 @@ mockIPC(
         return [];
       case "image_thumbnail":
         return wallpaper("#ddd", "#999");
+      case "screenshot_current":
+        return frame4;
       case "cloud_status":
         return { connected: true, server: "https://umi.cam" };
       case "share_state":

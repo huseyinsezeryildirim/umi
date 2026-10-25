@@ -38,7 +38,7 @@ umi-capture = { path = "../../../crates/umi-capture" }
 umi-recorder = { path = "../../../crates/umi-recorder" }
 umi-cloud = { path = "../../../crates/umi-cloud" }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
-arboard = { version = "3", default-features = false }
+arboard = { version = "3", default-features = false, features = ["image-data"] }
 
 [lints]
 workspace = true

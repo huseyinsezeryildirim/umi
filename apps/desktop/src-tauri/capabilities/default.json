@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Main window permissions.",
-  "windows": ["main", "editor-*", "launcher", "bubble", "controls", "countdown", "area", "prompter"],
+  "windows": ["main", "editor-*", "launcher", "bubble", "controls", "countdown", "area", "prompter", "shot"],
   "permissions": ["core:default", "core:window:allow-start-dragging", "dialog:default", "opener:default"]
 }

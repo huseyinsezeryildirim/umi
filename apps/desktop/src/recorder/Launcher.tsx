@@ -64,7 +64,7 @@ export function Launcher() {
     const list = sources();
     const entries: MenuEntry[] = [{ kind: "label", label: "Screen" }];
     for (const d of list?.displays ?? []) entries.push({ label: d.name, icon: <Monitor size={15} />, checked: !settings()?.cameraOnly && (target()?.kind ?? "display") === "display" && (!target() || (target() as { id: number }).id === d.id), onSelect: () => pick({ kind: "display", id: d.id }) });
-    entries.push({ label: "Select an area…", icon: <Crop size={15} />, onSelect: () => void recorder.show("area") });
+    entries.push({ label: "Select an area…", icon: <Crop size={15} />, onSelect: () => void invoke("area_pick", { mode: "record" }) });
     entries.push({ label: "Camera only", icon: <UserSquare2 size={15} />, checked: settings()?.cameraOnly, onSelect: () => pick(null, true) });
     const chosen = target()?.kind === "window" ? list?.windows.find((w) => w.id === (target() as { id: number }).id) : undefined;
     if (chosen) {
@@ -133,6 +133,7 @@ export function Launcher() {
     ...(["native", "1080p", "720p"] as const).map((r) => ({ label: r === "native" ? "Native resolution" : r, checked: settings()?.resolution === r, onSelect: () => update((s) => (s.resolution = r)) })),
     ...[60, 30].map((f) => ({ label: `${f} fps`, checked: settings()?.fps === f, onSelect: () => update((s) => (s.fps = f)) })),
     { kind: "separator" },
+    { label: "Take a screenshot", shortcut: "⌥⇧4", icon: <Camera size={15} />, onSelect: () => void invoke("area_pick", { mode: "screenshot" }) },
     { label: "Open library", icon: <Film size={15} />, onSelect: () => void recorder.show("main") },
     { label: "Quit Umi", onSelect: () => void invoke("app_quit") },
   ];
