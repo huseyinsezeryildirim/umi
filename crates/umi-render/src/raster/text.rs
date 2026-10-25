@@ -6,7 +6,7 @@ use cosmic_text::{Attrs, Buffer, Color as TextColor, Family, FontSystem, Metrics
 use parking_lot::Mutex;
 use std::sync::OnceLock;
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, PremultipliedColorU8, Rect as SkRect, Transform};
-use umi_project::edit::{TextOverlay, TextStyle};
+use umi_project::edit::{CaptionStyle, TextOverlay, TextStyle};
 
 struct Fonts {
     system: FontSystem,
@@ -307,42 +307,72 @@ pub fn card(text: &TextOverlay, characters: usize, canvas_height: f64) -> Option
 }
 
 /// A caption line on a dark pill, with the active word on an accent pill.
-pub fn caption(words: &[String], active: Option<usize>, height: f64, accent: [f32; 4]) -> Option<RasterImage> {
+pub fn caption(words: &[String], active: Option<usize>, height: f64, accent: [f32; 4], style: CaptionStyle, shown: usize) -> Option<RasterImage> {
     let height = height as f32;
+    let weight = if style == CaptionStyle::Bold { 850 } else { 700 };
     let mut guard = fonts().lock();
-    let shaped: Vec<Shaped> =
-        words.iter().map(|w| shape(&mut guard, &Line { text: w.clone(), face: Face::Sans(700), size: height, color: WHITE })).collect();
+    let shaped: Vec<Shaped> = words
+        .iter()
+        .map(|w| {
+            let text = if style == CaptionStyle::Bold { w.to_uppercase() } else { w.clone() };
+            shape(&mut guard, &Line { text, face: Face::Sans(weight), size: height, color: WHITE })
+        })
+        .collect();
     drop(guard);
     let space = height * 0.28;
-    let (pad_w, pad_h) = (height * 0.6, height * 0.35);
+    let (pad_w, pad_h) = match style {
+        CaptionStyle::Pill => (height * 0.6, height * 0.35),
+        _ => (height * 0.3, height * 0.25),
+    };
     let ascent = height * 0.95;
     let descent = height * 0.3;
     let text_w: f32 = shaped.iter().map(|s| s.width).sum::<f32>() + space * (words.len() as f32 - 1.0).max(0.0);
     let (w, h) = ((text_w + pad_w * 2.0).ceil(), (ascent + descent + pad_h * 2.0).ceil());
     let mut pm = Pixmap::new(w.max(1.0) as u32, h.max(1.0) as u32)?;
-    let mut paint = Paint::default();
-    paint.set_color_rgba8(14, 17, 30, 199);
-    paint.anti_alias = true;
-    pm.fill_path(&rounded_rect(0.0, 0.0, w, h, h * 0.28)?, &paint, FillRule::Winding, Transform::identity(), None);
+    if style == CaptionStyle::Pill {
+        let mut paint = Paint::default();
+        paint.set_color_rgba8(14, 17, 30, 199);
+        paint.anti_alias = true;
+        pm.fill_path(&rounded_rect(0.0, 0.0, w, h, h * 0.28)?, &paint, FillRule::Winding, Transform::identity(), None);
+    }
+    let to8 = |c: f32| (c.clamp(0.0, 1.0) * 255.0) as u8;
+    let accent8 = [to8(accent[0]), to8(accent[1]), to8(accent[2]), 255];
     let mut x = pad_w;
     for (i, s) in shaped.iter().enumerate() {
-        if Some(i) == active {
-            let mut p = Paint::default();
-            let to8 = |c: f32| (c.clamp(0.0, 1.0) * 255.0) as u8;
-            p.set_color(Color::from_rgba8(to8(accent[0]), to8(accent[1]), to8(accent[2]), 255));
-            p.anti_alias = true;
-            let r = rounded_rect(
-                x - height * 0.14,
-                pad_h - height * 0.06,
-                s.width + height * 0.28,
-                ascent + descent + height * 0.12,
-                height * 0.16,
-            );
-            if let Some(r) = r {
-                pm.fill_path(&r, &p, FillRule::Winding, Transform::identity(), None);
+        if i >= shown {
+            break;
+        }
+        let y = pad_h - height * 0.1;
+        let is_active = Some(i) == active;
+        match style {
+            CaptionStyle::Pill => {
+                if is_active {
+                    let mut p = Paint::default();
+                    p.set_color(Color::from_rgba8(accent8[0], accent8[1], accent8[2], 255));
+                    p.anti_alias = true;
+                    if let Some(r) = rounded_rect(x - height * 0.14, pad_h - height * 0.06, s.width + height * 0.28, ascent + descent + height * 0.12, height * 0.16) {
+                        pm.fill_path(&r, &p, FillRule::Winding, Transform::identity(), None);
+                    }
+                }
+                blend_coverage(&mut pm, s, x, y, WHITE);
+            }
+            CaptionStyle::Bold => {
+                // A thick dark outline, then the word (the spoken one in yellow).
+                let r = (height * 0.08).max(1.5);
+                for k in 0..16 {
+                    let a = k as f32 / 16.0 * std::f32::consts::TAU;
+                    blend_coverage(&mut pm, s, x + a.cos() * r, y + a.sin() * r, [10, 12, 20, 255]);
+                }
+                blend_coverage(&mut pm, s, x, y, if is_active { [255, 214, 10, 255] } else { WHITE });
+            }
+            CaptionStyle::Minimal => {
+                let r = (height * 0.05).max(1.0);
+                for (dx, dy) in [(0.0, r), (r * 0.7, r * 0.7), (-r * 0.7, r * 0.7)] {
+                    blend_coverage(&mut pm, s, x + dx, y + dy, [0, 0, 0, 110]);
+                }
+                blend_coverage(&mut pm, s, x, y, if is_active { accent8 } else { WHITE });
             }
         }
-        blend_coverage(&mut pm, s, x, pad_h - height * 0.1, WHITE);
         x += s.width + space;
     }
     Some(from_pixmap(pm))

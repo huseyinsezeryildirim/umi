@@ -160,7 +160,7 @@ export interface EditSettings {
   grade: { preset: GradePreset; exposure: number; contrast: number; saturation: number; vignette: number; grain: number };
   texts: TextOverlay[];
   moves: CameraMove[];
-  captions: { enabled: boolean; words: { id: Id; start: number; end: number; text: string }[]; language: string; size: number; position: number; highlightActiveWord: boolean };
+  captions: { enabled: boolean; words: { id: Id; start: number; end: number; text: string }[]; language: string; size: number; position: number; highlightActiveWord: boolean; style?: "pill" | "bold" | "minimal"; reveal?: boolean };
   clips: Clip[];
   crossfade: number;
   music?: { file: string; title?: string; volume: number; fadeOut: number };
