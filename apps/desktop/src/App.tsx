@@ -2,9 +2,12 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Button, Dialog, IconButton, Menu, Progress, Spinner, toast } from "@umi/ui";
-import { Circle, Combine, Download, Film, FolderOpen, MoreHorizontal, Trash2, Upload } from "lucide-solid";
+import { Circle, CircleHelp, Combine, Download, Film, FolderOpen, MoreHorizontal, Trash2, Upload } from "lucide-solid";
 import { Editor } from "./editor/Editor";
 import { installRecordingFlow } from "./recorder/flow";
+import { ShortcutsDialog } from "./ShortcutsDialog";
+import { shouldTour, Tour } from "./Tour";
+import { listen } from "@tauri-apps/api/event";
 import { createEditor, formatTime, type Editor as EditorModel } from "./editor/store";
 import type { EditorState, RecordingSummary } from "./editor/types";
 
@@ -25,6 +28,11 @@ export function App() {
     }
   };
 
+  const [shortcuts, setShortcuts] = createSignal(false);
+  const [touring, setTouring] = createSignal(shouldTour());
+  void listen("open-shortcuts", () => setShortcuts(true));
+  void listen<string[]>("shortcuts-busy", (e) => toast(`${e.payload.length === 1 ? "A shortcut is" : "Some shortcuts are"} used by another app — change ${e.payload.length === 1 ? "it" : "them"} in Keyboard shortcuts`));
+
   // Recording (launcher, tray, shortcuts) is run from here; a finished recording opens.
   installRecordingFlow((bundle) => {
     void refetch();
@@ -39,13 +47,23 @@ export function App() {
   };
 
   return (
-    <Show when={editor()} fallback={<Library recordings={recordings() ?? []} loading={recordings.loading} opening={opening()} onOpen={open} onChanged={() => void refetch()} />}>
+    <>
+    <ShortcutsDialog open={shortcuts()} onClose={() => setShortcuts(false)} />
+    <Tour
+      open={touring()}
+      onClose={() => {
+        setTouring(false);
+        void invoke("window_show", { view: "launcher" });
+      }}
+    />
+    <Show when={editor()} fallback={<Library recordings={recordings() ?? []} loading={recordings.loading} opening={opening()} onOpen={open} onChanged={() => void refetch()} onTour={() => setTouring(true)} />}>
       {(ed) => <Editor editor={ed()} onBack={back} />}
     </Show>
+    </>
   );
 }
 
-function Library(props: { recordings: RecordingSummary[]; loading: boolean; opening: string | null; onOpen: (path: string) => void; onChanged: () => void }) {
+function Library(props: { recordings: RecordingSummary[]; loading: boolean; opening: string | null; onOpen: (path: string) => void; onChanged: () => void; onTour: () => void }) {
   const [loom, setLoom] = createSignal(false);
   /** Recordings picked with Shift/⌘-click, in the order picked (for combining). */
   const [picked, setPicked] = createSignal<string[]>([]);
@@ -92,6 +110,9 @@ function Library(props: { recordings: RecordingSummary[]; loading: boolean; open
           <Button size="sm" onClick={() => setLoom(true)}>
             <Download size={14} /> Import from Loom
           </Button>
+          <IconButton label="Show the tour" size="sm" onClick={props.onTour}>
+            <CircleHelp size={16} />
+          </IconButton>
         </div>
       </header>
       <LoomImport open={loom()} onClose={() => setLoom(false)} onDone={props.onChanged} />

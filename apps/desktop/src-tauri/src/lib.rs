@@ -576,6 +576,25 @@ async fn import_loom(link: String, progress: tauri::ipc::Channel<f64>) -> Result
     .map_err(|e| e.to_string())?
 }
 
+/// macOS's own camera effects panel (Center Stage, Portrait, Studio Light, backgrounds).
+#[tauri::command]
+fn show_video_effects() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    #[allow(unexpected_cfgs, unsafe_code)]
+    {
+        use objc::runtime::Class;
+        use objc::{msg_send, sel, sel_impl};
+        let cls = Class::get("AVCaptureDevice").ok_or("AVFoundation isn't available")?;
+        // SAFETY: class method with an enum argument (1 = video effects), macOS 12+.
+        unsafe {
+            let _: () = msg_send![cls, showSystemUserInterface: 1isize];
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    Err("Video effects come from macOS.".into())
+}
+
 #[tauri::command]
 fn app_quit(app: tauri::AppHandle) {
     app.exit(0);
@@ -676,7 +695,11 @@ pub fn run() {
             });
 
             tray::install(app.handle())?;
-            shortcuts::install(app.handle());
+            let busy = shortcuts::install(app.handle());
+            if !busy.is_empty() {
+                // Shown by the main window: another app owns some of our shortcuts.
+                let _ = app.emit("shortcuts-busy", busy);
+            }
             // Recordings the app couldn't finish last time (it quit while recording).
             let recovered = umi_recorder::recover(&library_folder());
             if !recovered.is_empty() {
@@ -721,7 +744,10 @@ pub fn run() {
             share::share_update,
             share::share_delete,
             share::copy_text_to_clipboard,
+            shortcuts::shortcuts_get,
+            shortcuts::shortcuts_set,
             app_quit,
+            show_video_effects,
             open_privacy_settings,
             windows::window_show,
             windows::window_hide,

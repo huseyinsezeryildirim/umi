@@ -6551,6 +6551,7 @@ dependencies = [
  "dirs 6.0.0",
  "image",
  "keyring",
+ "objc",
  "parking_lot",
  "serde",
  "serde_json",
