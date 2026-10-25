@@ -24,7 +24,7 @@ export function Nav() {
         layout
         transition={{ type: "spring", stiffness: 260, damping: 30 }}
         className={`grid w-full grid-cols-[1fr_auto] items-center gap-4 md:grid-cols-[1fr_auto_1fr] ${
-          floating ? "max-w-3xl rounded-full bg-white/70 py-2 pr-2 pl-5 shadow-[0_0_0_1px_rgb(17_24_39/0.06),0_10px_30px_rgb(17_24_39/0.08)] backdrop-blur-xl" : "max-w-6xl px-4 py-3"
+          floating ? "max-w-4xl rounded-full bg-white/70 py-2 pr-2 pl-5 shadow-[0_0_0_1px_rgb(17_24_39/0.06),0_10px_30px_rgb(17_24_39/0.08)] backdrop-blur-xl" : "max-w-6xl px-4 py-3"
         }`}
       >
         <a href="#top" className="flex items-center gap-2 text-lg font-semibold tracking-tight" aria-label="Umi home">
@@ -32,13 +32,13 @@ export function Nav() {
         </a>
         <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
           {LINKS.map(([label, href]) => (
-            <a key={href} href={href} className="rounded-full px-3 py-1.5 text-[14px] text-text transition-colors hover:text-ink">
+            <a key={href} href={href} className="rounded-full px-3 py-1.5 text-[14px] whitespace-nowrap text-text transition-colors hover:text-ink">
               {label}
             </a>
           ))}
         </nav>
         <div className="flex items-center justify-end gap-2">
-          <a href="/login" className="hidden rounded-full px-3 py-1.5 text-[14px] font-medium text-text transition-colors hover:text-ink sm:block">
+          <a href="/login" className="hidden rounded-full px-3 py-1.5 text-[14px] font-medium whitespace-nowrap text-text transition-colors hover:text-ink sm:block">
             Sign in
           </a>
           <a href="#download" className="btn-dark">

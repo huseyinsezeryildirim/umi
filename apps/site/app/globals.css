@@ -98,7 +98,7 @@ html.lenis body {
     transform: scale(0.98);
   }
   .btn-dark {
-    @apply inline-flex h-9 items-center gap-2 rounded-full bg-ink px-4 text-sm font-medium text-white;
+    @apply inline-flex h-9 items-center gap-2 rounded-full bg-ink px-4 text-sm font-medium whitespace-nowrap text-white;
     transition: background-color 0.3s var(--ease-soft);
   }
   .btn-dark:hover {
