@@ -5,12 +5,14 @@ pub mod audio;
 pub mod decode;
 pub mod encode;
 pub mod gif;
+pub mod record;
 mod hw;
 
 pub use audio::{AudioReader, AudioStream, CHANNELS, SAMPLE_RATE, audio_streams, waveform};
 pub use decode::{ColorInfo, DecodedFrame, FrameFormat, VideoDecoder, VideoInfo, keyframe_thumbnails, thumbnail, to_rgba};
 pub use encode::{Container, Encoder, EncoderSettings, VideoCodec};
 pub use gif::GifWriter;
+pub use record::{Pixels, StreamWriter, WriterSettings};
 
 use ffmpeg_next as ff;
 use std::path::{Path, PathBuf};
