@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Umi — free screen recorder</title>
+  <meta name="description" content="Record your screen, camera and voice. Edit like a pro with zooms, captions and AI that runs on your computer. Free and open source for Mac, Windows, Linux and Chrome." />
+  <link rel="icon" href="umi-mark.svg" />
+  <meta property="og:title" content="Umi — free screen recorder" />
+  <meta property="og:description" content="Beautiful screen recordings, free forever. Mac, Windows, Linux and Chrome." />
+  <link rel="stylesheet" href="site.css" />
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="#"><img src="umi-mark.svg" alt="" width="30" height="30" /> Umi</a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="https://github.com/umi-cam/umi">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="pill">Free · Open source · Commercial use included</p>
+      <h1>Screen recordings people<br />actually want to watch.</h1>
+      <p class="lead">Record your screen, camera and voice. Umi adds smooth zooms, a polished cursor, captions and clean sound — on your computer, without an account.</p>
+      <div class="cta">
+        <a id="download" class="btn btn-ink" href="#downloads">Download Umi</a>
+        <a class="btn btn-glass" href="#downloads" id="other">Other platforms</a>
+      </div>
+      <p class="fine" id="detected">Mac · Windows · Linux · Chrome</p>
+      <div class="shot">
+        <img src="editor.png" alt="The Umi editor" onerror="this.parentElement.classList.add('empty')" />
+      </div>
+    </section>
+
+    <section id="features" class="features">
+      <article><h3>Zooms that follow you</h3><p>Smart zoom finds where you click and type, glides between moments, or magnifies with a loupe.</p></article>
+      <article><h3>Edit by text</h3><p>Captions in 99 languages, made on your computer. Delete words to cut the video, drop the “um”s in one click.</p></article>
+      <article><h3>Studio sound</h3><p>Remove fan and room noise, even out your voice, add music from a free library and a natural AI voiceover.</p></article>
+      <article><h3>Camera, made nicer</h3><p>Blur or remove the background, keep your face centered, move the bubble out of the cursor’s way.</p></article>
+      <article><h3>Looks great instantly</h3><p>Backgrounds, device frames, shadows, color looks, titles, 3D moves, keystrokes and click sounds.</p></article>
+      <article><h3>Share or keep it local</h3><p>Export MP4, MOV or GIF for free. With Umi Cloud: a link in seconds, comments, password and expiry.</p></article>
+    </section>
+
+    <section id="downloads" class="downloads">
+      <h2>Download</h2>
+      <div class="grid">
+        <a class="card" data-os="mac-arm" href="https://github.com/umi-cam/umi/releases/latest/download/Umi_aarch64.dmg"><strong>macOS</strong><span>Apple silicon</span></a>
+        <a class="card" data-os="mac-intel" href="https://github.com/umi-cam/umi/releases/latest/download/Umi_x64.dmg"><strong>macOS</strong><span>Intel</span></a>
+        <a class="card" data-os="windows" href="https://github.com/umi-cam/umi/releases/latest/download/Umi_x64-setup.exe"><strong>Windows</strong><span>10 and 11</span></a>
+        <a class="card" data-os="linux" href="https://github.com/umi-cam/umi/releases/latest/download/Umi_amd64.AppImage"><strong>Linux</strong><span>AppImage</span></a>
+        <a class="card" href="https://github.com/umi-cam/umi/releases/latest/download/Umi_amd64.deb"><strong>Linux</strong><span>Debian / Ubuntu (.deb)</span></a>
+        <a class="card" data-os="chrome" href="https://chromewebstore.google.com/search/Umi%20screen%20recorder"><strong>Chrome</strong><span>Extension · ChromeOS</span></a>
+      </div>
+    </section>
+
+    <section id="pricing" class="pricing">
+      <div class="plan">
+        <h3>Free</h3>
+        <p class="price">$0 <small>forever</small></p>
+        <ul>
+          <li>Unlimited recording and editing</li>
+          <li>Commercial use</li>
+          <li>On-device AI: captions, summaries, voiceover</li>
+          <li>Export MP4 · MOV · GIF up to 4K</li>
+          <li>Import from Loom</li>
+        </ul>
+      </div>
+      <div class="plan plan-cloud">
+        <h3>Umi Cloud</h3>
+        <p class="price">For teams <small>who share</small></p>
+        <ul>
+          <li>Instant links with comments and reactions</li>
+          <li>Passwords, expiry, embeds</li>
+          <li>Viewer insights</li>
+          <li>Shared workspaces</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">Made with care · <a href="https://github.com/umi-cam/umi">Open source (AGPL-3.0)</a></footer>
+  <script src="site.js"></script>
+</body>
+</html>
