@@ -1,22 +1,55 @@
-// Development only: a stand-in for the Rust side so the UI runs in a plain browser (for
-// design reviews and UI tests). Frames are real renders of a fixture recording.
+// A stand-in for the Rust side so the UI runs in a plain browser: design reviews, UI tests
+// and the interactive demo on the website. Frames are Umi renders of a made-up dashboard
+// recording (no personal content).
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import frame1 from "./frame-1.jpg";
 import frame4 from "./frame-4.jpg";
 import frame8 from "./frame-8.jpg";
+import screenA from "./screen-a.jpg";
+import screenB from "./screen-b.jpg";
+import { GRADIENTS } from "../editor/panels/Background";
 import fixture from "./state.json";
 import music from "../../src-tauri/resources/music.json";
 import type { EditorState, EditSettings, Selection } from "../editor/types";
 
 const frames: [number, string][] = [
   [1, frame1],
-  [4, frame4],
-  [8, frame8],
+  [2.6, frame4],
+  [6.2, frame8],
 ];
+/** The raw screen of the sample recording (before 6 s, after the share popover opens). */
+const screens: [number, string][] = [
+  [0, screenA],
+  [6, screenB],
+];
+/** Where the cursor was (0…1 of the screen) — the same path the sample recording used. */
+const CURSOR_KEYS: [number, number, number][] = [
+  [0, 0.55, 0.62],
+  [1.6, 0.34, 0.25],
+  [2.6, 0.36, 0.27],
+  [3.8, 0.6, 0.55],
+  [5.2, 0.915, 0.11],
+  [6.6, 0.9, 0.13],
+  [8.5, 0.7, 0.5],
+  [10, 0.68, 0.52],
+];
+function cursorAt(t: number): [number, number] {
+  for (let i = 0; i < CURSOR_KEYS.length - 1; i++) {
+    const [t0, x0, y0] = CURSOR_KEYS[i];
+    const [t1, x1, y1] = CURSOR_KEYS[i + 1];
+    if (t >= t0 && t <= t1) {
+      let k = (t - t0) / (t1 - t0);
+      k = k * k * (3 - 2 * k);
+      return [x0 + (x1 - x0) * k, y0 + (y1 - y0) * k];
+    }
+  }
+  const last = CURSOR_KEYS[CURSOR_KEYS.length - 1];
+  return [last[1], last[2]];
+}
 const images = new Map<string, HTMLImageElement>();
 const loaded = Promise.all(
-  frames.map(
+  [...frames, ...screens].map(
     ([, url]) =>
       new Promise<void>((done) => {
         const img = new Image();
@@ -36,6 +69,18 @@ let state: EditorState = {
   selection: null,
   ...(fixture as unknown as Omit<EditorState, "id" | "name" | "canUndo" | "canRedo" | "selection">),
 };
+{
+  state = structuredClone(state);
+  // The sample recording's zooms (its clicks at 2.0 s and 5.6 s).
+  state.zoomSegments = [
+    { id: "Z1", start: 1.2, end: 3.6, scale: 1.8 },
+    { id: "Z2", start: 4.9, end: 7.8, scale: 2 },
+  ];
+  state.recording.duration = 10;
+  state.name = "Northwind walkthrough";
+  state.recording.hasCamera = false;
+  state.edit.camera.visible = false;
+}
 let recordSettings = {
   target: null,
   fps: 60,
@@ -53,17 +98,99 @@ const history: EditSettings[] = [];
 const future: EditSettings[] = [];
 const uuid = () => crypto.randomUUID().toUpperCase();
 
+/**
+ * A small stand-in renderer: the sample screen on the edit's background with its padding,
+ * corners, shadow, zooms and cursor, so changes in the demo show up at once.
+ */
 function frameAt(time: number, width: number, height: number): ArrayBuffer {
-  const url = frames.reduce((best, f) => (Math.abs(f[0] - time) < Math.abs(best[0] - time) ? f : best))[1];
-  const img = images.get(url)!;
+  const edit = state.edit;
   const canvas = new OffscreenCanvas(width, height);
   const g = canvas.getContext("2d")!;
-  const aspect = img.naturalWidth / Math.max(img.naturalHeight, 1) || 16 / 10;
-  const w = Math.min(width, height * aspect);
-  const h = w / aspect;
-  g.fillStyle = "#cfe3f8";
+  const screen = images.get(screens.reduce((best, s) => (time >= s[0] ? s : best), screens[0])[1])!;
+
+  // Background.
+  const b = edit.background as Record<string, { _0: unknown }>;
+  if ("color" in b) {
+    const c = b.color._0 as { r: number; g: number; b: number };
+    g.fillStyle = `rgb(${c.r * 255},${c.g * 255},${c.b * 255})`;
+  } else {
+    const [from, to] = GRADIENTS[("gradient" in b ? b.gradient._0 : "sky") as keyof typeof GRADIENTS] ?? GRADIENTS.sky;
+    const a = ((edit.backgroundAngle ?? 135) - 90) * (Math.PI / 180);
+    const r = Math.hypot(width, height) / 2;
+    const grad = g.createLinearGradient(width / 2 - Math.cos(a) * r, height / 2 - Math.sin(a) * r, width / 2 + Math.cos(a) * r, height / 2 + Math.sin(a) * r);
+    grad.addColorStop(0, from);
+    grad.addColorStop(1, to);
+    g.fillStyle = grad;
+  }
   g.fillRect(0, 0, width, height);
-  if (img.complete) g.drawImage(img, (width - w) / 2, (height - h) / 2, w, h);
+  if ("blurredScreen" in b) {
+    g.filter = "blur(24px) brightness(0.8)";
+    g.drawImage(screen, -40, -40, width + 80, height + 80);
+    g.filter = "none";
+  }
+
+  // The screen, inset by the padding and kept 16:10.
+  const pad = edit.padding * Math.min(width, height) * 1.6;
+  let w = width - pad * 2;
+  let h = w / 1.6;
+  if (h > height - pad * 2) {
+    h = height - pad * 2;
+    w = h * 1.6;
+  }
+  const x = (width - w) / 2;
+  const y = (height - h) / 2;
+  const radius = edit.cornerRadius * Math.min(w, h) * 0.9;
+
+  // Zoom: eased in and out over 0.6 s toward the cursor.
+  const seg = state.zoomSegments.find((z) => time >= z.start && time <= z.end);
+  let scale = 1;
+  let [fx, fy] = cursorAt(time);
+  if (seg) {
+    const ease = (v: number) => 1 - Math.pow(1 - Math.min(Math.max(v, 0), 1), 3);
+    const k = Math.min(ease((time - seg.start) / 0.6), ease((seg.end - time) / 0.6));
+    scale = 1 + (seg.scale - 1) * k;
+    if (seg.focus) [fx, fy] = seg.focus;
+  }
+
+  g.save();
+  g.shadowColor = `rgba(0,0,0,${0.45 * edit.shadow})`;
+  g.shadowBlur = 50 * edit.shadow;
+  g.shadowOffsetY = 18 * edit.shadow;
+  g.beginPath();
+  g.roundRect(x, y, w, h, radius);
+  g.fillStyle = "#fff";
+  g.fill();
+  g.restore();
+  g.save();
+  g.beginPath();
+  g.roundRect(x, y, w, h, radius);
+  g.clip();
+  // Keep the zoomed view inside the screen's edges.
+  const vw = w / scale;
+  const vh = h / scale;
+  const sx = Math.min(Math.max(fx * w - vw / 2, 0), w - vw);
+  const sy = Math.min(Math.max(fy * h - vh / 2, 0), h - vh);
+  g.translate(x, y);
+  g.scale(scale, scale);
+  g.translate(-sx, -sy);
+  if (screen.complete) g.drawImage(screen, 0, 0, w, h);
+  // Cursor.
+  if (edit.cursor.visible) {
+    const [cx, cy] = cursorAt(time);
+    const size = (w / 60) * (edit.cursor.size || 1);
+    g.translate(cx * w, cy * h);
+    g.scale(size / 24, size / 24);
+    g.fillStyle = "#000";
+    g.strokeStyle = "#fff";
+    g.lineWidth = 1.6;
+    g.lineJoin = "round";
+    const p = new Path2D("M5 3l14 7.5-6.2 1.6L10 18.5z");
+    g.translate(-5, -3);
+    g.stroke(p);
+    g.fill(p);
+  }
+  g.restore();
+
   const pixels = g.getImageData(0, 0, width, height).data;
   const out = new Uint8Array(8 + pixels.length);
   const view = new DataView(out.buffer);
@@ -166,7 +293,7 @@ mockIPC(
     switch (cmd) {
       case "list_recordings":
         return [
-          { path: "/fixture/Product demo.umi", name: "Product demo", duration: 10.1, createdAt: "2026-10-24T21:33:09Z" },
+          { path: "/fixture/Product demo.umi", name: "Northwind walkthrough", duration: 10.1, createdAt: "2026-10-24T21:33:09Z" },
           { path: "/fixture/Onboarding walkthrough.umi", name: "Onboarding walkthrough", duration: 184.2, createdAt: "2026-10-23T10:12:00Z" },
           { path: "/fixture/Bug report.umi", name: "Bug report", duration: 42.7, createdAt: "2026-10-21T15:40:00Z" },
         ];
@@ -209,7 +336,7 @@ mockIPC(
       case "image_thumbnail":
         return wallpaper("#ddd", "#999");
       case "screenshot_current":
-        return frame4;
+        return frames[0][1];
       case "cloud_status":
         return { connected: true, server: "https://umi.cam" };
       case "share_state":
@@ -230,9 +357,9 @@ mockIPC(
         };
       case "team_videos":
         return [
-          { id: "v1", url: "https://umi.cam/v/v1", title: "Onboarding walkthrough", durationMs: 184000, thumbnailUrl: frame1, owner: "ada@umi.cam", yours: false },
-          { id: "v2", url: "https://umi.cam/v/v2", title: "Q4 roadmap", durationMs: 312000, thumbnailUrl: frame4, owner: "you@umi.cam", yours: true },
-          { id: "v3", url: "https://umi.cam/v/v3", title: "Bug repro: export", durationMs: 46000, thumbnailUrl: frame8, owner: "lin@umi.cam", yours: false },
+          { id: "v1", url: "https://umi.cam/v/v1", title: "Onboarding walkthrough", durationMs: 184000, thumbnailUrl: frames[0][1], owner: "ada@umi.cam", yours: false },
+          { id: "v2", url: "https://umi.cam/v/v2", title: "Q4 roadmap", durationMs: 312000, thumbnailUrl: frames[1][1], owner: "you@umi.cam", yours: true },
+          { id: "v3", url: "https://umi.cam/v/v3", title: "Bug repro: export", durationMs: 46000, thumbnailUrl: frames[2][1], owner: "lin@umi.cam", yours: false },
         ];
       case "team_presets":
         return [{ id: "P1", name: "Brand look", edit: {}, updatedBy: "ada@umi.cam" }];

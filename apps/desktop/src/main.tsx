@@ -8,7 +8,8 @@ import { App } from "./App";
 const view = new URLSearchParams(location.search).get("view") ?? "main";
 
 // In a plain browser (design reviews, UI tests) a stand-in answers for the Rust side.
-const ready = import.meta.env.DEV && !("__TAURI_INTERNALS__" in window) ? import("./dev/mock") : Promise.resolve();
+// The website's interactive demo is a build of this UI with the same stand-in (VITE_DEMO).
+const ready = (import.meta.env.DEV || import.meta.env.VITE_DEMO) && !("__TAURI_INTERNALS__" in window) ? import("./dev/mock") : Promise.resolve();
 
 void ready.then(async () => {
   const root = document.getElementById("root")!;
