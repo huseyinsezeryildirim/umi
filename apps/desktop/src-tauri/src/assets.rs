@@ -84,6 +84,24 @@ pub async fn image_thumbnail(path: PathBuf) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || thumbnail(&path).ok_or_else(|| "can't read image".to_string())).await.map_err(|e| e.to_string())?
 }
 
+/// One frame of the recording's screen at recording time `time` (JPEG data URL), for the
+/// crop sheet.
+#[tauri::command]
+pub async fn recording_still(path: PathBuf, time: f64, max_side: u32) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let screen = umi_project::Bundle::new(&path).screen();
+        let mut decoder = umi_media::VideoDecoder::open(&screen, true).map_err(|e| e.to_string())?;
+        let frame = decoder.frame_at(time.max(0.0)).map_err(|e| e.to_string())?.ok_or("no frame")?;
+        let (w, h, rgba) = umi_media::to_rgba(&frame, max_side).map_err(|e| e.to_string())?;
+        let img = image::RgbaImage::from_raw(w, h, rgba).ok_or("bad frame")?;
+        let mut jpeg = Vec::new();
+        image::DynamicImage::ImageRgba8(img).to_rgb8().write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg).map_err(|e| e.to_string())?;
+        Ok(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(jpeg)))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 // ───── Music library ─────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

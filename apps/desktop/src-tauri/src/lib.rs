@@ -3,6 +3,7 @@
 
 mod assets;
 mod editor;
+mod presets;
 
 use editor::{EditorSession, EditorState, Op};
 use parking_lot::Mutex;
@@ -17,7 +18,7 @@ use tauri::{Emitter, Manager, State};
 use umi_render::Gpu;
 
 #[derive(Default)]
-struct AppState {
+pub(crate) struct AppState {
     editors: Mutex<HashMap<String, Arc<EditorSession>>>,
     gpu: OnceLock<Arc<Gpu>>,
     /// Library hover previews by recording path (JPEG data URLs).
@@ -35,7 +36,7 @@ impl AppState {
         Ok(self.gpu.get_or_init(|| gpu).clone())
     }
 
-    fn editor(&self, id: &str) -> Result<Arc<EditorSession>, String> {
+    pub(crate) fn editor(&self, id: &str) -> Result<Arc<EditorSession>, String> {
         self.editors.lock().get(id).cloned().ok_or_else(|| format!("no editor {id}"))
     }
 }
@@ -378,8 +379,14 @@ pub fn run() {
             editor_export_cancel,
             export_default_path,
             assets::bundle_import,
+            presets::presets_list,
+            presets::preset_save,
+            presets::preset_apply,
+            presets::preset_delete,
+            presets::preset_set_default,
             assets::system_wallpapers,
             assets::image_thumbnail,
+            assets::recording_still,
             assets::music_tracks,
             assets::music_fetch,
             recording_waveform

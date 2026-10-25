@@ -4,6 +4,7 @@ import {
   AudioLines,
   Camera,
   Clapperboard,
+  Crop,
   Crosshair,
   EyeOff,
   Sun,
@@ -20,6 +21,7 @@ import {
   Type,
   ZoomIn,
 } from "lucide-solid";
+import { CropDialog } from "./CropDialog";
 import { BackgroundSection } from "./panels/Background";
 import { BrandSection } from "./panels/Brand";
 import { MusicSection } from "./panels/Music";
@@ -43,6 +45,7 @@ const ASPECTS: [AspectRatio, string][] = [
 export function Inspector(props: { editor: Editor }) {
   const ed = props.editor;
   const [tab, setTab] = createSignal<Tab>("background");
+  const [cropping, setCropping] = createSignal(false);
   createEffect(() => {
     const request = ed.panelRequest();
     if (request) setTab(request.tab as Tab);
@@ -122,6 +125,10 @@ export function Inspector(props: { editor: Editor }) {
                 ]}
               />
               <SliderField label="Shadow" value={edit().shadow} format={pct} onInput={(v) => set((e) => (e.shadow = v))} {...gesture} />
+              <Button size="sm" onClick={() => setCropping(true)}>
+                <Crop size={14} /> {edit().crop ? "Change crop…" : "Crop…"}
+              </Button>
+              <CropDialog editor={ed} open={cropping()} onClose={() => setCropping(false)} />
               <SliderField label="Border" value={edit().border} max={0.02} format={(v) => pct(v / 0.02)} onInput={(v) => set((e) => (e.border = v))} {...gesture} />
             </Section>
           </Match>
