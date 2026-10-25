@@ -4,7 +4,7 @@
 export const API = (process.env.NEXT_PUBLIC_UMI_API ?? "http://localhost:8799").replace(/\/+$/, "");
 const KEY = "umi.session";
 
-export type Account = { id: string; email: string | null; isPaid: boolean };
+export type Account = { id: string; email: string | null; isPaid: boolean; emailVerified: boolean };
 
 export function getToken(): string | null {
   try {
@@ -65,4 +65,22 @@ export async function me(): Promise<Account | null> {
 export async function signOut() {
   await call("/api/auth/logout", { method: "POST" }).catch(() => {});
   setToken(null);
+}
+
+export async function verifyEmail(token: string) {
+  await call("/api/auth/verify", { method: "POST", body: JSON.stringify({ token }) });
+}
+
+export async function resendVerification() {
+  await call("/api/auth/resend-verification", { method: "POST" });
+}
+
+export async function forgotPassword(email: string) {
+  await call("/api/auth/forgot", { method: "POST", body: JSON.stringify({ email }) });
+}
+
+export async function resetPassword(token: string, password: string): Promise<Account> {
+  const r = await call<{ token: string; account: Account }>("/api/auth/reset", { method: "POST", body: JSON.stringify({ token, password }) });
+  setToken(r.token);
+  return r.account;
 }
