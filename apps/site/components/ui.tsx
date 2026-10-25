@@ -16,7 +16,21 @@ export function Mark({ className = "size-7", mono = false }: { className?: strin
   );
 }
 
-/** A small copy button: copies `text`, shows a check for a moment. */
+/** Copies text; falls back to the old way where the clipboard API is missing (plain http). */
+export async function copyText(text: string) {
+  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.cssText = "position:fixed;opacity:0;top:0;left:0";
+  document.body.appendChild(area);
+  area.select();
+  const ok = document.execCommand("copy");
+  area.remove();
+  if (!ok) throw new Error("Copy failed");
+}
+
+/** A small copy button: copies `text`, says "Copied" for a moment. */
 export function CopyButton({ text, dark = false, className = "" }: { text: string; dark?: boolean; className?: string }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -25,17 +39,20 @@ export function CopyButton({ text, dark = false, className = "" }: { text: strin
       aria-label={copied ? "Copied" : "Copy"}
       title={copied ? "Copied" : "Copy"}
       onClick={() =>
-        void navigator.clipboard.writeText(text).then(() => {
+        void copyText(text).then(() => {
           setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
+          setTimeout(() => setCopied(false), 1600);
         })
       }
-      className={`grid size-8 shrink-0 place-items-center rounded-lg transition-colors ${dark ? "text-white/45 hover:bg-white/10 hover:text-white" : "text-faint hover:bg-ink/5 hover:text-ink"} ${className}`}
+      className={`flex h-8 min-w-8 shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-[12px] font-medium transition-colors ${dark ? "text-white/45 hover:bg-white/10 hover:text-white" : "text-faint hover:bg-ink/5 hover:text-ink"} ${className}`}
     >
       {copied ? (
-        <svg viewBox="0 0 24 24" className="size-4 text-[#30d158]" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="m5 12.5 4.5 4.5L19 7.5" />
-        </svg>
+        <>
+          <svg viewBox="0 0 24 24" className="size-4 text-[#30d158]" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="m5 12.5 4.5 4.5L19 7.5" />
+          </svg>
+          <span className="text-[#30d158]">Copied</span>
+        </>
       ) : (
         <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <rect x="9" y="9" width="12" height="12" rx="2.5" />
