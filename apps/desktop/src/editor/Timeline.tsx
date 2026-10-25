@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, Index, on, For, onCleanup, onMount, Show } from "solid-js";
 import { Menu, tokens, toast } from "@umi/ui";
-import { Clapperboard, Cuboid, EyeOff, Layers, Link2, Plus, Sun, Type, ZoomIn } from "lucide-solid";
+import { Clapperboard, Cuboid, EyeOff, ImagePlus, Layers, Link2, Music, Plus, Sun, Type, ZoomIn } from "lucide-solid";
+import { chooseIntoBundle, extensionOf, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from "./panels/files";
 import { formatTime, sameSelection, type Editor } from "./store";
 import { placementEnd, type Placement, type Selection } from "./types";
 
@@ -555,6 +556,15 @@ function Waveform(props: { editor: Editor; placement: Placement; width: number }
   );
 }
 
+/** Asks for an image or video and lays it on the Media track at the playhead. */
+async function addMedia(ed: Editor) {
+  const time = ed.time();
+  const file = await chooseIntoBundle(ed, "Image or video", [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS], "media");
+  if (!file) return;
+  const kind = VIDEO_EXTENSIONS.includes(extensionOf(file.name)) ? "video" : "image";
+  await ed.apply({ op: "addOverlay", file: file.name, kind, time });
+}
+
 /** Adds things at the playhead (zooms, masks, text, scenes, 3D moves). */
 function AddMenu(props: { editor: Editor }) {
   const ed = props.editor;
@@ -570,6 +580,8 @@ function AddMenu(props: { editor: Editor }) {
         { label: "Zoom", icon: <ZoomIn size={15} />, shortcut: "Z", onSelect: () => void ed.apply({ op: "addZoom", time: ed.time() }) },
         { label: "Blur", icon: <EyeOff size={15} />, onSelect: () => void ed.apply({ op: "addMask", time: ed.time(), style: "blur" }) },
         { label: "Spotlight", icon: <Sun size={15} />, onSelect: () => void ed.apply({ op: "addMask", time: ed.time(), style: "highlight" }) },
+        { label: "Image or video…", icon: <ImagePlus size={15} />, onSelect: () => void addMedia(ed) },
+        { label: "Music…", icon: <Music size={15} />, onSelect: () => ed.requestPanel("audio") },
         { kind: "separator" },
         { kind: "label", label: "Text" },
         { label: "Title", icon: <Type size={15} />, onSelect: () => void ed.apply({ op: "addText", style: "title", time: ed.time() }) },

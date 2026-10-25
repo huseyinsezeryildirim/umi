@@ -1,6 +1,7 @@
 //! Umi desktop app: Tauri shell around the Rust core. Windows are Solid UIs; heavy work
 //! (decoding, rendering, encoding) stays in Rust.
 
+mod assets;
 mod editor;
 
 use editor::{EditorSession, EditorState, Op};
@@ -376,6 +377,11 @@ pub fn run() {
             editor_export,
             editor_export_cancel,
             export_default_path,
+            assets::bundle_import,
+            assets::system_wallpapers,
+            assets::image_thumbnail,
+            assets::music_tracks,
+            assets::music_fetch,
             recording_waveform
         ])
         .run(tauri::generate_context!())

@@ -1,4 +1,4 @@
-import { createSignal, For, Match, Show, Switch as SolidSwitch } from "solid-js";
+import { createEffect, createSignal, For, Match, Show, Switch as SolidSwitch } from "solid-js";
 import { Button, Progress, Section, Segmented, SliderField, Swatch, SwitchRow, Tabs, TextField, toast } from "@umi/ui";
 import {
   AudioLines,
@@ -20,34 +20,33 @@ import {
   Type,
   ZoomIn,
 } from "lucide-solid";
+import { BackgroundSection } from "./panels/Background";
+import { BrandSection } from "./panels/Brand";
+import { MusicSection } from "./panels/Music";
 import type { Editor } from "./store";
-import { maskRectAt, sourceTimeAt, type AspectRatio, type Background, type DeviceFrame, type EditSettings, type GradePreset, type GradientPreset, type Selection } from "./types";
+import { maskRectAt, sourceTimeAt, type AspectRatio, type Background, type DeviceFrame, type EditSettings, type GradePreset, type MediaOverlay, type GradientPreset, type Selection } from "./types";
 
 type Tab = "background" | "screen" | "cursor" | "camera" | "zoom" | "color" | "audio";
 
-const GRADIENTS: Record<GradientPreset, [string, string]> = {
-  sky: ["#9eccfa", "#2e5eb8"],
-  ice: ["#f2f7fc", "#ccdff7"],
-  navy: ["#2e5487", "#0f172b"],
-  graphite: ["#40454f", "#0f121a"],
-  mist: ["#edf0f5", "#b8bfcf"],
-  mint: ["#8cedc2", "#1c8c8c"],
-  sand: ["#f5e8d1", "#d1b594"],
-  dusk: ["#fa736b", "#6b4adb"],
-  ocean: ["#2199f2", "#14338c"],
-  peach: ["#ffcc9e", "#f57885"],
-  grape: ["#cc73f2", "#4d2699"],
-  night: ["#333847", "#0d0d17"],
-  umay: ["#ff9ec7", "#8cc7ff"],
-};
-const PICKABLE: GradientPreset[] = ["sky", "ice", "navy", "graphite", "mist", "mint", "sand", "dusk"];
 const GRADES: GradePreset[] = ["none", "cinematic", "vivid", "golden", "frost", "midnight", "vintage", "noir", "dreamy"];
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
+const ASPECTS: [AspectRatio, string][] = [
+  ["auto", "Auto"],
+  ["wide", "16:9"],
+  ["vertical", "9:16"],
+  ["square", "1:1"],
+  ["classic", "4:3"],
+  ["portrait", "4:5"],
+];
 
 export function Inspector(props: { editor: Editor }) {
   const ed = props.editor;
   const [tab, setTab] = createSignal<Tab>("background");
+  createEffect(() => {
+    const request = ed.panelRequest();
+    if (request) setTab(request.tab as Tab);
+  });
   const edit = () => ed.state().edit;
   const set = (change: (e: EditSettings) => void) => void ed.update(change);
   const gesture = { onGestureStart: () => void ed.gestureStart(), onGestureEnd: () => void ed.gestureEnd() };
@@ -86,60 +85,19 @@ export function Inspector(props: { editor: Editor }) {
       <div class="ed-inspector__body">
         <SolidSwitch>
           <Match when={tab() === "background"}>
-            <Section title="Background" icon={<Palette size={15} />}>
-              <Segmented
-                value={backgroundKind(edit().background)}
-                onChange={(kind) => set((e) => (e.background = defaultBackground(kind)))}
-                options={[
-                  { value: "gradient", label: "Gradient" },
-                  { value: "color", label: "Color" },
-                  { value: "blurred", label: "Blur" },
-                ]}
-              />
-              <Show when={"gradient" in edit().background}>
-                <div class="ed-swatches">
-                  <For each={PICKABLE}>
-                    {(g) => (
-                      <Swatch
-                        label={g}
-                        background={`linear-gradient(135deg, ${GRADIENTS[g][0]}, ${GRADIENTS[g][1]})`}
-                        selected={"gradient" in edit().background && (edit().background as { gradient: { _0: string } }).gradient._0 === g}
-                        onClick={() => set((e) => (e.background = { gradient: { _0: g } }))}
-                      />
-                    )}
-                  </For>
-                </div>
-                <SliderField label="Angle" value={edit().backgroundAngle} min={0} max={360} step={1} format={(v) => `${Math.round(v)}°`} onInput={(v) => set((e) => (e.backgroundAngle = v))} {...gesture} />
-              </Show>
-              <Show when={"color" in edit().background}>
-                <div class="ed-swatches">
-                  <For each={["#0e111e", "#ffffff", "#f1f7fc", "#116ff5", "#13a874", "#f0443a", "#ffc83d", "#7a5af8"]}>
-                    {(hex) => (
-                      <Swatch
-                        label={hex}
-                        background={hex}
-                        selected={colorHex(edit().background) === hex}
-                        onClick={() => set((e) => (e.background = { color: { _0: hexToRgba(hex) } }))}
-                      />
-                    )}
-                  </For>
-                </div>
-              </Show>
-              <SliderField label="Grain" value={edit().backgroundNoise} format={pct} onInput={(v) => set((e) => (e.backgroundNoise = v))} {...gesture} />
-            </Section>
+            <BackgroundSection editor={ed} gesture={gesture} />
             <Section title="Shape" icon={<Clapperboard size={15} />}>
-              <Segmented<AspectRatio>
-                value={edit().aspect}
-                onChange={(a) => set((e) => (e.aspect = a))}
-                options={[
-                  { value: "auto", label: "Auto" },
-                  { value: "wide", label: "16:9" },
-                  { value: "vertical", label: "9:16" },
-                  { value: "square", label: "1:1" },
-                  { value: "classic", label: "4:3" },
-                ]}
-              />
+              <div class="ed-chips">
+                <For each={ASPECTS}>
+                  {([value, label]) => (
+                    <button type="button" class="ed-chip" data-selected={edit().aspect === value ? "true" : "false"} onClick={() => set((e) => (e.aspect = value))}>
+                      {label}
+                    </button>
+                  )}
+                </For>
+              </div>
             </Section>
+            <BrandSection editor={ed} gesture={gesture} />
           </Match>
 
           <Match when={tab() === "screen"}>
@@ -289,20 +247,7 @@ export function Inspector(props: { editor: Editor }) {
             <Section title="Clips" icon={<Scissors size={15} />} hint="Blends each cut into the next clip.">
               <SliderField label="Crossfade" value={edit().crossfade} max={1.5} format={(v) => `${v.toFixed(1)}s`} onInput={(v) => set((e) => (e.crossfade = v))} {...gesture} />
             </Section>
-            <Section title="Music" icon={<AudioLines size={15} />} hint={edit().music ? undefined : "Music plays under your voice and loops to the length of the video."}>
-              <Show when={edit().music}>
-                {(m) => (
-                  <>
-                    <div class="ed-file">{m().title ?? m().file}</div>
-                    <SliderField label="Volume" value={m().volume} format={pct} onInput={(v) => set((e) => (e.music!.volume = v))} {...gesture} />
-                    <SliderField label="Fade out" value={m().fadeOut} max={6} format={(v) => `${v.toFixed(1)}s`} onInput={(v) => set((e) => (e.music!.fadeOut = v))} {...gesture} />
-                    <Button size="sm" variant="danger" onClick={() => set((e) => delete e.music)}>
-                      <Trash2 size={14} /> Remove music
-                    </Button>
-                  </>
-                )}
-              </Show>
-            </Section>
+            <MusicSection editor={ed} gesture={gesture} />
           </Match>
         </SolidSwitch>
       </div>
@@ -435,6 +380,38 @@ function SelectionPanel(props: { editor: Editor; selection: Selection }) {
             </>
           )}
         </Match>
+        <Match when={s.kind === "overlay" && edit().overlays.find((x) => x.id === (s as { id: string }).id)}>
+          {(o) => {
+            const setO = (change: (x: MediaOverlay) => void) =>
+              set((e) => {
+                const x = e.overlays.find((y) => y.id === o().id);
+                if (x) change(x);
+              });
+            return (
+              <>
+                {header(o().lane === 2 ? "Video 2" : o().kind === "video" ? "Video" : "Image", <Image size={15} />)}
+                <Show when={o().lane !== 2}>
+                  <div class="ed-file">{o().file}</div>
+                </Show>
+                <Segmented
+                  value={o().mode}
+                  onChange={(v) => setO((x) => (x.mode = v))}
+                  options={[
+                    { value: "fill", label: "Fill" },
+                    { value: "pictureInPicture", label: "Picture in picture" },
+                  ]}
+                />
+                <Show when={o().mode === "pictureInPicture"}>
+                  <SliderField label="Size" value={o().width} min={0.15} max={0.9} format={pct} onInput={(v) => setO((x) => (x.width = v))} {...gesture} />
+                  <div class="umi-section__hint">Drag it on the preview to place it.</div>
+                </Show>
+                <Show when={o().mode === "fill"}>
+                  <div class="umi-section__hint">Covers the screen; background and camera stay.</div>
+                </Show>
+              </>
+            );
+          }}
+        </Match>
         <Match when={s.kind === "scene" && edit().scenes.find((x) => x.id === (s as { id: string }).id)}>
           {(sc) => (
             <>
@@ -457,30 +434,6 @@ function SelectionPanel(props: { editor: Editor; selection: Selection }) {
       </SolidSwitch>
     </div>
   );
-}
-
-function backgroundKind(b: Background): "gradient" | "color" | "blurred" {
-  if ("color" in b) return "color";
-  if ("blurredScreen" in b) return "blurred";
-  return "gradient";
-}
-
-function defaultBackground(kind: "gradient" | "color" | "blurred"): Background {
-  if (kind === "color") return { color: { _0: hexToRgba("#f1f7fc") } };
-  if (kind === "blurred") return { blurredScreen: {} };
-  return { gradient: { _0: "sky" } };
-}
-
-function hexToRgba(hex: string) {
-  const n = parseInt(hex.slice(1), 16);
-  return { r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255, a: 1 };
-}
-
-function colorHex(b: Background) {
-  if (!("color" in b)) return null;
-  const c = b.color._0;
-  const h = (v: number) => Math.round(v * 255).toString(16).padStart(2, "0");
-  return `#${h(c.r)}${h(c.g)}${h(c.b)}`;
 }
 
 /**

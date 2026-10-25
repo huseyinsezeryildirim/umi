@@ -18,6 +18,7 @@ type Op =
   | { op: "addScene"; layout: string; time: number }
   | { op: "addText"; style: string; time: number }
   | { op: "addMove"; kind: string; time: number }
+  | { op: "addOverlay"; file: string; kind: "video" | "image"; duration?: number; time: number }
   | { op: "retime"; selection: Selection; start: number; end: number }
   | { op: "delete"; selection: Selection }
   | { op: "deleteMany"; selections: Selection[] }
@@ -51,6 +52,8 @@ export function createEditor(initial: EditorState) {
   const [timelineZoom, setTimelineZoom] = createSignal(1);
   const [blade, setBlade] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
+  /** An inspector tab something asked to show (e.g. "Add → Music…"). */
+  const [panelRequest, requestPanel] = createSignal<{ tab: string } | null>(null);
   /** Mask being stuck to content, and how far along (0…1). */
   const [tracking, setTracking] = createSignal<{ mask: string; progress: number } | null>(null);
   /** Filmstrip pictures evenly over the recording, and voice peaks at 50/s. */
@@ -106,6 +109,8 @@ export function createEditor(initial: EditorState) {
     busy,
     thumbnails,
     waveform,
+    panelRequest,
+    requestPanel: (tab: string) => requestPanel({ tab }),
     setTime: (t: number) => setTime(Math.min(Math.max(t, 0), state().outputDuration)),
     setPlaying,
     tracking,
