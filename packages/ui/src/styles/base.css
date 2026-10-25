@@ -1,0 +1,77 @@
+@import "@fontsource-variable/inter";
+@import "./tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  font-family: var(--umi-font);
+  font-size: var(--umi-text-base);
+  font-weight: var(--umi-weight-regular);
+  font-feature-settings: "cv11", "ss01", "ss03";
+  color: var(--umi-text);
+  background: var(--umi-wash);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+}
+
+input,
+textarea,
+[contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  box-shadow: var(--umi-focus);
+  border-radius: var(--umi-radius-sm);
+}
+
+::selection {
+  background: var(--umi-accent-tint);
+}
+
+/* Thin, quiet scrollbars. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(14, 17, 30, 0.14);
+  border-radius: 10px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(14, 17, 30, 0.24);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.umi-mono {
+  font-family: var(--umi-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.umi-tabular {
+  font-variant-numeric: tabular-nums;
+}

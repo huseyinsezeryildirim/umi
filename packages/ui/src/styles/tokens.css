@@ -1,0 +1,125 @@
+/*
+ * Umi design tokens. Every surface (desktop app, web viewer, extension) builds on these;
+ * components never use raw colors, sizes or timings.
+ *
+ * Language: near-white surfaces on an icy-blue wash, ink text, white "glass" controls
+ * lit from the lower left, one ink capsule for the main action, blue accent.
+ */
+:root {
+  /* Ink */
+  --umi-ink: #0e111e;
+  --umi-text: #11121d;
+  --umi-text-2: #4a4f58;
+  --umi-text-3: #686b74;
+  --umi-text-4: #9a9ea8;
+  --umi-on-ink: #ffffff;
+
+  /* Light */
+  --umi-white: #ffffff;
+  --umi-ice-top: #f1f7fc;
+  --umi-ice-bottom: #e1effc;
+  --umi-ice-deep: #d3e6fa;
+  --umi-track: #eff0f4;
+  --umi-ring-lit: #c5d9f3;
+  --umi-hairline: rgba(14, 17, 30, 0.08);
+  --umi-hairline-strong: rgba(14, 17, 30, 0.14);
+  --umi-wash: linear-gradient(180deg, #ffffff 0%, var(--umi-ice-top) 46%, var(--umi-ice-bottom) 100%);
+  --umi-wash-soft: linear-gradient(180deg, #fbfdff 0%, #f3f8fd 100%);
+
+  /* Accent and states */
+  --umi-accent: #116ff5;
+  --umi-accent-hover: #0b62dc;
+  --umi-accent-light: #6fb5ef;
+  --umi-accent-tint: rgba(17, 111, 245, 0.1);
+  --umi-accent-ring: rgba(17, 111, 245, 0.28);
+  --umi-record: #f0443a;
+  --umi-success: #13a874;
+  --umi-warning: #e79a1e;
+  --umi-trim: #ffc83d;
+  --umi-trim-glow: rgba(255, 200, 61, 0.55);
+
+  /* Timeline lanes */
+  --umi-lane-zoom: #116ff5;
+  --umi-lane-scene: #7a5af8;
+  --umi-lane-mask: #e8590c;
+  --umi-lane-text: #12b886;
+  --umi-lane-move: #f76707;
+  --umi-lane-media: #0ca678;
+  --umi-lane-music: #d6336c;
+  --umi-lane-video2: #116ff5;
+
+  /* Glass */
+  --umi-glass: rgba(255, 255, 255, 0.72);
+  --umi-glass-strong: rgba(255, 255, 255, 0.88);
+  --umi-glass-blur: saturate(160%) blur(22px);
+  --umi-glass-border: linear-gradient(225deg, #b0b6c5, #d9e0ec);
+  --umi-glass-glow: inset -1.5px -1.5px 4px var(--umi-ice-deep);
+
+  /* Dark glass (recording controls, floating bars) */
+  --umi-night: rgba(14, 17, 30, 0.86);
+  --umi-night-border: rgba(255, 255, 255, 0.12);
+
+  /* Elevation */
+  --umi-shadow-xs: 0 1px 2px rgba(14, 17, 30, 0.08);
+  --umi-shadow-sm: 0 1.5px 3px rgba(14, 17, 30, 0.1);
+  --umi-shadow-md: 0 6px 18px rgba(14, 17, 30, 0.08), 0 1px 3px rgba(14, 17, 30, 0.06);
+  --umi-shadow-lg: 0 18px 48px rgba(14, 17, 30, 0.14), 0 2px 8px rgba(14, 17, 30, 0.06);
+  --umi-shadow-ink: 0 4px 8px rgba(14, 17, 30, 0.25);
+
+  /* Shape */
+  --umi-radius-xs: 6px;
+  --umi-radius-sm: 8px;
+  --umi-radius-md: 11px;
+  --umi-radius-lg: 14px;
+  --umi-radius-xl: 18px;
+  --umi-radius-2xl: 24px;
+  --umi-radius-pill: 999px;
+
+  /* Space (4 px grid) */
+  --umi-space-1: 4px;
+  --umi-space-2: 8px;
+  --umi-space-3: 12px;
+  --umi-space-4: 16px;
+  --umi-space-5: 20px;
+  --umi-space-6: 24px;
+  --umi-space-8: 32px;
+
+  /* Type */
+  --umi-font: "Inter Variable", "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --umi-font-mono: "SF Mono", ui-monospace, "Cascadia Code", "JetBrains Mono", monospace;
+  --umi-text-xs: 11px;
+  --umi-text-sm: 12px;
+  --umi-text-md: 13px;
+  --umi-text-base: 14px;
+  --umi-text-lg: 15.5px;
+  --umi-text-xl: 18px;
+  --umi-text-2xl: 22px;
+  --umi-weight-regular: 430;
+  --umi-weight-medium: 520;
+  --umi-weight-semibold: 600;
+  --umi-weight-bold: 700;
+
+  /* Motion: quick, eased, never bouncy-cute */
+  --umi-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --umi-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --umi-ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --umi-fast: 120ms;
+  --umi-normal: 180ms;
+  --umi-slow: 280ms;
+  --umi-slower: 420ms;
+
+  /* Controls */
+  --umi-control-sm: 28px;
+  --umi-control-md: 34px;
+  --umi-control-lg: 44px;
+  --umi-focus: 0 0 0 3px var(--umi-accent-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --umi-fast: 0ms;
+    --umi-normal: 0ms;
+    --umi-slow: 0ms;
+    --umi-slower: 0ms;
+  }
+}

@@ -7,6 +7,7 @@ pub mod export;
 pub mod schedule;
 pub mod sources;
 pub mod stretch;
+pub mod track;
 
 pub use compose::Composer;
 pub use export::{ExportSettings, Format, export};

@@ -1,0 +1,655 @@
+/* Component styles. Class names are umi-<component>[--modifier]; state lives in data-*. */
+
+/* ───── Buttons ───── */
+
+.umi-btn {
+  --h: var(--umi-control-md);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: var(--h);
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--umi-radius-md);
+  font-size: var(--umi-text-md);
+  font-weight: var(--umi-weight-medium);
+  white-space: nowrap;
+  cursor: default;
+  transition:
+    transform var(--umi-fast) var(--umi-ease),
+    background-color var(--umi-fast) var(--umi-ease),
+    box-shadow var(--umi-normal) var(--umi-ease),
+    opacity var(--umi-fast);
+}
+.umi-btn:active:not(:disabled) {
+  transform: scale(0.975);
+}
+.umi-btn:disabled {
+  opacity: 0.5;
+}
+.umi-btn--sm {
+  --h: var(--umi-control-sm);
+  padding: 0 10px;
+  font-size: var(--umi-text-sm);
+  border-radius: var(--umi-radius-sm);
+}
+.umi-btn--lg {
+  --h: var(--umi-control-lg);
+  padding: 0 20px;
+  font-size: var(--umi-text-lg);
+  border-radius: var(--umi-radius-lg);
+}
+.umi-btn--block {
+  width: 100%;
+}
+
+/* White glass: white face, pale-blue inner glow, gradient hairline lit from the lower left. */
+.umi-btn--glass {
+  color: #2b2b2b;
+  background: var(--umi-white);
+  box-shadow:
+    var(--umi-glass-glow),
+    0 0 0 1px #c9d0dc,
+    var(--umi-shadow-sm);
+}
+.umi-btn--glass:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ffffff 0%, #f6faff 100%);
+  box-shadow:
+    var(--umi-glass-glow),
+    0 0 0 1px #b0b6c5,
+    var(--umi-shadow-md);
+}
+
+/* The one main action on a surface. */
+.umi-btn--ink {
+  color: var(--umi-on-ink);
+  background: var(--umi-ink);
+  border-radius: var(--umi-radius-pill);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    var(--umi-shadow-ink);
+}
+.umi-btn--ink:hover:not(:disabled) {
+  background: #1d2130;
+}
+
+.umi-btn--accent {
+  color: #fff;
+  background: var(--umi-accent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 4px 12px rgba(17, 111, 245, 0.3);
+}
+.umi-btn--accent:hover:not(:disabled) {
+  background: var(--umi-accent-hover);
+}
+
+.umi-btn--ghost {
+  color: var(--umi-text-2);
+  background: transparent;
+}
+.umi-btn--ghost:hover:not(:disabled) {
+  color: var(--umi-text);
+  background: rgba(14, 17, 30, 0.05);
+}
+.umi-btn--ghost[data-active="true"] {
+  color: var(--umi-accent);
+  background: var(--umi-accent-tint);
+}
+
+.umi-btn--danger {
+  color: var(--umi-record);
+  background: transparent;
+}
+.umi-btn--danger:hover:not(:disabled) {
+  background: rgba(240, 68, 58, 0.08);
+}
+
+/* Square icon buttons. */
+.umi-icon-btn {
+  --s: var(--umi-control-md);
+  width: var(--s);
+  height: var(--s);
+  padding: 0;
+  flex: none;
+}
+.umi-icon-btn.umi-btn--sm {
+  --s: var(--umi-control-sm);
+}
+.umi-icon-btn.umi-btn--lg {
+  --s: var(--umi-control-lg);
+}
+.umi-icon-btn.umi-btn--glass {
+  border-radius: 50%;
+}
+
+/* ───── Surfaces ───── */
+
+.umi-card {
+  background: var(--umi-white);
+  border-radius: var(--umi-radius-xl);
+  box-shadow:
+    0 0 0 1px var(--umi-hairline),
+    var(--umi-shadow-sm);
+}
+
+.umi-panel {
+  background: var(--umi-glass);
+  backdrop-filter: var(--umi-glass-blur);
+  -webkit-backdrop-filter: var(--umi-glass-blur);
+  border-radius: var(--umi-radius-xl);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.7),
+    0 0 0 1px var(--umi-hairline),
+    var(--umi-shadow-md);
+}
+
+.umi-floating {
+  background: var(--umi-glass-strong);
+  backdrop-filter: var(--umi-glass-blur);
+  -webkit-backdrop-filter: var(--umi-glass-blur);
+  border-radius: var(--umi-radius-lg);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.8),
+    0 0 0 1px var(--umi-hairline-strong),
+    var(--umi-shadow-lg);
+}
+
+.umi-divider {
+  height: 1px;
+  background: var(--umi-hairline);
+  border: 0;
+  margin: 0;
+}
+.umi-divider--vertical {
+  width: 1px;
+  height: 18px;
+}
+
+/* ───── Switch ───── */
+
+.umi-switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex: none;
+  border-radius: var(--umi-radius-pill);
+  background: #dfe3ea;
+  box-shadow: inset 0 1px 2px rgba(14, 17, 30, 0.12);
+  border: 0;
+  padding: 0;
+  transition: background-color var(--umi-normal) var(--umi-ease);
+}
+.umi-switch[data-on="true"] {
+  background: var(--umi-ink);
+}
+.umi-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(14, 17, 30, 0.25);
+  transition: transform var(--umi-normal) var(--umi-ease-spring);
+}
+.umi-switch[data-on="true"]::after {
+  transform: translateX(16px);
+}
+
+/* ───── Slider ───── */
+
+.umi-slider {
+  position: relative;
+  height: 24px;
+  touch-action: none;
+  cursor: default;
+}
+.umi-slider__track {
+  position: absolute;
+  inset: 10px 0;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--umi-track);
+  box-shadow: inset 0 1px 1px rgba(14, 17, 30, 0.08);
+  overflow: hidden;
+}
+.umi-slider__fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--umi-accent-light), var(--umi-accent));
+  border-radius: 4px;
+}
+.umi-slider__thumb {
+  position: absolute;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgba(14, 17, 30, 0.12),
+    0 2px 5px rgba(14, 17, 30, 0.18);
+  transition:
+    transform var(--umi-fast) var(--umi-ease),
+    box-shadow var(--umi-fast);
+}
+.umi-slider:hover .umi-slider__thumb,
+.umi-slider[data-dragging="true"] .umi-slider__thumb {
+  transform: scale(1.12);
+  box-shadow:
+    0 0 0 1px rgba(14, 17, 30, 0.14),
+    0 0 0 5px var(--umi-accent-tint),
+    0 2px 6px rgba(14, 17, 30, 0.2);
+}
+
+.umi-field-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--umi-space-2);
+  font-size: var(--umi-text-md);
+  color: var(--umi-text-2);
+  margin-bottom: 2px;
+}
+.umi-field-row__value {
+  color: var(--umi-text-3);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--umi-text-sm);
+}
+
+/* ───── Segmented control (sliding pill) ───── */
+
+.umi-segmented {
+  position: relative;
+  display: flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: var(--umi-radius-md);
+  background: var(--umi-track);
+  box-shadow: inset 0 1px 2px rgba(14, 17, 30, 0.06);
+}
+.umi-segmented__pill {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border-radius: calc(var(--umi-radius-md) - 3px);
+  background: #fff;
+  box-shadow:
+    0 0 0 0.5px rgba(14, 17, 30, 0.08),
+    0 1px 3px rgba(14, 17, 30, 0.12);
+  transition:
+    left var(--umi-normal) var(--umi-ease),
+    width var(--umi-normal) var(--umi-ease);
+}
+.umi-segmented__item {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  font-size: var(--umi-text-sm);
+  font-weight: var(--umi-weight-medium);
+  color: var(--umi-text-3);
+  border-radius: calc(var(--umi-radius-md) - 3px);
+  transition: color var(--umi-fast);
+  white-space: nowrap;
+}
+.umi-segmented__item[data-selected="true"] {
+  color: var(--umi-text);
+}
+.umi-segmented__item:hover:not([data-selected="true"]) {
+  color: var(--umi-text-2);
+}
+
+/* ───── Tabs (icon rail with sliding indicator) ───── */
+
+.umi-tabs {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--umi-radius-lg);
+  background: rgba(14, 17, 30, 0.04);
+}
+.umi-tabs__indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border-radius: var(--umi-radius-md);
+  background: #fff;
+  box-shadow:
+    0 0 0 0.5px rgba(14, 17, 30, 0.08),
+    0 2px 6px rgba(14, 17, 30, 0.1);
+  transition:
+    left var(--umi-normal) var(--umi-ease),
+    width var(--umi-normal) var(--umi-ease);
+}
+.umi-tabs__tab {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  height: 32px;
+  min-width: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--umi-text-3);
+  border-radius: var(--umi-radius-md);
+  transition: color var(--umi-fast);
+}
+.umi-tabs__tab[data-selected="true"] {
+  color: var(--umi-accent);
+}
+.umi-tabs__tab:hover:not([data-selected="true"]) {
+  color: var(--umi-text);
+}
+
+/* ───── Section (inspector group) ───── */
+
+.umi-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--umi-space-3);
+  padding: var(--umi-space-4) 0;
+}
+.umi-section + .umi-section {
+  border-top: 1px solid var(--umi-hairline);
+}
+.umi-section__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--umi-text-md);
+  font-weight: var(--umi-weight-semibold);
+  color: var(--umi-text);
+}
+.umi-section__title svg {
+  color: var(--umi-text-3);
+}
+.umi-section__hint {
+  font-size: var(--umi-text-sm);
+  color: var(--umi-text-3);
+  line-height: 1.45;
+}
+
+/* ───── Text field ───── */
+
+.umi-input {
+  width: 100%;
+  height: var(--umi-control-md);
+  padding: 0 11px;
+  border: 0;
+  border-radius: var(--umi-radius-md);
+  background: #fff;
+  box-shadow:
+    inset 0 0 0 1px var(--umi-hairline-strong),
+    inset 0 1px 2px rgba(14, 17, 30, 0.04);
+  font: inherit;
+  font-size: var(--umi-text-md);
+  color: var(--umi-text);
+  transition: box-shadow var(--umi-fast);
+}
+.umi-input:focus {
+  box-shadow:
+    inset 0 0 0 1px var(--umi-accent),
+    0 0 0 3px var(--umi-accent-ring);
+}
+.umi-input::placeholder {
+  color: var(--umi-text-4);
+}
+
+/* ───── Menu / popover ───── */
+
+.umi-popover {
+  position: fixed;
+  z-index: 1000;
+  min-width: 180px;
+  padding: 5px;
+  transform-origin: var(--origin, top left);
+  animation: umi-pop-in var(--umi-normal) var(--umi-ease);
+}
+.umi-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--umi-radius-sm);
+  background: transparent;
+  font-size: var(--umi-text-md);
+  color: var(--umi-text);
+  text-align: left;
+}
+.umi-menu__item:hover,
+.umi-menu__item[data-highlighted="true"] {
+  background: var(--umi-accent);
+  color: #fff;
+}
+.umi-menu__item:hover svg,
+.umi-menu__item[data-highlighted="true"] svg {
+  color: #fff;
+}
+.umi-menu__item svg {
+  color: var(--umi-text-3);
+  flex: none;
+}
+.umi-menu__check {
+  margin-left: auto;
+}
+.umi-menu__shortcut {
+  margin-left: auto;
+  font-size: var(--umi-text-xs);
+  color: var(--umi-text-4);
+}
+.umi-menu__separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--umi-hairline);
+}
+.umi-menu__label {
+  padding: 6px 10px 3px;
+  font-size: var(--umi-text-xs);
+  font-weight: var(--umi-weight-semibold);
+  color: var(--umi-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@keyframes umi-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+}
+
+/* ───── Tooltip ───── */
+
+.umi-tooltip {
+  position: fixed;
+  z-index: 1100;
+  padding: 5px 8px;
+  border-radius: var(--umi-radius-sm);
+  background: var(--umi-ink);
+  color: #fff;
+  font-size: var(--umi-text-sm);
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: var(--umi-shadow-md);
+  animation: umi-fade-in var(--umi-fast) var(--umi-ease);
+}
+.umi-tooltip kbd {
+  margin-left: 6px;
+  color: rgba(255, 255, 255, 0.6);
+  font: inherit;
+}
+
+@keyframes umi-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+/* ───── Kbd, badge ───── */
+
+.umi-kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow:
+    inset 0 -1px 0 rgba(14, 17, 30, 0.12),
+    0 0 0 1px var(--umi-hairline-strong);
+  font-size: var(--umi-text-xs);
+  font-weight: var(--umi-weight-semibold);
+  color: var(--umi-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.umi-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--umi-radius-pill);
+  font-size: var(--umi-text-xs);
+  font-weight: var(--umi-weight-semibold);
+  background: var(--umi-accent-tint);
+  color: var(--umi-accent);
+}
+
+/* ───── Swatch ───── */
+
+.umi-swatch {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1.45;
+  border: 0;
+  padding: 0;
+  border-radius: var(--umi-radius-md);
+  box-shadow:
+    inset 0 0 0 1px rgba(14, 17, 30, 0.08),
+    var(--umi-shadow-xs);
+  transition:
+    transform var(--umi-fast) var(--umi-ease),
+    box-shadow var(--umi-normal) var(--umi-ease);
+}
+.umi-swatch:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 0 0 1px rgba(14, 17, 30, 0.12),
+    var(--umi-shadow-md);
+}
+.umi-swatch[data-selected="true"] {
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px var(--umi-accent),
+    var(--umi-shadow-md);
+}
+
+/* ───── Spinner, progress ───── */
+
+.umi-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(14, 17, 30, 0.12);
+  border-top-color: var(--umi-accent);
+  animation: umi-spin 0.7s linear infinite;
+}
+@keyframes umi-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.umi-progress {
+  height: 6px;
+  border-radius: 6px;
+  background: var(--umi-track);
+  overflow: hidden;
+}
+.umi-progress__bar {
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--umi-accent-light), var(--umi-accent));
+  transition: width var(--umi-normal) var(--umi-ease);
+}
+
+/* ───── Dialog / sheet ───── */
+
+.umi-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  background: rgba(14, 17, 30, 0.18);
+  backdrop-filter: blur(2px);
+  animation: umi-fade var(--umi-normal) var(--umi-ease);
+}
+.umi-dialog {
+  width: min(520px, calc(100vw - 48px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  padding: var(--umi-space-6);
+  animation: umi-dialog-in var(--umi-slow) var(--umi-ease);
+}
+.umi-dialog__title {
+  margin: 0 0 var(--umi-space-4);
+  font-size: var(--umi-text-xl);
+  font-weight: var(--umi-weight-bold);
+  letter-spacing: -0.01em;
+}
+@keyframes umi-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes umi-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+/* ───── Toast ───── */
+
+.umi-toasts {
+  position: fixed;
+  z-index: 1200;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+.umi-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: var(--umi-text-md);
+  animation: umi-dialog-in var(--umi-slow) var(--umi-ease);
+}

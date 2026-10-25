@@ -1,0 +1,623 @@
+/* Editor layout: icy wash, a floating stage in the middle, glass inspector and timeline. */
+
+.ed {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(1200px 600px at 30% -10%, #ffffff 0%, rgba(255, 255, 255, 0) 60%),
+    var(--umi-wash);
+}
+
+/* ───── Top bar (also the window's drag area; traffic lights sit at the left) ───── */
+
+.ed-topbar {
+  height: 52px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px 0 84px;
+}
+.ed-topbar__left,
+.ed-topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ed-title {
+  font-size: var(--umi-text-base);
+  font-weight: var(--umi-weight-semibold);
+  color: var(--umi-text);
+  letter-spacing: -0.005em;
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ───── Main ───── */
+
+.ed-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+.ed-center {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ───── Stage ───── */
+
+.ed-stage {
+  position: relative;
+  flex: 1;
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--umi-radius-2xl);
+  background:
+    radial-gradient(80% 70% at 50% 40%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, rgba(225, 239, 252, 0.55), rgba(211, 230, 250, 0.55));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7), inset 0 1px 12px rgba(17, 111, 245, 0.05);
+  overflow: hidden;
+}
+.ed-canvas {
+  display: block;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px rgba(14, 17, 30, 0.06),
+    0 24px 60px rgba(14, 17, 30, 0.18),
+    0 4px 14px rgba(14, 17, 30, 0.08);
+  transition:
+    width var(--umi-slow) var(--umi-ease),
+    height var(--umi-slow) var(--umi-ease);
+}
+
+/* ───── Transport ───── */
+
+.ed-transport {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: 44px;
+  padding: 0 4px;
+}
+.ed-time {
+  font-size: var(--umi-text-md);
+  font-weight: var(--umi-weight-medium);
+  color: var(--umi-text);
+}
+.ed-time__total {
+  color: var(--umi-text-3);
+}
+.ed-transport__center {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ed-transport__right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.ed-play {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--umi-ink);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    var(--umi-shadow-ink);
+  transition:
+    transform var(--umi-fast) var(--umi-ease),
+    background var(--umi-fast);
+}
+.ed-play:hover {
+  background: #1d2130;
+  transform: scale(1.04);
+}
+.ed-play:active {
+  transform: scale(0.96);
+}
+.ed-play svg {
+  margin-left: 1px;
+}
+
+/* ───── Timeline ───── */
+
+.ed-timeline {
+  flex: none;
+  display: flex;
+  height: clamp(190px, 30vh, 340px);
+  padding: 8px 0;
+  overflow: hidden;
+}
+.ed-tl-labels {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  flex: none;
+  width: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 6px 0 10px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.96) 85%, rgba(255, 255, 255, 0));
+}
+.ed-tl-label {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: var(--umi-radius-md);
+  font-size: var(--umi-text-sm);
+  font-weight: var(--umi-weight-semibold);
+  color: var(--umi-text-3);
+  background: rgba(14, 17, 30, 0.035);
+}
+.ed-tl-scroll {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  overflow: auto;
+}
+.ed-tl-content {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 100%;
+  padding-bottom: 6px;
+}
+.ed-tl-content[data-blade="true"] {
+  cursor: crosshair;
+}
+
+.ed-ruler {
+  position: relative;
+  flex: none;
+  cursor: text;
+}
+.ed-tick {
+  position: absolute;
+  bottom: 0;
+  width: 1px;
+  height: 5px;
+  background: rgba(14, 17, 30, 0.2);
+}
+.ed-tick[data-major="true"] {
+  height: 9px;
+  background: rgba(14, 17, 30, 0.35);
+}
+.ed-tick span {
+  position: absolute;
+  bottom: 11px;
+  left: 3px;
+  font-size: 10px;
+  font-weight: var(--umi-weight-medium);
+  color: var(--umi-text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ed-lane {
+  position: relative;
+  flex: none;
+  margin-right: 12px;
+  border-radius: var(--umi-radius-md);
+  background: rgba(14, 17, 30, 0.025);
+}
+
+/* Clips: dark film cards with yellow trim handles (like every serious editor). */
+.ed-clip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 9px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(14, 17, 30, 0.1), rgba(14, 17, 30, 0.5)),
+    linear-gradient(90deg, #233250, #1a2540);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 2px 6px rgba(14, 17, 30, 0.18);
+  transition:
+    box-shadow var(--umi-normal) var(--umi-ease),
+    transform var(--umi-normal) var(--umi-ease),
+    opacity var(--umi-fast);
+}
+.ed-clip[data-selected="true"] {
+  box-shadow:
+    inset 0 0 0 2px var(--umi-trim),
+    0 4px 14px rgba(14, 17, 30, 0.25);
+}
+.ed-clip[data-lifted="true"] {
+  opacity: 0.85;
+  box-shadow:
+    inset 0 0 0 2px var(--umi-trim),
+    0 16px 32px rgba(14, 17, 30, 0.3);
+}
+.ed-clip__film {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.ed-clip__film img {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  object-fit: cover;
+}
+.ed-clip[data-selected="true"] .ed-clip__film {
+  opacity: 0.75;
+}
+.ed-clip__wave {
+  position: absolute;
+  left: 0;
+  bottom: 3px;
+  pointer-events: none;
+}
+.ed-clip__wave path {
+  fill: rgba(111, 181, 239, 0.75);
+}
+.ed-clip__label {
+  position: absolute;
+  left: 12px;
+  top: 7px;
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: var(--umi-weight-semibold);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.ed-clip__label b {
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--umi-trim);
+  color: var(--umi-ink);
+}
+
+.ed-item {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: var(--umi-weight-semibold);
+  color: color-mix(in srgb, var(--lane) 80%, black);
+  background: color-mix(in srgb, var(--lane) 16%, white);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lane) 45%, white);
+  transition:
+    box-shadow var(--umi-normal) var(--umi-ease),
+    background var(--umi-normal);
+}
+.ed-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ed-item[data-dashed="true"] {
+  background: color-mix(in srgb, var(--lane) 8%, white);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lane) 35%, white);
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--lane) 8%, transparent) 6px 12px);
+}
+.ed-item[data-selected="true"] {
+  background: color-mix(in srgb, var(--lane) 26%, white);
+  box-shadow:
+    inset 0 0 0 2px var(--umi-trim),
+    0 3px 10px rgba(14, 17, 30, 0.12);
+}
+
+/* Trim handles: show on hover and when selected, glow while dragging. */
+.ed-trim {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: ew-resize;
+  background: var(--umi-trim);
+  opacity: 0;
+  transition: opacity var(--umi-fast);
+}
+.ed-trim::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 40%;
+  max-height: 16px;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  background: rgba(14, 17, 30, 0.45);
+}
+.ed-trim--start {
+  left: 0;
+  border-radius: 8px 0 0 8px;
+}
+.ed-trim--end {
+  right: 0;
+  border-radius: 0 8px 8px 0;
+}
+.ed-clip:hover .ed-trim,
+.ed-item:hover .ed-trim,
+[data-selected="true"] > .ed-trim {
+  opacity: 1;
+}
+.ed-trim:active {
+  box-shadow: 0 0 12px var(--umi-trim-glow);
+}
+
+.ed-range {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 200, 61, 0.18);
+  border-left: 2px solid var(--umi-trim);
+  border-right: 2px solid var(--umi-trim);
+  pointer-events: none;
+}
+
+.ed-blade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--umi-trim);
+  box-shadow: 0 0 8px var(--umi-trim-glow);
+  pointer-events: none;
+}
+.ed-blade span {
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--umi-trim);
+  color: var(--umi-ink);
+  font-size: 10px;
+  font-weight: var(--umi-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.ed-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--umi-record);
+  pointer-events: none;
+  will-change: transform;
+}
+.ed-playhead__knob {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  width: 13px;
+  height: 18px;
+  transform: translateX(-50%);
+  border-radius: 4px 4px 7px 7px;
+  background: var(--umi-record);
+  box-shadow: 0 1px 4px rgba(240, 68, 58, 0.45);
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.ed-hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(clamp(190px, 30vh, 340px) + 8px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: var(--umi-text-md);
+  color: var(--umi-text-2);
+  animation: umi-dialog-in var(--umi-slow) var(--umi-ease);
+}
+
+/* ───── Inspector ───── */
+
+.ed-inspector {
+  width: 320px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ed-inspector__tabs {
+  padding: 12px 12px 4px;
+}
+.ed-inspector__body {
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 16px 16px;
+}
+.ed-sel {
+  margin: 12px 12px 0;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-radius: var(--umi-radius-lg);
+  background: #fff;
+  box-shadow:
+    0 0 0 1px var(--umi-hairline),
+    var(--umi-shadow-sm);
+  animation: umi-dialog-in var(--umi-normal) var(--umi-ease);
+}
+.ed-sel__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--umi-text-md);
+  font-weight: var(--umi-weight-semibold);
+}
+.ed-sel__header svg {
+  color: var(--umi-text-3);
+}
+.ed-sel__header span {
+  flex: 1;
+}
+
+.ed-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.ed-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ed-chip {
+  height: 28px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: var(--umi-radius-pill);
+  font-size: var(--umi-text-sm);
+  font-weight: var(--umi-weight-medium);
+  color: var(--umi-text-2);
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--umi-hairline-strong);
+  transition:
+    background var(--umi-fast),
+    color var(--umi-fast),
+    box-shadow var(--umi-fast);
+}
+.ed-chip:hover {
+  color: var(--umi-text);
+}
+.ed-chip[data-selected="true"] {
+  color: #fff;
+  background: var(--umi-ink);
+  box-shadow: none;
+}
+.ed-file {
+  font-size: var(--umi-text-md);
+  color: var(--umi-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ed-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: var(--umi-radius-pill);
+  font-size: var(--umi-text-sm);
+  font-weight: var(--umi-weight-semibold);
+  color: #fff;
+  background: var(--umi-accent);
+  box-shadow: 0 2px 6px rgba(17, 111, 245, 0.3);
+  transition:
+    transform var(--umi-fast) var(--umi-ease),
+    background var(--umi-fast);
+}
+.ed-add:hover,
+.ed-add[data-open="true"] {
+  background: var(--umi-accent-hover);
+}
+.ed-add:active {
+  transform: scale(0.96);
+}
+
+/* ───── Preview handles ───── */
+
+.ed-handle-box {
+  position: absolute;
+  border: 1.5px solid #fff;
+  border-radius: 6px;
+  box-shadow:
+    0 0 0 1px rgba(14, 17, 30, 0.35),
+    0 0 0 9999px rgba(14, 17, 30, 0.08);
+  cursor: move;
+}
+.ed-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 0 1.5px var(--umi-accent),
+    0 2px 5px rgba(14, 17, 30, 0.3);
+}
+.ed-handle--nw {
+  left: -7px;
+  top: -7px;
+  cursor: nwse-resize;
+}
+.ed-handle--ne {
+  right: -7px;
+  top: -7px;
+  cursor: nesw-resize;
+}
+.ed-handle--sw {
+  left: -7px;
+  bottom: -7px;
+  cursor: nesw-resize;
+}
+.ed-handle--se {
+  right: -7px;
+  bottom: -7px;
+  cursor: nwse-resize;
+}
+.ed-handle-badge {
+  position: absolute;
+  left: 0;
+  top: -26px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: var(--umi-weight-semibold);
+  color: #fff;
+  background: var(--umi-accent);
+}
+
+.ed-key {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  transform: rotate(45deg);
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 0 0 0 1.5px var(--lane);
+  pointer-events: none;
+}
