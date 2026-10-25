@@ -209,6 +209,7 @@ fn call(name: &str, args: &Value) -> Result<String, String> {
                 resolution: args.get("resolution").and_then(Value::as_u64).unwrap_or(1080) as u32,
                 fps: 60,
                 hardware: true,
+                bit_rate: 0,
             };
             let cancel = std::sync::atomic::AtomicBool::new(false);
             umi_engine::export(gpu, &path, doc.edit.clone(), &settings, &destination, &|_| {}, &cancel).map_err(|e| e.to_string())?;

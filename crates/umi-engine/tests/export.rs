@@ -15,7 +15,8 @@ fn run(name: &str, edit: umi_project::EditSettings, format: Format, resolution: 
     let out = Path::new("/tmp/umi-golden").join(name);
     let cancel = AtomicBool::new(false);
     let start = Instant::now();
-    export(gpu, Path::new(BUNDLE), edit, &ExportSettings { format, resolution, fps, hardware: true }, &out, &|_| {}, &cancel).unwrap();
+    export(gpu, Path::new(BUNDLE), edit, &ExportSettings { format, resolution, fps, hardware: true, bit_rate: 0 }, &out, &|_| {}, &cancel)
+        .unwrap();
     let secs = start.elapsed().as_secs_f64();
     let duration = umi_media::duration(&out).unwrap_or(0.0);
     eprintln!("{name}: {duration:.2}s of video in {secs:.2}s ({:.1}× real time)", duration / secs);
@@ -83,7 +84,7 @@ fn streaming_mp4_plays_and_only_patches_its_head() {
     let snapshot = std::sync::Mutex::new(Vec::<u8>::new());
     let gpu = Gpu::new().unwrap();
     let cancel = AtomicBool::new(false);
-    let settings = ExportSettings { format: Format::StreamingMp4, resolution: 720, fps: 30, hardware: true };
+    let settings = ExportSettings { format: Format::StreamingMp4, resolution: 720, fps: 30, hardware: true, bit_rate: 0 };
     export(
         gpu,
         Path::new(BUNDLE),
