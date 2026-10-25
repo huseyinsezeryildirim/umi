@@ -13,7 +13,7 @@ function Shell({ title, lead, children }: { title: string; lead: string; childre
     <main className="relative grid min-h-[100svh] place-items-center overflow-hidden px-4 py-16">
       <img src="/photos/sky.jpg" alt="" className="absolute inset-0 size-full object-cover" />
       <a href="/" className="absolute top-5 left-5 flex items-center gap-2 text-[17px] font-semibold text-white drop-shadow-[0_1px_6px_rgb(0_40_90/0.35)]">
-        <Mark className="size-6" /> Umi
+        <Mark className="size-6" mono /> Umi
       </a>
       <motion.div
         className="relative w-full max-w-[400px] rounded-[28px] bg-white/90 p-8 shadow-[0_0_0_1px_rgb(255_255_255/0.6),0_40px_100px_-30px_rgb(20_60_130/0.55)] backdrop-blur-xl sm:p-10"
