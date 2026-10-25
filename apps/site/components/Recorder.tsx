@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type BrowserInfo, browserInfo } from "@/lib/browser";
 import type { CameraShape, Corner } from "@/lib/look";
+import { type CameraBackground, cameraWithBackground, loadSegmenter } from "@/lib/segment";
 import { Mark } from "./ui";
 import { Editor, type Take } from "./WebEditor";
 
@@ -29,7 +30,7 @@ const SURFACES: [Surface, string][] = [
 ];
 const SIZES = { S: 150, M: 210, L: 300 } as const;
 type Size = keyof typeof SIZES;
-type Place = { x: number; y: number; size: Size; shape: CameraShape; mirror: boolean };
+type Place = { x: number; y: number; size: Size; shape: CameraShape; mirror: boolean; bg: CameraBackground };
 
 type Session = {
   pause: () => void;
@@ -53,7 +54,7 @@ export function Recorder({ account }: { account?: React.ReactNode }) {
   const [blocked, setBlocked] = useState("");
   const [camera, setCamera] = useState<MediaStream | null>(null);
   const [mic, setMic] = useState<MediaStream | null>(null);
-  const [bubble, setBubble] = useState<Place>({ x: 24, y: -1, size: "M", shape: "circle", mirror: true });
+  const [bubble, setBubble] = useState<Place>({ x: 24, y: -1, size: "M", shape: "circle", mirror: true, bg: "none" });
   const [count, setCount] = useState(3);
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -226,6 +227,7 @@ export function Recorder({ account }: { account?: React.ReactNode }) {
         camSize: b.size === "S" ? 0.18 : b.size === "M" ? 0.24 : 0.32,
         camShape: b.shape,
         mirror: b.mirror,
+        camBg: b.bg,
       });
       setStage("edit");
     };
@@ -371,27 +373,37 @@ function Bubble({ stream, place, onPlace, onClose }: { stream: MediaStream; plac
       onPointerLeave={() => setHover(false)}
     >
       <video ref={video} autoPlay muted playsInline className={`pointer-events-none size-full object-cover ${place.mirror ? "-scale-x-100" : ""}`} />
+      {place.bg !== "none" && <BubbleEffect video={video} mode={place.bg} mirror={place.mirror} />}
       {hover && (
         // In the middle, where a round bubble is widest; two rows so nothing is cut off.
-        <div className="absolute top-1/2 left-1/2 flex w-max max-w-[82%] -translate-x-1/2 -translate-y-1/2 flex-wrap justify-center gap-0.5 rounded-2xl bg-ink/75 p-1 backdrop-blur">
+        <div className="absolute top-1/2 left-1/2 flex w-max max-w-[76%] -translate-x-1/2 -translate-y-1/2 flex-wrap items-center justify-center gap-0.5 rounded-[14px] bg-[rgb(14_17_30/0.72)] p-1 backdrop-blur-md">
           {(Object.keys(SIZES) as Size[]).map((s) => (
             <PillButton key={s} label={`Size ${s}`} on={place.size === s} onClick={() => onPlace({ ...place, size: s })}>
-              <span className="text-[11px] font-semibold">{s}</span>
+              {s}
             </PillButton>
           ))}
           {(["circle", "rounded", "square"] as CameraShape[]).map((shape) => (
             <PillButton key={shape} label={`Shape ${shape}`} on={place.shape === shape} onClick={() => onPlace({ ...place, shape })}>
-              <span className={`size-3 border-[1.5px] border-current ${shape === "circle" ? "rounded-full" : shape === "rounded" ? "rounded-[4px]" : "rounded-[1px]"}`} />
+              <span className={`size-2.5 border-[1.5px] border-current ${shape === "circle" ? "rounded-full" : shape === "rounded" ? "rounded-[35%]" : "rounded-[2px]"}`} />
             </PillButton>
           ))}
           <PillButton label="Mirror" on={place.mirror} onClick={() => onPlace({ ...place, mirror: !place.mirror })}>
-            <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3v18M8 7 3 12l5 5zM16 7l5 5-5 5z" />
+            <svg viewBox="0 0 24 24" className="size-[13px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m3 7 5 5-5 5V7M21 7l-5 5 5 5V7M12 20v2M12 14v2M12 8v2M12 2v2" />
+            </svg>
+          </PillButton>
+          <PillButton
+            label={place.bg === "none" ? "Blur background" : place.bg === "blur" ? "Remove background" : "Original background"}
+            on={place.bg !== "none"}
+            onClick={() => onPlace({ ...place, bg: place.bg === "none" ? "blur" : place.bg === "blur" ? "remove" : "none" })}
+          >
+            <svg viewBox="0 0 24 24" className="size-[13px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9.9 15.5A2 2 0 0 0 8.5 14.1L2.4 12.5a.5.5 0 0 1 0-1L8.5 9.9A2 2 0 0 0 9.9 8.5l1.6-6.1a.5.5 0 0 1 1 0l1.6 6.1a2 2 0 0 0 1.4 1.4l6.1 1.6a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0zM20 3v4M22 5h-4" />
             </svg>
           </PillButton>
           {onClose && (
             <PillButton label="Turn camera off" on={false} onClick={onClose}>
-              <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <svg viewBox="0 0 24 24" className="size-[13px]" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
                 <path d="M6 6l12 12M18 6 6 18" />
               </svg>
             </PillButton>
@@ -402,9 +414,42 @@ function Bubble({ stream, place, onPlace, onClose }: { stream: MediaStream; plac
   );
 }
 
+/** The bubble with its background blurred or removed, live, drawn over the camera. */
+function BubbleEffect({ video, mode, mirror }: { video: React.RefObject<HTMLVideoElement | null>; mode: CameraBackground; mirror: boolean }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void loadSegmenter().then(() => alive && setReady(true));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!ready) return;
+    let frame = requestAnimationFrame(function loop() {
+      const v = video.current;
+      const ctx = canvas.current?.getContext("2d");
+      if (v && ctx && v.readyState >= 2) {
+        const out = cameraWithBackground(v, v.videoWidth, v.videoHeight, 320, mode);
+        if (out) ctx.drawImage(out, 0, 0);
+      }
+      frame = requestAnimationFrame(loop);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [ready, mode, video]);
+  return <canvas ref={canvas} width={320} height={320} className={`pointer-events-none absolute inset-0 size-full transition-opacity ${ready ? "opacity-100" : "opacity-0"} ${mirror ? "-scale-x-100" : ""}`} />;
+}
+
 function PillButton({ label, on, onClick, children }: { label: string; on: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" aria-label={label} title={label} onClick={onClick} className={`grid size-7 place-items-center rounded-full ${on ? "bg-white/25 text-white" : "text-white/70 hover:text-white"}`}>
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={`grid h-[22px] min-w-[22px] place-items-center rounded-full px-[3px] text-[11px] font-semibold ${on ? "bg-white/[0.18] text-white" : "text-white/75 hover:text-white"}`}
+    >
       {children}
     </button>
   );

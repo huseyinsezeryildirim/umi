@@ -22,6 +22,7 @@ export type Take = {
   camSize?: number;
   camShape?: CameraShape;
   mirror?: boolean;
+  camBg?: Look["camBg"];
 };
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -29,8 +30,12 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60))
 type Job = { phase: "idle" } | { phase: "loading" | "working"; progress: number } | { phase: "done" } | { phase: "error"; message: string };
 
 export function Editor({ take, account, onRestart }: { take: Take; account?: React.ReactNode; onRestart: () => void }) {
-  const [look, setLook] = useState<Look>({ ...LOOK, camera: !!take.camera, corner: take.corner ?? LOOK.corner, camSize: take.camSize ?? LOOK.camSize, camShape: take.camShape ?? LOOK.camShape, mirror: take.mirror ?? LOOK.mirror });
+  const [look, setLook] = useState<Look>({ ...LOOK, camera: !!take.camera, corner: take.corner ?? LOOK.corner, camSize: take.camSize ?? LOOK.camSize, camShape: take.camShape ?? LOOK.camShape, mirror: take.mirror ?? LOOK.mirror, camBg: take.camBg ?? LOOK.camBg });
   const [bgJob, setBgJob] = useState<Job>({ phase: "idle" });
+  // Background effect chosen while recording: load it straight away.
+  useEffect(() => {
+    if (take.camBg && take.camBg !== "none") void loadSegmenter().then(() => setBgJob({ phase: "done" }));
+  }, [take]);
   const [trim, setTrim] = useState<Range>([0, take.duration]);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
