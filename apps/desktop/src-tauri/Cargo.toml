@@ -1,0 +1,34 @@
+[package]
+name = "umi-desktop"
+description = "Umi for macOS, Windows and Linux."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "umi_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = ["macos-private-api"] }
+tauri-plugin-dialog = "2.8"
+tauri-plugin-opener = "2.7"
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+thiserror.workspace = true
+parking_lot = "0.12"
+crossbeam-channel = "0.5"
+dirs = "6"
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+base64 = "0.22"
+umi-project.workspace = true
+umi-render = { path = "../../../crates/umi-render" }
+umi-media = { path = "../../../crates/umi-media" }
+umi-engine = { path = "../../../crates/umi-engine" }
+
+[lints]
+workspace = true

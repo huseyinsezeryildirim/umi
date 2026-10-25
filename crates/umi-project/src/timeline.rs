@@ -352,6 +352,7 @@ impl Document {
             rect: Rect::new(0.35, 0.35, 0.3, 0.2),
             style: MaskStyle::Blur,
             amount: 0.6,
+            keyframes: vec![],
         };
         let id = mask.id;
         self.edit.masks.push(mask);

@@ -346,12 +346,13 @@ impl FramePlanner {
         let screen_size = assets.size(&TexRef::Screen).unwrap_or((w, h));
         for mask in s.masks.iter().filter(|m| t >= m.start && t <= m.end) {
             let fade = ((t - mask.start) / 0.2).min((mask.end - t) / 0.2).min(1.0);
-            // Mask rect (normalized to the full recording) → layer px (top-left origin).
+            // Mask rect (normalized to the full recording, moving over time) → layer px.
+            let rect = mask.rect_at(t);
             let local = Rect::new(
-                (mask.rect.min_x() - crop.min_x()) / crop.width() * layer.width(),
-                (mask.rect.min_y() - crop.min_y()) / crop.height() * layer.height(),
-                mask.rect.width() / crop.width() * layer.width(),
-                mask.rect.height() / crop.height() * layer.height(),
+                (rect.min_x() - crop.min_x()) / crop.width() * layer.width(),
+                (rect.min_y() - crop.min_y()) / crop.height() * layer.height(),
+                rect.width() / crop.width() * layer.width(),
+                rect.height() / crop.height() * layer.height(),
             );
             let Some(local) = local.intersection(&layer) else { continue };
             let px_per_screen_px = layer.width() / (screen_size.0 as f64 * crop.width()).max(1.0);

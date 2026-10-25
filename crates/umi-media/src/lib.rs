@@ -8,7 +8,7 @@ pub mod gif;
 mod hw;
 
 pub use audio::{AudioReader, AudioStream, CHANNELS, SAMPLE_RATE, audio_streams, waveform};
-pub use decode::{ColorInfo, DecodedFrame, FrameFormat, VideoDecoder, VideoInfo, thumbnail, to_rgba};
+pub use decode::{ColorInfo, DecodedFrame, FrameFormat, VideoDecoder, VideoInfo, keyframe_thumbnails, thumbnail, to_rgba};
 pub use encode::{Container, Encoder, EncoderSettings, VideoCodec};
 pub use gif::GifWriter;
 

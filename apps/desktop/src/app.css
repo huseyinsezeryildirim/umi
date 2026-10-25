@@ -1,0 +1,117 @@
+/* Recordings library (start screen). */
+
+.lib {
+  height: 100vh;
+  overflow-y: auto;
+  padding: 0 32px 32px;
+}
+.lib__header {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding-left: 60px;
+}
+.lib__header h1 {
+  margin: 0;
+  font-size: var(--umi-text-xl);
+  font-weight: var(--umi-weight-bold);
+  letter-spacing: -0.01em;
+}
+.lib__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+.lib__card {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 0;
+  text-align: left;
+  overflow: hidden;
+  transition:
+    transform var(--umi-normal) var(--umi-ease),
+    box-shadow var(--umi-normal) var(--umi-ease);
+}
+.lib__card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px var(--umi-hairline),
+    var(--umi-shadow-lg);
+}
+.lib__thumb {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--umi-accent);
+  background: linear-gradient(135deg, var(--umi-ice-top), var(--umi-ice-bottom));
+}
+.lib__meta {
+  padding: 12px 14px 14px;
+}
+.lib__name {
+  font-size: var(--umi-text-md);
+  font-weight: var(--umi-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib__sub {
+  margin-top: 2px;
+  font-size: var(--umi-text-sm);
+  color: var(--umi-text-3);
+}
+.lib__empty {
+  color: var(--umi-text-3);
+}
+.lib__thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lib__dots {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(14, 17, 30, 0.45);
+  backdrop-filter: blur(8px);
+}
+.lib__dots i {
+  width: 14px;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.4);
+  transition: background var(--umi-fast);
+}
+.lib__dots i[data-on="true"] {
+  background: #fff;
+}
+.lib__duration {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: var(--umi-weight-semibold);
+  color: #fff;
+  background: rgba(14, 17, 30, 0.55);
+  backdrop-filter: blur(8px);
+  font-variant-numeric: tabular-nums;
+}
+.lib__opening {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.6);
+}

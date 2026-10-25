@@ -219,6 +219,29 @@ impl VideoDecoder {
     }
 }
 
+/// Filmstrip pictures: for each time, the keyframe at or before it (one frame decode each,
+/// so a whole strip takes a fraction of a second). RGBA, long side at most `max`.
+pub fn keyframe_thumbnails(path: &Path, times: &[f64], max: u32) -> Result<Vec<(u32, u32, Vec<u8>)>, MediaError> {
+    let mut decoder = VideoDecoder::open(path, true)?;
+    let mut out = Vec::with_capacity(times.len());
+    let mut last: Option<(f64, (u32, u32, Vec<u8>))> = None;
+    for &t in times {
+        decoder.seek(t)?;
+        let Some(frame) = decoder.next()? else { break };
+        // Several times can share a keyframe: reuse the picture.
+        if let Some((pts, image)) = &last
+            && (pts - frame.pts).abs() < 1e-6
+        {
+            out.push(image.clone());
+            continue;
+        }
+        let image = to_rgba(&frame, max)?;
+        last = Some((frame.pts, image.clone()));
+        out.push(image);
+    }
+    Ok(out)
+}
+
 /// A small RGBA picture of the frame at `t` (filmstrips, posters). `max` bounds the long side.
 pub fn thumbnail(path: &Path, t: f64, max: u32) -> Result<(u32, u32, Vec<u8>), MediaError> {
     let mut decoder = VideoDecoder::open(path, false)?;

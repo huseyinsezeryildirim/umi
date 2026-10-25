@@ -478,6 +478,59 @@ pub struct PrivacyMask {
     /// Blur radius / pixel size / dimming, 0…1.
     #[serde(default = "mask_amount")]
     pub amount: f64,
+    /// Where the mask is over time (moved by hand or by tracking). Empty = always `rect`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keyframes: Vec<MaskKeyframe>,
+}
+
+/// The mask's rect at a recording time.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct MaskKeyframe {
+    pub t: f64,
+    pub rect: Rect,
+}
+
+impl PrivacyMask {
+    /// The rect at recording time `t`: interpolated between keyframes (smoothly eased),
+    /// held before the first and after the last.
+    pub fn rect_at(&self, t: f64) -> Rect {
+        let k = &self.keyframes;
+        let (Some(first), Some(last)) = (k.first(), k.last()) else { return self.rect };
+        if t <= first.t {
+            return first.rect;
+        }
+        if t >= last.t {
+            return last.rect;
+        }
+        let i = k.partition_point(|f| f.t <= t).saturating_sub(1);
+        let (a, b) = (k[i], k[(i + 1).min(k.len() - 1)]);
+        let span = (b.t - a.t).max(1e-6);
+        let x = ((t - a.t) / span).clamp(0.0, 1.0);
+        // Dense keyframes (tracking) interpolate linearly; sparse ones (hand-placed) ease.
+        let f = if span < 0.2 { x } else { x * x * (3.0 - 2.0 * x) };
+        let l = |p: f64, q: f64| p + (q - p) * f;
+        Rect::new(
+            l(a.rect.min_x(), b.rect.min_x()),
+            l(a.rect.min_y(), b.rect.min_y()),
+            l(a.rect.width(), b.rect.width()),
+            l(a.rect.height(), b.rect.height()),
+        )
+    }
+
+    /// Sets the rect at `t`: a keyframe if the mask moves, else the fixed rect.
+    pub fn set_rect_at(&mut self, t: f64, rect: Rect) {
+        if self.keyframes.is_empty() {
+            self.rect = rect;
+            return;
+        }
+        match self.keyframes.iter_mut().find(|f| (f.t - t).abs() < 1.0 / 60.0) {
+            Some(f) => f.rect = rect,
+            None => {
+                self.keyframes.push(MaskKeyframe { t, rect });
+                self.keyframes.sort_by(|a, b| a.t.total_cmp(&b.t));
+            }
+        }
+    }
 }
 
 fn mask_amount() -> f64 {
