@@ -227,6 +227,8 @@ pub struct Recording {
     size: (u32, u32),
     capture_rect: (f64, f64, f64, f64),
     audio: AudioInfo,
+    /// Spans with the camera turned off (the camera keeps recording; the edit hides it).
+    camera_off: parking_lot::Mutex<(Vec<(f64, f64)>, Option<f64>)>,
 }
 
 /// "Umi 2026-10-25 at 10.41.07.umi" in `library` (made unique).
@@ -321,6 +323,7 @@ impl Recording {
             size,
             capture_rect: rect,
             audio,
+            camera_off: parking_lot::Mutex::new((Vec::new(), None)),
         };
 
         let result = (|| -> Result<(), RecordError> {
@@ -393,6 +396,24 @@ impl Recording {
         self.clock.resume();
     }
 
+    /// Turns the camera off or on in the video from now (the camera keeps recording).
+    pub fn set_camera_visible(&self, visible: bool) {
+        let now = self.clock.elapsed();
+        let mut off = self.camera_off.lock();
+        match (visible, off.1) {
+            (false, None) => off.1 = Some(now),
+            (true, Some(since)) => {
+                off.0.push((since, now));
+                off.1 = None;
+            }
+            _ => {}
+        }
+    }
+
+    pub fn camera_visible(&self) -> bool {
+        self.camera_off.lock().1.is_none()
+    }
+
     /// Microphone peak level, 0…1 (for the control bar's meter).
     pub fn mic_level(&self) -> f32 {
         self.mic.as_ref().map_or(0.0, |m| m.level())
@@ -450,6 +471,13 @@ impl Recording {
             edit: None,
             camera_only: self.options.camera_only.then_some(true),
             title: None,
+            camera_off: {
+                let mut off = self.camera_off.lock();
+                if let Some(since) = off.1.take() {
+                    off.0.push((since, duration));
+                }
+                (has_camera && !off.0.is_empty()).then(|| off.0.clone())
+            },
             title_auto: None,
         };
         let mut project = project;
@@ -553,6 +581,7 @@ pub fn recover(library: &Path) -> Vec<PathBuf> {
             edit: None,
             camera_only: None,
             title: None,
+            camera_off: None,
             title_auto: None,
         };
         if bundle.write_project(&project).is_ok() {

@@ -54,6 +54,10 @@ pub struct RecordingProject {
     /// Recorded in camera-only mode: the video starts as a full-length Camera Only scene.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub camera_only: Option<bool>,
+    /// Where the camera was turned off while recording (recording time, seconds): the video
+    /// starts with the camera hidden there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub camera_off: Option<Vec<(f64, f64)>>,
     /// The recording's title, when it has one (otherwise the folder name is shown).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -145,6 +149,14 @@ impl RecordingProject {
                 layout: SceneLayout::CameraOnly,
                 transition: 0.0,
             }];
+        } else {
+            // Camera turned off for a while during the recording: hidden there in the video.
+            for &(start, end) in self.camera_off.iter().flatten() {
+                let (start, end) = (start.max(0.0), end.min(self.duration));
+                if end - start >= 0.2 {
+                    edit.scenes.push(SceneSegment { id: new_id(), start, end, layout: SceneLayout::HideCamera, transition: 0.3 });
+                }
+            }
         }
         edit
     }

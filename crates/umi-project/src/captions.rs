@@ -256,6 +256,7 @@ mod tests {
             edit: None,
             camera_only: None,
             title: None,
+            camera_off: None,
             title_auto: None,
         };
         let mut edit = EditSettings::default();

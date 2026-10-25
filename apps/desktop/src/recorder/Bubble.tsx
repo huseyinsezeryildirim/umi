@@ -1,11 +1,10 @@
 import { emit, listen } from "@tauri-apps/api/event";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { FlipHorizontal2 } from "lucide-solid";
 import { recorder, type CameraStyle, type RecordSettings } from "./api";
 
 const SIZES = { S: 160, M: 220, L: 300 } as const;
 
-/** The camera bubble: always on top, draggable; size (three dots) and mirror on hover. */
+/** The camera bubble: always on top, draggable; shape and mirror on hover. */
 export function Bubble() {
   const [settings, setSettings] = createSignal<RecordSettings | null>(null);
   const [frame, setFrame] = createSignal<string | null>(null);
@@ -45,10 +44,6 @@ export function Bubble() {
     // The launcher shows these settings too.
     void recorder.save(next).then(() => emit("record:settings"));
   };
-  const setSize = (key: keyof typeof SIZES) => {
-    update((c) => (c.size = key === "S" ? 0.16 : key === "M" ? 0.24 : 0.34));
-    void recorder.resize(SIZES[key], SIZES[key]);
-  };
 
   return (
     <div class="bubble" data-shape={style()?.shape ?? "circle"} onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)} data-tauri-drag-region>
@@ -57,15 +52,17 @@ export function Bubble() {
       </Show>
       <Show when={hover()}>
         <div class="bubble__pill">
-          <For each={["S", "M", "L"] as const}>
-            {(k, i) => (
-              <button type="button" data-on={settings() && sizeOf(style()!) === SIZES[k] ? "true" : "false"} onClick={() => setSize(k)} aria-label={["Small", "Medium", "Large"][i()]} title={["Small", "Medium", "Large"][i()]}>
-                <span class="bubble__dot" style={{ width: `${4 + i() * 3}px`, height: `${4 + i() * 3}px` }} />
+          <For each={["circle", "squircle", "square"] as const}>
+            {(shape) => (
+              <button type="button" data-on={style()?.shape === shape ? "true" : "false"} onClick={() => update((c) => (c.shape = shape))} aria-label={shape} title={shape === "squircle" ? "Rounded" : shape[0].toUpperCase() + shape.slice(1)}>
+                <span class={`bubble__shape bubble__shape--${shape}`} />
               </button>
             )}
           </For>
           <button type="button" data-on={style()?.mirrored ? "true" : "false"} onClick={() => update((c) => (c.mirrored = !c.mirrored))} aria-label="Mirror" title="Mirror">
-            <FlipHorizontal2 size={13} />
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3v18M8 7 3 12l5 5zM16 7l5 5-5 5z" />
+            </svg>
           </button>
         </div>
       </Show>

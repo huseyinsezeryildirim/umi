@@ -19,6 +19,8 @@ export type Take = {
   camShape?: CameraShape;
   mirror?: boolean;
   camBg?: "none" | "blur" | "remove";
+  /** Where the camera was turned off while recording (seconds). */
+  cameraOff?: [number, number][];
 };
 
 function open(account: string): Promise<IDBDatabase> {
@@ -78,6 +80,7 @@ export async function saveTake(account: string, take: Take): Promise<string> {
         }
       : {}),
     audio: { microphoneTrack: 0 },
+    ...(camera && take.cameraOff?.length ? { cameraOff: take.cameraOff } : {}),
   };
   const db = await open(account);
   const files = [[screen, "screen.webm"], ...(camera ? [[camera, "camera.webm"]] : [])] as [Blob, string][];

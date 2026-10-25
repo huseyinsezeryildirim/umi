@@ -42,6 +42,7 @@ pub fn import_file(library: &Path, file: &Path, name: Option<&str>) -> Result<Pa
             edit: None,
             camera_only: None,
             title: None,
+            camera_off: None,
             title_auto: None,
         };
         bundle.write_project(&project).map_err(|e| e.to_string())?;

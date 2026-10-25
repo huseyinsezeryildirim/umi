@@ -103,6 +103,7 @@ let state: EditorState = {
   state.recording.hasCamera = true;
   state.edit.camera = { ...state.edit.camera, visible: true, shape: "circle", position: [0.9, 0.82], mirrored: false };
 }
+let demoCameraVisible = true;
 let recordSettings = {
   target: null,
   fps: 60,
@@ -591,9 +592,13 @@ mockIPC(
           cameras: [{ id: "0", name: "FaceTime HD Camera" }],
           missingPermission: null,
         };
+      case "record_camera":
+        demoCameraVisible = Boolean(p.visible);
+        dispatchEvent(new CustomEvent("demo:window", { detail: { view: "bubble", shown: demoCameraVisible } }));
+        return null;
       case "record_status":
         // The desktop demo starts its recording at `__demoRecStart`.
-        return { recording: true, paused: false, elapsed: (performance.now() - ((window as unknown as { __demoRecStart?: number }).__demoRecStart ?? 0)) / 1000, level: Math.abs(Math.sin(performance.now() / 300)) * 0.5 };
+        return { recording: true, paused: false, elapsed: (performance.now() - ((window as unknown as { __demoRecStart?: number }).__demoRecStart ?? 0)) / 1000, level: Math.abs(Math.sin(performance.now() / 300)) * 0.5, cameraVisible: demoCameraVisible };
       case "record_camera_preview":
         return cameraPreview(p.camera as string | null, p.frames as { onmessage: (b: ArrayBuffer) => void });
       // The desktop demo draws the app's floating windows itself; tell it what to show.
