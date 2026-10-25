@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createResource, createSignal, For, Show } from "solid-js";
-import { Button, Section, SliderField, Spinner, Swatch } from "@umi/ui";
-import { Blend, Droplets, Image as ImageIcon, ImagePlus, Mountain, PaintBucket, Palette, Shuffle } from "lucide-solid";
+import { Button, Section, SliderField, Spinner, Swatch, TextField, toast } from "@umi/ui";
+import { Blend, Droplets, Search, Image as ImageIcon, ImagePlus, Mountain, PaintBucket, Palette, Shuffle } from "lucide-solid";
 import type { JSX } from "solid-js";
 import type { Editor } from "../store";
 import type { Background, EditSettings, GradientPreset } from "../types";
@@ -171,11 +171,143 @@ export function BackgroundSection(props: { editor: Editor; gesture: object }) {
         <Button size="sm" onClick={() => void chooseImage()}>
           <ImagePlus size={14} /> {currentImage() ? "Choose another image…" : "Choose image…"}
         </Button>
+        <StockPhotos editor={ed} current={currentImage()} onPick={(name) => setBackground({ image: { _0: name } })} />
       </Show>
       <Show when={kind() === "blurred"}>
         <div class="umi-section__hint">Your recording, blurred and dimmed behind the screen.</div>
       </Show>
       <SliderField label="Grain" value={edit().backgroundNoise} format={(v) => `${Math.round(v * 100)}%`} onInput={(v) => set((e) => (e.backgroundNoise = v))} {...props.gesture} />
     </Section>
+  );
+}
+
+interface Photo {
+  id: number;
+  thumb: string;
+  full: string;
+  photographer: string;
+  photographerUrl: string;
+  pageUrl: string;
+  color?: string | null;
+}
+
+/** Free stock photos from Pexels (people add their own free API key once). */
+function StockPhotos(props: { editor: Editor; current: string | null; onPick: (name: string) => void }) {
+  const [connected, setConnected] = createSignal<boolean | null>(null);
+  const [key, setKey] = createSignal("");
+  const [query, setQuery] = createSignal("");
+  const [photos, setPhotos] = createSignal<Photo[]>([]);
+  const [page, setPage] = createSignal(1);
+  const [more, setMore] = createSignal(false);
+  const [loading, setLoading] = createSignal(false);
+  const [using, setUsing] = createSignal<number | null>(null);
+  let timer = 0;
+
+  const load = async (reset: boolean) => {
+    setLoading(true);
+    try {
+      const next = reset ? 1 : page() + 1;
+      const result = await invoke<{ photos: Photo[]; hasMore: boolean }>("pexels_search", { query: query(), page: next });
+      setPhotos(reset ? result.photos : [...photos(), ...result.photos]);
+      setPage(next);
+      setMore(result.hasMore);
+    } catch (e) {
+      toast(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+  void invoke<boolean>("pexels_status").then((on) => {
+    setConnected(on);
+    if (on) void load(true);
+  });
+
+  const connect = async () => {
+    try {
+      await invoke("pexels_connect", { key: key() });
+      setKey("");
+      setConnected(true);
+      void load(true);
+    } catch (e) {
+      toast(String(e));
+    }
+  };
+  const search = (text: string) => {
+    setQuery(text);
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => void load(true), 350);
+  };
+  const use = async (p: Photo) => {
+    setUsing(p.id);
+    try {
+      props.onPick(await invoke<string>("pexels_use", { bundle: props.editor.state().recording.bundle, id: p.id, url: p.full }));
+    } catch (e) {
+      toast(String(e));
+    } finally {
+      setUsing(null);
+    }
+  };
+
+  return (
+    <div class="ed-stock">
+      <div class="umi-field-label">Free photos</div>
+      <Show
+        when={connected()}
+        fallback={
+          <Show when={connected() === false}>
+            <div class="umi-section__hint">
+              Add a free Pexels API key to search millions of photos. Get one at{" "}
+              <a href="https://www.pexels.com/api/" target="_blank" rel="noreferrer">
+                pexels.com/api
+              </a>
+              .
+            </div>
+            <div class="ed-share__row">
+              <TextField value={key()} placeholder="Pexels API key" type="password" onInput={(e) => setKey(e.currentTarget.value)} />
+              <Button size="sm" disabled={!key().trim()} onClick={() => void connect()}>
+                Add
+              </Button>
+            </div>
+          </Show>
+        }
+      >
+        <label class="ed-stock__search">
+          <Search size={14} />
+          <input value={query()} placeholder="Search photos (mountains, office, sky…)" onInput={(e) => search(e.currentTarget.value)} />
+        </label>
+        <div class="ed-wallpapers ed-stock__grid">
+          <For each={photos()}>
+            {(p) => (
+              <button
+                type="button"
+                class="ed-wallpaper"
+                title={`Photo by ${p.photographer} on Pexels`}
+                style={{ background: p.color ?? undefined }}
+                data-selected={props.current === `background-pexels-${p.id}.jpg` ? "true" : "false"}
+                data-busy={using() === p.id ? "true" : "false"}
+                onClick={() => void use(p)}
+              >
+                <img src={p.thumb} alt={`Photo by ${p.photographer}`} loading="lazy" draggable={false} />
+              </button>
+            )}
+          </For>
+        </div>
+        <Show when={loading()}>
+          <Spinner />
+        </Show>
+        <Show when={more() && !loading()}>
+          <Button size="sm" variant="ghost" onClick={() => void load(false)}>
+            More photos
+          </Button>
+        </Show>
+        <div class="umi-section__hint">
+          Photos provided by{" "}
+          <a href="https://www.pexels.com" target="_blank" rel="noreferrer">
+            Pexels
+          </a>
+          .
+        </div>
+      </Show>
+    </div>
   );
 }
