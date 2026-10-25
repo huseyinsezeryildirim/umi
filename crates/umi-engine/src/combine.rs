@@ -11,7 +11,19 @@ pub fn concatenate(files: &[&Path], out: &Path, fps: u32, progress: &dyn Fn(f64)
     let first = VideoDecoder::open(files.first().ok_or_else(|| EngineError::Media(umi_media::MediaError::NoEncoder))?, false)?;
     let (w, h) = (first.info().width, first.info().height);
     drop(first);
-    let mut writer = StreamWriter::create(out, &WriterSettings { width: w, height: h, fps, codec: VideoCodec::H264, bit_rate: 0, audio_tracks: 1, fragmented: false, hardware: true })?;
+    let mut writer = StreamWriter::create(
+        out,
+        &WriterSettings {
+            width: w,
+            height: h,
+            fps,
+            codec: VideoCodec::H264,
+            bit_rate: 0,
+            audio_tracks: 1,
+            fragmented: false,
+            hardware: true,
+        },
+    )?;
     let total: f64 = files.iter().map(|f| umi_media::duration(f).unwrap_or(0.0)).sum::<f64>().max(0.1);
     let mut offset = 0.0;
     for file in files {
@@ -20,7 +32,15 @@ pub fn concatenate(files: &[&Path], out: &Path, fps: u32, progress: &dyn Fn(f64)
         while let Some(frame) = decoder.next()? {
             let t = offset + (frame.pts - info.start).max(0.0);
             match frame.format {
-                FrameFormat::Nv12 => writer.push_video(Pixels::Nv12 { y: &frame.planes[0], y_stride: frame.strides[0] as usize, uv: &frame.planes[1], uv_stride: frame.strides[1] as usize }, t)?,
+                FrameFormat::Nv12 => writer.push_video(
+                    Pixels::Nv12 {
+                        y: &frame.planes[0],
+                        y_stride: frame.strides[0] as usize,
+                        uv: &frame.planes[1],
+                        uv_stride: frame.strides[1] as usize,
+                    },
+                    t,
+                )?,
                 FrameFormat::Rgba => writer.push_video(Pixels::Rgba { data: &frame.planes[0], stride: frame.strides[0] as usize }, t)?,
             }
             progress(t / total);

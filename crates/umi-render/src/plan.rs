@@ -121,10 +121,7 @@ impl FramePlanner {
     /// 0 = the bubble where it was put, 1 = mirrored to the other side.
     fn camera_shift(&self, t: f64) -> f64 {
         const GLIDE: f64 = 0.45;
-        self.camera_away
-            .iter()
-            .map(|&(a, b)| ease(((t - a) / GLIDE).min((b - t) / GLIDE).clamp(0.0, 1.0)))
-            .fold(0.0, f64::max)
+        self.camera_away.iter().map(|&(a, b)| ease(((t - a) / GLIDE).min((b - t) / GLIDE).clamp(0.0, 1.0))).fold(0.0, f64::max)
     }
 
     /// The face at `t`, interpolated (`None` without a face path).
@@ -650,7 +647,18 @@ impl FramePlanner {
 
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::too_many_arguments)]
-    fn plan_camera(&self, t: f64, canvas: Rect, assets: &mut dyn Assets, rect: Rect, radius: f64, alpha: f64, _short: f64, target: Target, ops: &mut Vec<Op>) {
+    fn plan_camera(
+        &self,
+        t: f64,
+        canvas: Rect,
+        assets: &mut dyn Assets,
+        rect: Rect,
+        radius: f64,
+        alpha: f64,
+        _short: f64,
+        target: Target,
+        ops: &mut Vec<Op>,
+    ) {
         let Some(size) = assets.size(&TexRef::Camera) else { return };
         let cam = &self.settings.camera;
         // Out of the cursor's way: glide to the mirrored spot.

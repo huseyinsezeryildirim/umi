@@ -308,8 +308,32 @@ const VOWELS: &str = "aeiouæɛɪɑʌəɔʊiuAIOWYQɜɚ";
 
 fn letter_name(c: char) -> Option<&'static str> {
     const NAMES: [&str; 26] = [
-        "ˈA", "bˈi", "sˈi", "dˈi", "ˈi", "ˈɛf", "ʤˈi", "ˈAʧ", "ˈI", "ʤˈA", "kˈA", "ˈɛl", "ˈɛm", "ˈɛn", "ˈO", "pˈi", "kjˈu", "ˈɑɹ", "ˈɛs", "tˈi", "jˈu", "vˈi",
-        "dˈʌbəlju", "ˈɛks", "wˈI", "zˈi",
+        "ˈA",
+        "bˈi",
+        "sˈi",
+        "dˈi",
+        "ˈi",
+        "ˈɛf",
+        "ʤˈi",
+        "ˈAʧ",
+        "ˈI",
+        "ʤˈA",
+        "kˈA",
+        "ˈɛl",
+        "ˈɛm",
+        "ˈɛn",
+        "ˈO",
+        "pˈi",
+        "kjˈu",
+        "ˈɑɹ",
+        "ˈɛs",
+        "tˈi",
+        "jˈu",
+        "vˈi",
+        "dˈʌbəlju",
+        "ˈɛks",
+        "wˈI",
+        "zˈi",
     ];
     let i = (c.to_ascii_lowercase() as u32).checked_sub('a' as u32)? as usize;
     NAMES.get(i).copied()

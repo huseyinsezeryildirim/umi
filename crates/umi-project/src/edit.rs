@@ -592,7 +592,15 @@ pub enum ZoomFollow {
 
 impl Default for Zoom {
     fn default() -> Self {
-        Self { auto: true, scale: 1.8, segments: vec![], trigger: ZoomTrigger::Clicks, speed: ZoomSpeed::Normal, follow: ZoomFollow::Cursor, glide: false }
+        Self {
+            auto: true,
+            scale: 1.8,
+            segments: vec![],
+            trigger: ZoomTrigger::Clicks,
+            speed: ZoomSpeed::Normal,
+            follow: ZoomFollow::Cursor,
+            glide: false,
+        }
     }
 }
 

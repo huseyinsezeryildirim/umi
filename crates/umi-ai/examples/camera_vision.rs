@@ -14,7 +14,13 @@ fn main() {
     let mask = seg.mask(&rgba, w, h).unwrap();
     let t1 = std::time::Instant::now();
     let mask2 = seg.mask(&rgba, w, h).unwrap();
-    println!("mask {} values, mean {:.2}; first {:.1} ms, warm {:.1} ms", mask.len(), mask.iter().sum::<f32>() / mask.len() as f32, (t1 - t).as_secs_f64() * 1000.0, t1.elapsed().as_secs_f64() * 1000.0);
+    println!(
+        "mask {} values, mean {:.2}; first {:.1} ms, warm {:.1} ms",
+        mask.len(),
+        mask.iter().sum::<f32>() / mask.len() as f32,
+        (t1 - t).as_secs_f64() * 1000.0,
+        t1.elapsed().as_secs_f64() * 1000.0
+    );
     let _ = mask2;
     // Frame with the background darkened by the mask, and the face box.
     let mut out = image::RgbaImage::from_raw(w, h, rgba).unwrap();
@@ -25,7 +31,8 @@ fn main() {
         }
     }
     if let Some(f) = found.first() {
-        let (x0, y0, x1, y1) = ((f.x * w as f64) as u32, (f.y * h as f64) as u32, ((f.x + f.width) * w as f64) as u32, ((f.y + f.height) * h as f64) as u32);
+        let (x0, y0, x1, y1) =
+            ((f.x * w as f64) as u32, (f.y * h as f64) as u32, ((f.x + f.width) * w as f64) as u32, ((f.y + f.height) * h as f64) as u32);
         for x in x0..x1.min(w - 1) {
             for y in [y0.min(h - 1), y1.min(h - 1)] {
                 out.put_pixel(x, y, image::Rgba([0, 255, 0, 255]));

@@ -51,7 +51,10 @@ pub fn subtitles(doc: &Document, format: SubtitleFormat) -> String {
     let mut n = 0;
     for line in caption_lines(&doc.edit.captions.words) {
         let (Some(first), Some(last)) = (line.first(), line.last()) else { continue };
-        let (Some(start), Some(end)) = (doc.output_time(first.start), doc.output_time(last.end).or_else(|| doc.output_time(first.start))) else { continue };
+        let (Some(start), Some(end)) = (doc.output_time(first.start), doc.output_time(last.end).or_else(|| doc.output_time(first.start)))
+        else {
+            continue;
+        };
         n += 1;
         if format == SubtitleFormat::Srt {
             out += &format!("{n}\n");
@@ -66,10 +69,8 @@ pub fn subtitles(doc: &Document, format: SubtitleFormat) -> String {
 /// punctuation.
 const FILLERS: &[&str] = &[
     // English
-    "um", "umm", "uh", "uhh", "uhm", "er", "erm", "ah", "hmm", "mm", "mhm",
-    // Turkish
-    "ıı", "ııı", "ee", "eee", "eh", "hı", "şey",
-    // Spanish, French, German, Portuguese, Italian
+    "um", "umm", "uh", "uhh", "uhm", "er", "erm", "ah", "hmm", "mm", "mhm", // Turkish
+    "ıı", "ııı", "ee", "eee", "eh", "hı", "şey", // Spanish, French, German, Portuguese, Italian
     "eh", "ehm", "euh", "äh", "ähm", "hum", "ehh",
 ];
 
@@ -143,7 +144,13 @@ impl Document {
             if end - start < 1.5 || self.edit.scenes.iter().any(|s| s.start < end && s.end > start) {
                 continue;
             }
-            self.edit.scenes.push(crate::edit::SceneSegment { id: crate::serde_util::new_id(), start, end, layout: crate::edit::SceneLayout::HideCamera, transition: 0.4 });
+            self.edit.scenes.push(crate::edit::SceneSegment {
+                id: crate::serde_util::new_id(),
+                start,
+                end,
+                layout: crate::edit::SceneLayout::HideCamera,
+                transition: 0.4,
+            });
             added += 1;
         }
         self.edit.scenes.sort_by(|a, b| a.start.total_cmp(&b.start));
@@ -160,7 +167,8 @@ impl Document {
                 continue;
             }
             let mut at = clip.start;
-            let mut inside: Vec<(f64, f64)> = ranges.iter().map(|&(a, b)| (a.max(clip.start), b.min(clip.end))).filter(|(a, b)| b - a > 0.3).collect();
+            let mut inside: Vec<(f64, f64)> =
+                ranges.iter().map(|&(a, b)| (a.max(clip.start), b.min(clip.end))).filter(|(a, b)| b - a > 0.3).collect();
             inside.sort_by(|a, b| a.0.total_cmp(&b.0));
             for (a, b) in inside {
                 if a > at + 0.05 {

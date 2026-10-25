@@ -31,7 +31,20 @@ fn follows_scrolling_content() {
     use umi_media::{Container, Encoder, EncoderSettings, VideoCodec};
     let (w, h, fps) = (640u32, 400u32, 30u32);
     let path = std::env::temp_dir().join("umi-scroll-test.mp4");
-    let mut enc = Encoder::create(&path, &EncoderSettings { width: w, height: h, fps, codec: VideoCodec::H264, container: Container::Mp4, bit_rate: 8_000_000, audio: false, hardware: true }).unwrap();
+    let mut enc = Encoder::create(
+        &path,
+        &EncoderSettings {
+            width: w,
+            height: h,
+            fps,
+            codec: VideoCodec::H264,
+            container: Container::Mp4,
+            bit_rate: 8_000_000,
+            audio: false,
+            hardware: true,
+        },
+    )
+    .unwrap();
     // A tall "page" of distinct blocks, scrolled 4 px per frame.
     let page_h = h as usize + 4 * 90;
     let mut page = vec![0u8; w as usize * page_h * 4];

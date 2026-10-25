@@ -134,7 +134,11 @@ mod tests {
         // Precise work in a small corner, then broad clicks across the screen.
         let cursor = CursorData {
             moves: vec![mv(1.0, 0.10, 0.10), mv(2.0, 0.15, 0.12), mv(9.0, 0.1, 0.1), mv(10.0, 0.9, 0.8)],
-            clicks: vec![CursorClick { t: 1.5, x: 0.12, y: 0.11, button: MouseButton::Left }, CursorClick { t: 9.0, x: 0.1, y: 0.1, button: MouseButton::Left }, CursorClick { t: 10.0, x: 0.9, y: 0.8, button: MouseButton::Left }],
+            clicks: vec![
+                CursorClick { t: 1.5, x: 0.12, y: 0.11, button: MouseButton::Left },
+                CursorClick { t: 9.0, x: 0.1, y: 0.1, button: MouseButton::Left },
+                CursorClick { t: 10.0, x: 0.9, y: 0.8, button: MouseButton::Left },
+            ],
             keys: (0..2).map(|i| KeyPress { t: 20.0 + i as f64 * 0.2, key: "A".into(), modifiers: vec![] }).collect(),
         };
         let segs = smart_segments(&cursor, 2.5, 30.0);

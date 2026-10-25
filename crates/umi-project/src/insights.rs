@@ -26,15 +26,17 @@ pub struct Insights {
 /// Common words that say little about the topic (English and Turkish, plus a few
 /// frequent European ones).
 const STOP: &[&str] = &[
-    "a", "an", "the", "and", "or", "but", "if", "so", "to", "of", "in", "on", "at", "for", "with", "by", "from", "as", "is", "are", "was", "were", "be", "been",
-    "it", "its", "this", "that", "these", "those", "i", "you", "we", "they", "he", "she", "me", "my", "your", "our", "their", "them", "us", "do", "does", "did",
-    "have", "has", "had", "can", "will", "would", "should", "could", "just", "really", "very", "like", "then", "there", "here", "what", "which", "who", "how",
-    "when", "where", "why", "not", "no", "yes", "okay", "ok", "all", "some", "any", "more", "most", "about", "into", "out", "up", "down", "now", "also", "too",
-    "going", "gonna", "want", "get", "got", "let", "lets", "let's", "see", "know", "think", "right", "well", "one", "two", "thing", "things", "way", "kind",
-    "bir", "ve", "bu", "şu", "o", "da", "de", "ki", "mi", "mı", "mu", "mü", "için", "ile", "gibi", "çok", "daha", "en", "ne", "nasıl", "neden", "ben", "sen",
-    "biz", "siz", "onlar", "var", "yok", "olarak", "olan", "ama", "fakat", "ya", "yani", "şey", "işte", "evet", "hayır", "şimdi", "sonra", "önce", "kadar",
-    "her", "bunu", "şunu", "onu", "bunlar", "burada", "orada", "bence", "aslında", "zaten", "hani", "tamam", "böyle", "şöyle", "öyle", "bize", "size",
-    "der", "die", "das", "und", "ist", "le", "la", "les", "et", "est", "el", "los", "las", "y", "es", "que", "di", "il", "che",
+    "a", "an", "the", "and", "or", "but", "if", "so", "to", "of", "in", "on", "at", "for", "with", "by", "from", "as", "is", "are", "was",
+    "were", "be", "been", "it", "its", "this", "that", "these", "those", "i", "you", "we", "they", "he", "she", "me", "my", "your", "our",
+    "their", "them", "us", "do", "does", "did", "have", "has", "had", "can", "will", "would", "should", "could", "just", "really", "very",
+    "like", "then", "there", "here", "what", "which", "who", "how", "when", "where", "why", "not", "no", "yes", "okay", "ok", "all",
+    "some", "any", "more", "most", "about", "into", "out", "up", "down", "now", "also", "too", "going", "gonna", "want", "get", "got",
+    "let", "lets", "let's", "see", "know", "think", "right", "well", "one", "two", "thing", "things", "way", "kind", "bir", "ve", "bu",
+    "şu", "o", "da", "de", "ki", "mi", "mı", "mu", "mü", "için", "ile", "gibi", "çok", "daha", "en", "ne", "nasıl", "neden", "ben", "sen",
+    "biz", "siz", "onlar", "var", "yok", "olarak", "olan", "ama", "fakat", "ya", "yani", "şey", "işte", "evet", "hayır", "şimdi", "sonra",
+    "önce", "kadar", "her", "bunu", "şunu", "onu", "bunlar", "burada", "orada", "bence", "aslında", "zaten", "hani", "tamam", "böyle",
+    "şöyle", "öyle", "bize", "size", "der", "die", "das", "und", "ist", "le", "la", "les", "et", "est", "el", "los", "las", "y", "es",
+    "que", "di", "il", "che",
 ];
 
 fn tokens(text: &str) -> Vec<String> {
@@ -233,13 +235,21 @@ mod tests {
         let mut script = vec![];
         let mut t = 0.0;
         for _ in 0..6 {
-            for s in ["Today we set up the billing dashboard for your team.", "The billing dashboard shows invoices and payments.", "You can export invoices from the dashboard."] {
+            for s in [
+                "Today we set up the billing dashboard for your team.",
+                "The billing dashboard shows invoices and payments.",
+                "You can export invoices from the dashboard.",
+            ] {
                 script.push((t, s));
                 t += 6.0;
             }
         }
         for _ in 0..6 {
-            for s in ["Next the deployment pipeline builds every commit.", "The pipeline runs tests before deployment.", "A failed deployment rolls back the release."] {
+            for s in [
+                "Next the deployment pipeline builds every commit.",
+                "The pipeline runs tests before deployment.",
+                "A failed deployment rolls back the release.",
+            ] {
                 script.push((t, s));
                 t += 6.0;
             }
@@ -258,7 +268,11 @@ mod tests {
 
     #[test]
     fn turkish_too() {
-        let script = [(0.0, "Bugün yeni kayıt uygulamasını göstereceğim."), (5.0, "Kayıt uygulaması ekranı ve kamerayı birlikte kaydediyor."), (10.0, "Sonra kaydı düzenleyip paylaşabilirsiniz.")];
+        let script = [
+            (0.0, "Bugün yeni kayıt uygulamasını göstereceğim."),
+            (5.0, "Kayıt uygulaması ekranı ve kamerayı birlikte kaydediyor."),
+            (10.0, "Sonra kaydı düzenleyip paylaşabilirsiniz."),
+        ];
         let i = insights(&words(&script)).unwrap();
         assert!(i.title.to_lowercase().contains("kayıt") || i.title.to_lowercase().contains("uygulama"), "{}", i.title);
     }

@@ -6,8 +6,8 @@ pub mod decode;
 pub mod device;
 pub mod encode;
 pub mod gif;
-pub mod record;
 mod hw;
+pub mod record;
 
 pub use audio::{AudioReader, AudioStream, CHANNELS, SAMPLE_RATE, audio_streams, waveform};
 pub use decode::{ColorInfo, DecodedFrame, FrameFormat, VideoDecoder, VideoInfo, keyframe_thumbnails, thumbnail, to_rgba};

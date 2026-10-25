@@ -107,7 +107,20 @@ fn writes_a_recording_as_it_happens() {
     use umi_media::{Pixels, StreamWriter, VideoCodec, WriterSettings};
     let path = std::env::temp_dir().join("umi-record-test.mov");
     let (w, h) = (640u32, 360u32);
-    let mut writer = StreamWriter::create(&path, &WriterSettings { width: w, height: h, fps: 60, codec: VideoCodec::H264, bit_rate: 0, audio_tracks: 2, fragmented: true, hardware: true }).unwrap();
+    let mut writer = StreamWriter::create(
+        &path,
+        &WriterSettings {
+            width: w,
+            height: h,
+            fps: 60,
+            codec: VideoCodec::H264,
+            bit_rate: 0,
+            audio_tracks: 2,
+            fragmented: true,
+            hardware: true,
+        },
+    )
+    .unwrap();
     let y = vec![128u8; (w * h) as usize];
     let uv = vec![128u8; (w * h / 2) as usize];
     let bgra = vec![200u8; (w * h * 4) as usize];
@@ -124,7 +137,12 @@ fn writes_a_recording_as_it_happens() {
         k += 1;
     }
     // Track 0 continuous; track 1 starts late (0.5 s) — silence is filled in.
-    let tone: Vec<f32> = (0..48_000 * 2).flat_map(|i| { let v = (i as f32 * 0.05).sin() * 0.3; [v, v] }).collect();
+    let tone: Vec<f32> = (0..48_000 * 2)
+        .flat_map(|i| {
+            let v = (i as f32 * 0.05).sin() * 0.3;
+            [v, v]
+        })
+        .collect();
     for (i, chunk) in tone.chunks(960 * 2).enumerate() {
         writer.push_audio(0, chunk, i as f64 * 0.02).unwrap();
         if i as f64 * 0.02 >= 0.5 {

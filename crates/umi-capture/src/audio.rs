@@ -49,7 +49,9 @@ impl MicSession {
 pub fn start(id: Option<&str>, clock: Clock, sink: Option<Arc<dyn AudioSink>>) -> Result<MicSession, CaptureError> {
     let host = cpal::default_host();
     let device = match id {
-        Some(id) => host.input_devices().map_err(|e| CaptureError::Other(e.to_string()))?.find(|d| d.id().is_ok_and(|n| n.to_string() == id)),
+        Some(id) => {
+            host.input_devices().map_err(|e| CaptureError::Other(e.to_string()))?.find(|d| d.id().is_ok_and(|n| n.to_string() == id))
+        }
         None => host.default_input_device(),
     }
     .ok_or_else(|| CaptureError::NotFound("The microphone".into()))?;
@@ -75,12 +77,18 @@ pub fn start(id: Option<&str>, clock: Clock, sink: Option<Arc<dyn AudioSink>>) -
     };
     let stream = match config.sample_format() {
         cpal::SampleFormat::F32 => device.build_input_stream(config.clone().into(), move |d: &[f32], _: &_| callback(d), on_error, None),
-        cpal::SampleFormat::I16 => {
-            device.build_input_stream(config.clone().into(), move |d: &[i16], _: &_| callback(&d.iter().map(|s| *s as f32 / 32768.0).collect::<Vec<_>>()), on_error, None)
-        }
-        cpal::SampleFormat::I32 => {
-            device.build_input_stream(config.clone().into(), move |d: &[i32], _: &_| callback(&d.iter().map(|s| *s as f32 / 2_147_483_648.0).collect::<Vec<_>>()), on_error, None)
-        }
+        cpal::SampleFormat::I16 => device.build_input_stream(
+            config.clone().into(),
+            move |d: &[i16], _: &_| callback(&d.iter().map(|s| *s as f32 / 32768.0).collect::<Vec<_>>()),
+            on_error,
+            None,
+        ),
+        cpal::SampleFormat::I32 => device.build_input_stream(
+            config.clone().into(),
+            move |d: &[i32], _: &_| callback(&d.iter().map(|s| *s as f32 / 2_147_483_648.0).collect::<Vec<_>>()),
+            on_error,
+            None,
+        ),
         other => return Err(CaptureError::Other(format!("unsupported microphone format {other:?}"))),
     }
     .map_err(|e| {

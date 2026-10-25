@@ -134,7 +134,12 @@ impl SCStreamOutputTrait for Output {
                     let (ys, uvs) = (guard.bytes_per_row_of_plane(0), guard.bytes_per_row_of_plane(1));
                     // SAFETY: the buffer stays locked while these slices live; sizes come
                     // from the buffer's own plane geometry.
-                    let (y, uv) = unsafe { (std::slice::from_raw_parts(y, ys * guard.height_of_plane(0)), std::slice::from_raw_parts(uv, uvs * guard.height_of_plane(1))) };
+                    let (y, uv) = unsafe {
+                        (
+                            std::slice::from_raw_parts(y, ys * guard.height_of_plane(0)),
+                            std::slice::from_raw_parts(uv, uvs * guard.height_of_plane(1)),
+                        )
+                    };
                     self.video.frame(Frame::Nv12 { width: w, height: h, y, y_stride: ys, uv, uv_stride: uvs }, t);
                 } else if let Some(data) = unsafe { guard.as_slice() } {
                     self.video.frame(Frame::Bgra { width: w, height: h, data, stride: guard.bytes_per_row() }, t);
@@ -210,7 +215,13 @@ impl Drop for Session {
     }
 }
 
-pub fn start(target: &Target, options: &ScreenOptions, clock: Clock, video: Arc<dyn VideoSink>, audio: Option<Arc<dyn AudioSink>>) -> Result<Box<dyn ScreenSession>, CaptureError> {
+pub fn start(
+    target: &Target,
+    options: &ScreenOptions,
+    clock: Clock,
+    video: Arc<dyn VideoSink>,
+    audio: Option<Arc<dyn AudioSink>>,
+) -> Result<Box<dyn ScreenSession>, CaptureError> {
     let content = content()?;
     let own = std::process::id() as i32;
     let own_windows: Vec<SCWindow> = if options.exclude_own_windows {
@@ -223,7 +234,11 @@ pub fn start(target: &Target, options: &ScreenOptions, clock: Clock, video: Arc<
 
     let (filter, points, scale, source) = match target {
         Target::Display { id } | Target::Area { display: id, .. } => {
-            let display = content.displays().into_iter().find(|d| d.display_id() == *id).ok_or_else(|| CaptureError::NotFound("That display".into()))?;
+            let display = content
+                .displays()
+                .into_iter()
+                .find(|d| d.display_id() == *id)
+                .ok_or_else(|| CaptureError::NotFound("That display".into()))?;
             let f = display.frame();
             let scale = pixel_scale(*id);
             let filter = SCContentFilter::create().with_display(&display).with_excluding_windows(&own_refs).build().map_err(err)?;
@@ -234,7 +249,8 @@ pub fn start(target: &Target, options: &ScreenOptions, clock: Clock, video: Arc<
         }
         Target::Device { .. } => return Err(CaptureError::Unsupported),
         Target::Window { id } => {
-            let window = content.windows().into_iter().find(|w| w.window_id() == *id).ok_or_else(|| CaptureError::NotFound("That window".into()))?;
+            let window =
+                content.windows().into_iter().find(|w| w.window_id() == *id).ok_or_else(|| CaptureError::NotFound("That window".into()))?;
             let f = window.frame();
             let scale = content.displays().first().map_or(2.0, |d| pixel_scale(d.display_id()));
             let filter = SCContentFilter::create().with_window(&window).build().map_err(err)?;

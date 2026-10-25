@@ -42,7 +42,9 @@ pub trait AudioSink: Send + Sync {
 
 #[derive(Debug, thiserror::Error)]
 pub enum CaptureError {
-    #[error("Umi needs permission to record the screen. Allow it in System Settings → Privacy & Security → Screen Recording, then try again.")]
+    #[error(
+        "Umi needs permission to record the screen. Allow it in System Settings → Privacy & Security → Screen Recording, then try again."
+    )]
     ScreenPermission,
     #[error("Umi needs permission to use the camera.")]
     CameraPermission,
@@ -87,10 +89,22 @@ pub struct Window {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum Target {
-    Display { id: u32 },
-    Window { id: u32 },
+    Display {
+        id: u32,
+    },
+    Window {
+        id: u32,
+    },
     /// Part of a display, in that display's points (top-left origin).
-    Area { display: u32, x: f64, y: f64, width: f64, height: f64 },
+    Area {
+        display: u32,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+    },
     /// A phone or tablet connected by cable (macOS), by name.
-    Device { name: String },
+    Device {
+        name: String,
+    },
 }
