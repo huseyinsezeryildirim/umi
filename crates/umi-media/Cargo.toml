@@ -11,7 +11,7 @@ ffmpeg-next = { version = "9", default-features = false, features = ["codec", "f
 ffmpeg-sys-next = "9"
 thiserror.workspace = true
 gif = "0.14"
-color_quant = "1"
+color_quant = "2"
 tracing.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
