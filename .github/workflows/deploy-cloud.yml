@@ -28,9 +28,10 @@ jobs:
     runs-on: ubuntu-24.04
     environment:
       name: ${{ github.event.inputs.environment || (startsWith(github.ref, 'refs/tags/') && 'production' || 'staging') }}
-      url: ${{ vars.API_URL }}
+      url: ${{ ((github.event.inputs.environment || (startsWith(github.ref, 'refs/tags/') && 'production' || 'staging')) == 'production' && vars.PRODUCTION_API_URL) || ((github.event.inputs.environment || (startsWith(github.ref, 'refs/tags/') && 'production' || 'staging')) == 'staging' && vars.STAGING_API_URL) || '' }}
     env:
       TARGET: ${{ github.event.inputs.environment || (startsWith(github.ref, 'refs/tags/') && 'production' || 'staging') }}
+      API_URL: ${{ ((github.event.inputs.environment || (startsWith(github.ref, 'refs/tags/') && 'production' || 'staging')) == 'production' && vars.PRODUCTION_API_URL) || ((github.event.inputs.environment || (startsWith(github.ref, 'refs/tags/') && 'production' || 'staging')) == 'staging' && vars.STAGING_API_URL) || '' }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     defaults:
@@ -73,9 +74,7 @@ jobs:
         if: steps.ready.outputs.ok == 'true'
         run: npx wrangler deploy --env "$TARGET" --message "${GITHUB_REF_NAME} ${GITHUB_SHA::7}"
       - name: Health check
-        if: steps.ready.outputs.ok == 'true' && vars.API_URL != ''
-        env:
-          API_URL: ${{ vars.API_URL }}
+        if: steps.ready.outputs.ok == 'true' && env.API_URL != ''
         run: |
           for _ in 1 2 3 4 5 6; do
             if curl -fsS --max-time 10 "${API_URL%/}/healthz" | grep -q '"ok":true'; then echo "healthy"; exit 0; fi
