@@ -31,7 +31,7 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
   const ed = props.editor;
   const [exporting, setExporting] = createSignal(false);
   const [commanding, setCommanding] = createSignal(false);
-  const [sharing, setSharing] = createSignal(false);
+  const [sharing, setSharing] = createSignal((import.meta.env.DEV || import.meta.env.VITE_DEMO) && new URLSearchParams(location.search).has("share"));
 
   const commands = (): Command[] => {
     const at = () => ed.time();

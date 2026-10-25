@@ -35,6 +35,12 @@ export function App() {
   void listen<string[]>("shortcuts-busy", (e) => toast(`${e.payload.length === 1 ? "A shortcut is" : "Some shortcuts are"} used by another app — change ${e.payload.length === 1 ? "it" : "them"} in Keyboard shortcuts`));
 
   // Recording (launcher, tray, shortcuts) is run from here; a finished recording opens.
+  // Development: `?open` opens the first recording (for screenshots and UI tests).
+  if ((import.meta.env.DEV || import.meta.env.VITE_DEMO) && new URLSearchParams(location.search).has("open")) {
+    void invoke<RecordingSummary[]>("list_recordings").then((list) => list[0] && open(list[0].path));
+  }
+  if ((import.meta.env.DEV || import.meta.env.VITE_DEMO) && new URLSearchParams(location.search).get("tab") === "team") setTimeout(() => window.dispatchEvent(new Event("umi:team")), 50);
+
   installRecordingFlow((bundle) => {
     void refetch();
     void open(bundle);
@@ -67,6 +73,7 @@ export function App() {
 function Library(props: { recordings: RecordingSummary[]; loading: boolean; opening: string | null; onOpen: (path: string) => void; onChanged: () => void; onTour: () => void }) {
   const [loom, setLoom] = createSignal(false);
   const [tab, setTab] = createSignal<"mine" | "team">("mine");
+  window.addEventListener("umi:team", () => setTab("team"));
   /** Recordings picked with Shift/⌘-click, in the order picked (for combining). */
   const [picked, setPicked] = createSignal<string[]>([]);
   const [combining, setCombining] = createSignal<number | null>(null);

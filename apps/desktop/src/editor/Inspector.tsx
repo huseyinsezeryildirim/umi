@@ -65,7 +65,7 @@ const ASPECTS: [AspectRatio, string][] = [
 
 export function Inspector(props: { editor: Editor }) {
   const ed = props.editor;
-  const [tab, setTab] = createSignal<Tab>("background");
+  const [tab, setTab] = createSignal<Tab>(((import.meta.env.DEV || import.meta.env.VITE_DEMO) && (new URLSearchParams(location.search).get("panel") as Tab)) || "background");
   const [cropping, setCropping] = createSignal(false);
   const keys = () => edit().keystrokes ?? { enabled: false, includeTyping: false, size: 0.045, position: 0.82 };
   const setKeys = (change: (k: NonNullable<EditSettings["keystrokes"]>) => void) =>

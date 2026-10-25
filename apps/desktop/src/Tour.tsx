@@ -14,6 +14,7 @@ const STEPS: { icon: () => JSX.Element; title: string; text: string }[] = [
 const KEY = "umi.toured";
 
 export function shouldTour() {
+  if ((import.meta.env.DEV || import.meta.env.VITE_DEMO) && new URLSearchParams(location.search).has("demo")) return false;
   try {
     return !localStorage.getItem(KEY);
   } catch {

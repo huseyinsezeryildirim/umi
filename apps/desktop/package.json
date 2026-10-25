@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "tauri": "tauri",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:demo": "VITE_DEMO=1 vite build --base /demo/ --outDir ../site/public/demo --emptyOutDir"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",
