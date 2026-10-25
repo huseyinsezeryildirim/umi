@@ -15,7 +15,7 @@ ureq = "3"
 ort = { version = "=2.0.0-rc.15", features = ["ndarray"] }
 ndarray = "0.17"
 misaki-rs = { version = "0.6", default-features = false }
-dirs = "6"
+dirs = "7"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 whisper-rs = { version = "0.16", features = ["metal"] }
