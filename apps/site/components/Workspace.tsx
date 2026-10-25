@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { type Account, me, signOut } from "@/lib/account";
+import { type Account, me, resendVerification, signOut } from "@/lib/account";
 import { Recorder } from "./Recorder";
 import { Mark } from "./ui";
 
@@ -34,7 +34,32 @@ export function Workspace() {
       </main>
     );
 
-  return <Recorder account={<AccountMenu account={account} />} />;
+  return (
+    <>
+      {!account.emailVerified && <VerifyBanner email={account.email} />}
+      <Recorder account={<AccountMenu account={account} />} />
+    </>
+  );
+}
+
+/** Until the email is confirmed: a thin reminder with a way to resend the link. */
+function VerifyBanner({ email }: { email: string | null }) {
+  const [sent, setSent] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  if (hidden) return null;
+  return (
+    <div className="fixed bottom-4 left-1/2 z-50 flex w-[min(560px,calc(100vw-32px))] -translate-x-1/2 items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-[14px] text-white shadow-[0_20px_50px_-12px_rgb(17_24_39/0.5)]">
+      <span className="flex-1">{sent ? `Sent. Check ${email}.` : `Confirm your email: we sent a link to ${email}.`}</span>
+      {!sent && (
+        <button type="button" onClick={() => void resendVerification().then(() => setSent(true))} className="font-medium whitespace-nowrap text-[#8ab8ff]">
+          Send again
+        </button>
+      )}
+      <button type="button" aria-label="Hide" onClick={() => setHidden(true)} className="text-white/50 hover:text-white">
+        ✕
+      </button>
+    </div>
+  );
 }
 
 function AccountMenu({ account }: { account: Account }) {
@@ -48,7 +73,10 @@ function AccountMenu({ account }: { account: Account }) {
       {open && (
         <div className="absolute top-11 right-0 z-50 w-60 rounded-2xl bg-white p-2 text-left shadow-[0_0_0_1px_rgb(17_24_39/0.08),0_20px_50px_-12px_rgb(17_24_39/0.25)]">
           <p className="truncate px-3 pt-2 text-[14px] font-medium">{account.email}</p>
-          <p className="px-3 pb-2 text-[12px] text-faint">{account.isPaid ? "Umi Cloud" : "Free"}</p>
+          <p className="px-3 pb-2 text-[12px] text-faint">
+            {account.isPaid ? "Umi Cloud" : "Free"}
+            {account.emailVerified ? "" : " · email not confirmed"}
+          </p>
           <a href="/" className="block rounded-xl px-3 py-2 text-[14px] hover:bg-ink/5">
             Umi website
           </a>

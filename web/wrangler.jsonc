@@ -16,12 +16,19 @@
     "R2_S3_ENDPOINT": "",
     "R2_BUCKET_NAME": "umi-videos",
     // Website origins allowed to call /api (sign-in, the web recorder). Comma-separated.
-    "SITE_ORIGINS": "http://localhost:3210,https://umi.cam"
+    "SITE_ORIGINS": "http://localhost:3210,https://umi.cam",
+    // Where emailed links (verify, reset password) point.
+    "SITE_URL": "http://localhost:3210",
+    // "resend", "brevo" or "log" (print emails to the Worker log; local development).
+    "EMAIL_PROVIDER": "log",
+    "EMAIL_FROM": "Umi <hello@umi.cam>"
   },
   // Secrets (set with `wrangler secret put`, or in .dev.vars locally):
   //   SIGNING_SECRET        HMAC key for upload URLs and password-unlock cookies (required)
   //   R2_ACCESS_KEY_ID      only with R2_S3_ENDPOINT
   //   R2_SECRET_ACCESS_KEY  only with R2_S3_ENDPOINT
+  //   RESEND_API_KEY        with EMAIL_PROVIDER "resend"
+  //   BREVO_API_KEY         with EMAIL_PROVIDER "brevo"
   "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "umi-videos" }],
   "d1_databases": [
     {

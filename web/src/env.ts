@@ -2,6 +2,8 @@
 export interface AppEnv extends Env {
   R2_ACCESS_KEY_ID?: string;
   R2_SECRET_ACCESS_KEY?: string;
+  RESEND_API_KEY?: string;
+  BREVO_API_KEY?: string;
 }
 
 export function baseUrl(env: AppEnv, request: Request): string {

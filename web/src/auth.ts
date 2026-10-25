@@ -1,11 +1,13 @@
 import type { AppEnv } from "./env";
 import { hashPassword, randomId, sha256Hex, verifyPassword } from "./crypto";
 import { HttpError, json, readJson } from "./http";
+import { buttonEmail, sendEmail } from "./email";
 
 export interface Account {
   id: string;
   email: string | null;
   is_paid: number;
+  email_verified?: number;
 }
 
 function bearer(request: Request): string {
@@ -21,7 +23,7 @@ function bearer(request: Request): string {
 export async function authenticate(request: Request, env: AppEnv): Promise<Account> {
   const hash = await sha256Hex(bearer(request));
   const session = await env.DB.prepare(
-    "SELECT a.id, a.email, a.is_paid FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.token_hash = ?",
+    "SELECT a.id, a.email, a.is_paid, a.email_verified FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.token_hash = ?",
   )
     .bind(hash)
     .first<Account>();
@@ -29,7 +31,7 @@ export async function authenticate(request: Request, env: AppEnv): Promise<Accou
     await env.DB.prepare("UPDATE sessions SET last_used = ? WHERE token_hash = ?").bind(Date.now(), hash).run();
     return session;
   }
-  const account = await env.DB.prepare("SELECT id, email, is_paid FROM accounts WHERE token_hash = ?").bind(hash).first<Account>();
+  const account = await env.DB.prepare("SELECT id, email, is_paid, email_verified FROM accounts WHERE token_hash = ?").bind(hash).first<Account>();
   if (!account) throw new HttpError(401, "unauthorized", "Invalid or expired sign-in.");
   return account;
 }
@@ -54,42 +56,177 @@ function credentials(body: { email?: unknown; password?: unknown }): { email: st
   return { email, password };
 }
 
-/** POST /api/auth/signup, /api/auth/login, /api/auth/logout; GET /api/auth/me. */
+const publicAccount = (a: Account) => ({ id: a.id, email: a.email, isPaid: a.is_paid === 1, emailVerified: a.email_verified === 1 });
+
+// ───── Wrong-password limit ─────
+
+const WINDOW_MS = 15 * 60 * 1000;
+const MAX_PER_EMAIL = 8;
+const MAX_PER_IP = 40;
+
+/** Refuses a sign-in when this email or this address has failed too often in the last 15 minutes. */
+async function checkLimit(env: AppEnv, keys: [string, number][]): Promise<void> {
+  const now = Date.now();
+  for (const [key, max] of keys) {
+    const row = await env.DB.prepare("SELECT count, window_start FROM login_failures WHERE key = ?").bind(key).first<{ count: number; window_start: number }>();
+    if (row && now - row.window_start < WINDOW_MS && row.count >= max) {
+      const minutes = Math.ceil((row.window_start + WINDOW_MS - now) / 60000);
+      throw new HttpError(429, "too_many_attempts", `Too many tries. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}, or reset your password.`);
+    }
+  }
+}
+
+async function recordFailure(env: AppEnv, keys: string[]): Promise<void> {
+  const now = Date.now();
+  for (const key of keys) {
+    await env.DB.prepare(
+      `INSERT INTO login_failures (key, count, window_start) VALUES (?1, 1, ?2)
+       ON CONFLICT(key) DO UPDATE SET
+         count = CASE WHEN ?2 - window_start >= ?3 THEN 1 ELSE count + 1 END,
+         window_start = CASE WHEN ?2 - window_start >= ?3 THEN ?2 ELSE window_start END`,
+    )
+      .bind(key, now, WINDOW_MS)
+      .run();
+  }
+}
+
+// ───── Emailed links ─────
+
+const VERIFY_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+const RESET_TTL_MS = 60 * 60 * 1000;
+
+async function emailToken(env: AppEnv, accountId: string, kind: "verify" | "reset", ttl: number): Promise<string> {
+  const token = randomId(40);
+  // One live link per purpose: a new email replaces the old link.
+  await env.DB.prepare("DELETE FROM email_tokens WHERE account_id = ? AND kind = ?").bind(accountId, kind).run();
+  await env.DB.prepare("INSERT INTO email_tokens (token_hash, account_id, kind, expires_at) VALUES (?, ?, ?, ?)")
+    .bind(await sha256Hex(token), accountId, kind, Date.now() + ttl)
+    .run();
+  return token;
+}
+
+/** Spends a link's token; returns its account, or throws if it's wrong, used or expired. */
+async function useToken(env: AppEnv, token: unknown, kind: "verify" | "reset"): Promise<string> {
+  if (typeof token !== "string" || !token) throw new HttpError(400, "invalid_link", "This link isn't valid.");
+  const hash = await sha256Hex(token);
+  const row = await env.DB.prepare("SELECT account_id, expires_at, used_at FROM email_tokens WHERE token_hash = ? AND kind = ?")
+    .bind(hash, kind)
+    .first<{ account_id: string; expires_at: number; used_at: number | null }>();
+  if (!row || row.used_at) throw new HttpError(400, "invalid_link", "This link has already been used or isn't valid. Ask for a new one.");
+  if (row.expires_at < Date.now()) throw new HttpError(400, "expired_link", "This link has expired. Ask for a new one.");
+  await env.DB.prepare("UPDATE email_tokens SET used_at = ? WHERE token_hash = ?").bind(Date.now(), hash).run();
+  return row.account_id;
+}
+
+const site = (env: AppEnv) => String(env.SITE_URL || "https://umi.cam").replace(/\/+$/, "");
+
+async function sendVerification(env: AppEnv, accountId: string, email: string): Promise<void> {
+  const token = await emailToken(env, accountId, "verify", VERIFY_TTL_MS);
+  const link = `${site(env)}/verify?token=${token}`;
+  try {
+    await sendEmail(env, buttonEmail(email, "Confirm your email for Umi", "Confirm this is your email to finish setting up your Umi account.", "Confirm email", link, "The link works for 3 days. If you didn't sign up for Umi, you can ignore this email."));
+  } catch (e) {
+    console.error("verification email failed", e);
+  }
+}
+
+// ───── Routes ─────
+
+/**
+ * POST /api/auth/signup, login, logout, verify, resend-verification, forgot, reset; GET /api/auth/me.
+ */
 export async function handleAuth(request: Request, env: AppEnv, path: string): Promise<Response | null> {
   const method = request.method;
   if (path === "/api/auth/signup" && method === "POST") {
     const { email, password } = credentials(await readJson(request));
-    if (password.length < 8) throw new HttpError(400, "weak_password", "Use at least 8 characters.");
-    if (password.length > 200) throw new HttpError(400, "weak_password", "That password is too long.");
+    checkPassword(password);
     const taken = await env.DB.prepare("SELECT 1 FROM accounts WHERE email = ?").bind(email).first();
     if (taken) throw new HttpError(409, "email_taken", "There's already an account with this email. Sign in instead.");
     const id = `acc_${randomId(16)}`;
     // token_hash is required by the original schema; a random value nobody holds.
-    await env.DB.prepare("INSERT INTO accounts (id, email, token_hash, password_hash, is_paid, created_at) VALUES (?, ?, ?, ?, 0, ?)")
+    await env.DB.prepare("INSERT INTO accounts (id, email, token_hash, password_hash, is_paid, email_verified, created_at) VALUES (?, ?, ?, ?, 0, 0, ?)")
       .bind(id, email, await sha256Hex(randomId(40)), await hashPassword(password), Date.now())
       .run();
-    return json({ token: await newSession(env, id), account: { id, email, isPaid: false } }, 201);
+    await sendVerification(env, id, email);
+    return json({ token: await newSession(env, id), account: publicAccount({ id, email, is_paid: 0, email_verified: 0 }) }, 201);
   }
   if (path === "/api/auth/login" && method === "POST") {
     const { email, password } = credentials(await readJson(request));
-    const row = await env.DB.prepare("SELECT id, email, is_paid, password_hash FROM accounts WHERE email = ?")
+    const ip = request.headers.get("cf-connecting-ip") ?? "local";
+    await checkLimit(env, [
+      [`email:${email}`, MAX_PER_EMAIL],
+      [`ip:${ip}`, MAX_PER_IP],
+    ]);
+    const row = await env.DB.prepare("SELECT id, email, is_paid, email_verified, password_hash FROM accounts WHERE email = ?")
       .bind(email)
       .first<Account & { password_hash: string | null }>();
     // Same answer whether the email or the password is wrong.
     if (!row?.password_hash || !(await verifyPassword(password, row.password_hash))) {
+      await recordFailure(env, [`email:${email}`, `ip:${ip}`]);
       throw new HttpError(401, "bad_credentials", "Wrong email or password.");
     }
-    return json({ token: await newSession(env, row.id), account: { id: row.id, email: row.email, isPaid: row.is_paid === 1 } });
+    await env.DB.prepare("DELETE FROM login_failures WHERE key = ?").bind(`email:${email}`).run();
+    return json({ token: await newSession(env, row.id), account: publicAccount(row) });
   }
   if (path === "/api/auth/logout" && method === "POST") {
     await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256Hex(bearer(request))).run();
     return json({ ok: true });
   }
   if (path === "/api/auth/me" && method === "GET") {
+    return json({ account: publicAccount(await authenticate(request, env)) });
+  }
+  if (path === "/api/auth/verify" && method === "POST") {
+    const token = (await readJson<{ token?: unknown }>(request)).token;
+    // Opening the link twice (or a mail scanner opening it first) still confirms.
+    if (typeof token === "string" && token) {
+      const done = await env.DB.prepare(
+        "SELECT 1 FROM email_tokens t JOIN accounts a ON a.id = t.account_id WHERE t.token_hash = ? AND t.kind = 'verify' AND t.used_at IS NOT NULL AND a.email_verified = 1",
+      )
+        .bind(await sha256Hex(token))
+        .first();
+      if (done) return json({ ok: true });
+    }
+    const accountId = await useToken(env, token, "verify");
+    await env.DB.prepare("UPDATE accounts SET email_verified = 1 WHERE id = ?").bind(accountId).run();
+    return json({ ok: true });
+  }
+  if (path === "/api/auth/resend-verification" && method === "POST") {
     const a = await authenticate(request, env);
-    return json({ account: { id: a.id, email: a.email, isPaid: a.is_paid === 1 } });
+    if (a.email && a.email_verified !== 1) await sendVerification(env, a.id, a.email);
+    return json({ ok: true });
+  }
+  if (path === "/api/auth/forgot" && method === "POST") {
+    const { email } = credentials({ ...(await readJson<{ email?: unknown }>(request)), password: "" });
+    const row = await env.DB.prepare("SELECT id FROM accounts WHERE email = ?").bind(email).first<{ id: string }>();
+    // The same answer either way, so nobody can find out who has an account.
+    if (row) {
+      const token = await emailToken(env, row.id, "reset", RESET_TTL_MS);
+      try {
+        await sendEmail(env, buttonEmail(email, "Reset your Umi password", "Someone asked to reset the password for your Umi account. If it was you, choose a new one.", "Choose a new password", `${site(env)}/reset?token=${token}`, "The link works for 1 hour. If you didn't ask, ignore this email; your password stays the same."));
+      } catch (e) {
+        console.error("reset email failed", e);
+      }
+    }
+    return json({ ok: true });
+  }
+  if (path === "/api/auth/reset" && method === "POST") {
+    const body = await readJson<{ token?: unknown; password?: unknown }>(request);
+    const password = typeof body.password === "string" ? body.password : "";
+    checkPassword(password);
+    const accountId = await useToken(env, body.token, "reset");
+    // A reset signs out every device and proves the email works.
+    await env.DB.prepare("UPDATE accounts SET password_hash = ?, email_verified = 1 WHERE id = ?").bind(await hashPassword(password), accountId).run();
+    await env.DB.prepare("DELETE FROM sessions WHERE account_id = ?").bind(accountId).run();
+    const row = await env.DB.prepare("SELECT id, email, is_paid, email_verified FROM accounts WHERE id = ?").bind(accountId).first<Account>();
+    if (row?.email) await env.DB.prepare("DELETE FROM login_failures WHERE key = ?").bind(`email:${row.email}`).run();
+    return json({ token: await newSession(env, accountId), account: publicAccount(row!) });
   }
   return null;
+}
+
+function checkPassword(password: string) {
+  if (password.length < 8) throw new HttpError(400, "weak_password", "Use at least 8 characters.");
+  if (password.length > 200) throw new HttpError(400, "weak_password", "That password is too long.");
 }
 
 /**
