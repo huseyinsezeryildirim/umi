@@ -50,6 +50,8 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
       await recorder.hide("controls");
       await recorder.hide("bubble");
       await recorder.hide("prompter");
+      await recorder.hide("ink");
+      await emit("ink:mode", { drawing: false });
       const bundle = await invoke<string>("record_stop");
       if (settings.flow === "instant") {
         await instant(bundle);
@@ -68,6 +70,8 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
     await recorder.hide("controls");
     await recorder.hide("bubble");
     await recorder.hide("prompter");
+    await recorder.hide("ink");
+    await emit("ink:mode", { drawing: false });
     await invoke("record_cancel");
     toast("Recording discarded");
   };
@@ -94,10 +98,13 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
   void listen("record:stop", () => void stop());
   void listen("record:discard", () => void discard());
   void listen("record:pause", () => void pause());
+  let inking = false;
+  void listen<{ drawing: boolean }>("ink:mode", (e) => (inking = e.payload.drawing));
   void listen<string>("shortcut", (e) => {
     if (e.payload === "record") void start();
     if (e.payload === "pause") void pause();
     if (e.payload === "discard") void discard();
+    if (e.payload === "draw") void recorder.status().then((s) => s.recording && invoke("ink_set", { drawing: !inking }));
   });
   void listen<number>("recovered", (e) => toast(e.payload === 1 ? "Recovered a recording from last time" : `Recovered ${e.payload} recordings from last time`));
 }

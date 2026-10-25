@@ -751,6 +751,7 @@ pub fn run() {
             show_video_effects,
             open_privacy_settings,
             windows::window_show,
+            windows::ink_set,
             windows::window_hide,
             windows::window_resize,
             windows::resize_app_window,

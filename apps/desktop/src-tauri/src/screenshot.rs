@@ -64,7 +64,7 @@ fn nv12_to_rgba(w: u32, h: u32, y: &[u8], ys: usize, uv: &[u8], uvs: usize) -> V
 pub async fn screenshot_take(app: AppHandle, target: Target) -> Result<PathBuf, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let grab = Arc::new(Grab(Mutex::new(None)));
-        let options = ScreenOptions { fps: 30, max_size: 0, show_cursor: false, system_audio: false, exclude_own_windows: true };
+        let options = ScreenOptions { fps: 30, max_size: 0, show_cursor: false, system_audio: false, exclude_own_windows: true, hide_desktop_icons: false };
         let mut session = screen::start(&target, &options, Clock::new(), grab.clone(), None).map_err(|e| e.to_string())?;
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
         while grab.0.lock().is_none() && std::time::Instant::now() < deadline {

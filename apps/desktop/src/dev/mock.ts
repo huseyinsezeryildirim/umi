@@ -1,5 +1,6 @@
 // Development only: a stand-in for the Rust side so the UI runs in a plain browser (for
 // design reviews and UI tests). Frames are real renders of a fixture recording.
+import { emit } from "@tauri-apps/api/event";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import frame1 from "./frame-1.jpg";
 import frame4 from "./frame-4.jpg";
@@ -216,6 +217,9 @@ mockIPC(
         return { id: "s2Zty2QoHiLz", url: "https://umi.cam/v/s2Zty2QoHiLz", title: "Product demo", status: "ready", allowDownload: true, hasPassword: false, allowComments: true, expiresAt: null };
       case "share_insights":
         return { views: 42, watchedSeconds: 2310, averageSeconds: 55, completion: 0.62, retention: [1, 0.97, 0.95, 0.93, 0.9, 0.88, 0.86, 0.85, 0.83, 0.82, 0.8, 0.79, 0.77, 0.75, 0.74, 0.72, 0.7, 0.68, 0.65, 0.62], embeddedViews: 9, countries: [{ country: "TR", count: 30 }, { country: "DE", count: 8 }, { country: "US", count: 4 }] };
+      case "ink_set":
+        void emit("ink:mode", { drawing: p.drawing, color: p.color });
+        return null;
       case "copy_text_to_clipboard":
         return null;
       case "record_settings":

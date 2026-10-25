@@ -31,6 +31,7 @@ export interface RecordSettings {
   notesOn: boolean;
   notesSpeed: number;
   notesSize: number;
+  hideDesktopIcons?: boolean;
 }
 
 export interface Display {
