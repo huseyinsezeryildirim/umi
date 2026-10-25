@@ -18,6 +18,7 @@ import {
 } from "lucide-solid";
 import { ExportDialog } from "./ExportDialog";
 import { Inspector } from "./Inspector";
+import { PresetsMenu } from "./Presets";
 import { Preview } from "./Preview";
 import { formatTime, type Editor as EditorModel } from "./store";
 import { Timeline } from "./Timeline";
@@ -103,6 +104,7 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
           <IconButton label="Redo" shortcut="⇧⌘Z" disabled={!ed.state().canRedo} onClick={() => void ed.redo()}>
             <Redo2 size={17} />
           </IconButton>
+          <PresetsMenu editor={ed} />
           <div class="umi-divider umi-divider--vertical" />
           <Button variant="glass" tip="Get a link to this video">
             <Link size={15} /> Share

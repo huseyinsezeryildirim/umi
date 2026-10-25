@@ -98,7 +98,8 @@ impl EditorSession {
         let bundle = Bundle::new(path);
         let project = bundle.read_project().map_err(|e| e.to_string())?;
         let cursor = bundle.read_cursor();
-        let edit = project.effective_edit(None);
+        // A recording never edited starts with the default look.
+        let edit = project.effective_edit(crate::presets::load().default_preset());
         let media_duration = umi_media::duration(&bundle.screen()).unwrap_or(project.duration);
         let doc = Document::new(project, edit.clone(), cursor, media_duration);
 
