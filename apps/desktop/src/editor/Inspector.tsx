@@ -338,7 +338,24 @@ function SelectionPanel(props: { editor: Editor; selection: Selection }) {
         <Match when={s.kind === "zoom" && ed.state().zoomSegments.find((z) => z.id === (s as { id: string }).id)}>
           {(z) => (
             <>
-              {header("Zoom", <ZoomIn size={15} />)}
+              {header(z().loupe ? "Magnifier" : "Zoom", <ZoomIn size={15} />)}
+              <Segmented
+                value={z().loupe ? "loupe" : "view"}
+                onChange={(v) =>
+                  set((e) => {
+                    if (e.zoom.auto) {
+                      e.zoom.segments = structuredClone(ed.state().zoomSegments);
+                      e.zoom.auto = false;
+                    }
+                    const seg = e.zoom.segments.find((x) => x.id === z().id);
+                    if (seg) seg.loupe = v === "loupe";
+                  })
+                }
+                options={[
+                  { value: "view", label: "Zoom the view" },
+                  { value: "loupe", label: "Magnifier" },
+                ]}
+              />
               <SliderField
                 label="Zoom"
                 value={z().scale}

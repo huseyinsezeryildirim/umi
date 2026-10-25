@@ -67,8 +67,8 @@ impl FramePlanner {
         }
     }
 
-    pub fn zoom_segments(&self) -> &[ZoomSegment] {
-        &self.zoom.segments
+    pub fn zoom_segments(&self) -> Vec<ZoomSegment> {
+        self.zoom.all()
     }
 
     /// The screen content rect at `time` (bottom-left canvas px), e.g. for editor handles.
@@ -143,6 +143,43 @@ impl FramePlanner {
             let uv = Rect::new(ox / canvas.width(), 1.0 - (oy + vh) / canvas.height(), vw / canvas.width(), vh / canvas.height());
             ops.push(Op::Draw { target: Target::Composite2, draw: full_canvas(canvas, TexRef::Target(composite), uv, 1.0) });
             composite = Target::Composite2;
+        }
+
+        // Magnifier: a round, enlarged view around the focus, over the screen.
+        if self.apply_zoom_and_moves
+            && let Some((amount, magnification, raw)) = self.zoom.loupe(t)
+            && amount > 0.001
+            && inputs.has_screen
+        {
+            let content = DeviceFrameGeometry::content_rect(s.frame, scene.screen_rect);
+            let focus = self.to_content(raw);
+            let (fx, fy) = (content.min_x() + focus.x * content.width(), content.max_y() - focus.y * content.height());
+            let d = short * 0.36 * (0.55 + 0.45 * amount);
+            let cx = fx.clamp(d / 2.0, canvas.width() - d / 2.0);
+            let cy = fy.clamp(d / 2.0, canvas.height() - d / 2.0);
+            let rect = Rect::new(cx - d / 2.0, cy - d / 2.0, d, d);
+            // What's shown inside: a window around the focus, `magnification` times smaller.
+            let m = 1.0 + (magnification.max(1.2) - 1.0) * amount;
+            let w = d / m;
+            let (wx, wy) = ((fx - w / 2.0).clamp(0.0, canvas.width() - w), (fy - w / 2.0).clamp(0.0, canvas.height() - w));
+            let uv = Rect::new(wx / canvas.width(), 1.0 - (wy + w) / canvas.height(), w / canvas.width(), w / canvas.height());
+            let dst = if composite == Target::Composite { Target::Composite2 } else { Target::Composite };
+            ops.push(Op::Draw { target: dst, draw: full_canvas(canvas, TexRef::Target(composite), Rect::UNIT, 1.0) });
+            ops.push(Op::Draw { target: dst, draw: shadow(rect.offset(0.0, -d * 0.03), d / 2.0, d * 0.06, black(0.45 * amount), 1.0) });
+            ops.push(Op::Draw {
+                target: dst,
+                draw: Draw {
+                    size: (d, d),
+                    transform: Homography::rect(rect),
+                    fill: Fill::Texture { tint: WHITE, mirror: false },
+                    texture: TexRef::Target(composite),
+                    uv,
+                    mask: Mask { kind: MaskKind::Rounded, rect: Rect::new(0.0, 0.0, d, d), radius: d / 2.0 },
+                    alpha: amount,
+                },
+            });
+            ops.push(Op::Draw { target: dst, draw: ring(rect, (d * 0.012).max(2.0), 0.0, srgb(1.0, 1.0, 1.0, 0.95), amount) });
+            composite = dst;
         }
 
         let screen_content = DeviceFrameGeometry::content_rect(s.frame, scene.screen_rect);

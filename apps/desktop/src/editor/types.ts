@@ -35,6 +35,8 @@ export interface ZoomSegment {
   end: number;
   scale: number;
   focus?: Point;
+  /** A round magnifier instead of zooming the whole view. */
+  loupe?: boolean;
 }
 
 export interface PrivacyMask {

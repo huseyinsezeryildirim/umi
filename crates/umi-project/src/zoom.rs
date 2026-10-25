@@ -18,7 +18,7 @@ pub fn auto_segments(clicks: &[CursorClick], scale: f64, duration: f64) -> Vec<Z
         let Some((start, end)) = group else { return };
         let begin = (start - 0.6).max(0.0);
         let id = Uuid::parse_str(&format!("00000000-0000-4000-8000-{:012x}", (begin * 1000.0) as u64)).unwrap_or_else(|_| Uuid::new_v4());
-        let segment = ZoomSegment { id, start: begin, end: duration.min(end + 1.8), scale, focus: None };
+        let segment = ZoomSegment { id, start: begin, end: duration.min(end + 1.8), scale, focus: None, loupe: false };
         match result.last_mut() {
             Some(last) if segment.start <= last.end => last.end = segment.end,
             _ => result.push(segment),
@@ -80,7 +80,7 @@ pub fn smart_segments(cursor: &CursorData, max_scale: f64, duration: f64) -> Vec
         let scale = fit.clamp(1.3_f64.min(max_scale), max_scale);
         let begin = (start - 0.6).max(0.0);
         let id = Uuid::parse_str(&format!("00000000-0000-4000-9000-{:012x}", (begin * 1000.0) as u64)).unwrap_or_else(|_| Uuid::new_v4());
-        let segment = ZoomSegment { id, start: begin, end: duration.min(end + 1.8), scale, focus: None };
+        let segment = ZoomSegment { id, start: begin, end: duration.min(end + 1.8), scale, focus: None, loupe: false };
         match result.last_mut() {
             Some(last) if segment.start <= last.end => {
                 last.end = segment.end;

@@ -82,7 +82,7 @@ export function Timeline(props: { editor: Editor }) {
       selection: { kind: "zoom", id: z.id },
       start: z.start,
       end: z.end,
-      label: `${z.scale.toFixed(1)}×${z.focus ? "" : " · follow"}`,
+      label: `${z.loupe ? "Magnifier " : ""}${z.scale.toFixed(1)}×${z.focus ? "" : " · follow"}`,
       color: c.zoom,
       dashed: !e.zoom.segments.some((m) => m.id === z.id),
     }));
