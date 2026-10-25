@@ -167,7 +167,7 @@ impl Document {
         (s, self.project.duration.min(end.max(s + 0.3)))
     }
 
-    fn kept(&self) -> Vec<Clip> {
+    pub(crate) fn kept(&self) -> Vec<Clip> {
         self.placements().iter().map(|p| p.clip).collect()
     }
 

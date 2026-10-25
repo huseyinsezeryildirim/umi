@@ -1,7 +1,7 @@
 //! Words spoken in a recording: caption lines, subtitle files, and editing the video by its
 //! transcript (cut words, filler words, long pauses).
 
-use crate::edit::CaptionWord;
+use crate::edit::{CaptionWord, Clip};
 use crate::timeline::Document;
 use uuid::Uuid;
 
@@ -96,7 +96,54 @@ pub fn long_pauses(words: &[CaptionWord], min: f64, keep: f64) -> Vec<(f64, f64)
         .collect()
 }
 
+/// Stretches of steady typing (plain keys, gaps under a second) longer than `min` seconds,
+/// in recording time, trimmed a little at the ends so the first and last letters are seen.
+pub fn typing_runs(keys: &[crate::project::KeyPress], min: f64) -> Vec<(f64, f64)> {
+    let plain = keys.iter().filter(|k| k.modifiers.iter().all(|m| m == "⇧") && k.key.chars().count() <= 1);
+    let mut runs: Vec<(f64, f64)> = Vec::new();
+    for k in plain {
+        match runs.last_mut() {
+            Some(r) if k.t - r.1 < 1.0 => r.1 = k.t,
+            _ => runs.push((k.t, k.t)),
+        }
+    }
+    runs.into_iter().filter(|r| r.1 - r.0 >= min).map(|(a, b)| (a + 0.4, b - 0.2)).collect()
+}
+
 impl Document {
+    /// Plays recording-time ranges at `speed` (splitting clips at their edges); ranges in
+    /// clips already sped up or slowed down are left alone.
+    pub fn speed_up_source_ranges(&mut self, ranges: &[(f64, f64)], speed: f64) {
+        let mut out = Vec::new();
+        for clip in self.kept() {
+            if (clip.speed - 1.0).abs() > 1e-6 {
+                out.push(clip);
+                continue;
+            }
+            let mut at = clip.start;
+            let mut inside: Vec<(f64, f64)> = ranges.iter().map(|&(a, b)| (a.max(clip.start), b.min(clip.end))).filter(|(a, b)| b - a > 0.3).collect();
+            inside.sort_by(|a, b| a.0.total_cmp(&b.0));
+            for (a, b) in inside {
+                if a > at + 0.05 {
+                    out.push(Clip::new(at, a, 1.0));
+                }
+                out.push(Clip::new(a.max(at), b, speed));
+                at = b;
+            }
+            if clip.end > at + 0.05 {
+                out.push(Clip::new(at, clip.end, 1.0));
+            }
+        }
+        self.edit.clips = out;
+    }
+
+    /// Speeds up long typing (Screen Studio's "skip typing"); returns how many stretches.
+    pub fn speed_up_typing(&mut self, speed: f64) -> usize {
+        let runs = typing_runs(&self.cursor.keys, 3.0);
+        self.speed_up_source_ranges(&runs, speed);
+        runs.len()
+    }
+
     /// Removes recording-time ranges from the video (wherever they are in the edit). Returns
     /// how many seconds of output were removed.
     pub fn cut_source_ranges(&mut self, ranges: &[(f64, f64)]) -> f64 {
@@ -195,5 +242,20 @@ mod tests {
         let srt = subtitles(&d, SubtitleFormat::Srt);
         assert!(srt.contains("1\n00:00:01,000 --> 00:00:01,500\nHi.") && srt.contains("2\n00:00:03,000 --> 00:00:03,500\nBye."), "{srt}");
         assert!(subtitles(&d, SubtitleFormat::Vtt).starts_with("WEBVTT\n\n00:00:01.000"));
+    }
+
+    #[test]
+    fn speeds_up_long_typing() {
+        use crate::project::KeyPress;
+        let mut d = doc(vec![]);
+        d.cursor.keys = (0..30).map(|i| KeyPress { t: 2.0 + i as f64 * 0.15, key: "a".into(), modifiers: vec![] }).collect();
+        // A shortcut on its own doesn't count.
+        d.cursor.keys.push(KeyPress { t: 8.0, key: "S".into(), modifiers: vec!["⌘".into()] });
+        assert_eq!(d.speed_up_typing(3.0), 1);
+        let clips = &d.edit.clips;
+        assert_eq!(clips.len(), 3, "{clips:?}");
+        assert!((clips[1].speed - 3.0).abs() < 1e-9 && (clips[1].start - 2.4).abs() < 1e-9);
+        // 3.75 s of typing at 3× saves 2.5 s.
+        assert!((d.output_duration() - 7.5).abs() < 0.01, "{}", d.output_duration());
     }
 }

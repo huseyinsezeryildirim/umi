@@ -50,6 +50,8 @@ pub enum Op {
     RemoveFillers,
     /// Shortens silences longer than `min` seconds.
     RemovePauses { min: f64 },
+    /// Plays long typing faster.
+    SpeedUpTyping { speed: f64 },
     BeginGesture,
     EndGesture,
     Undo,
@@ -242,6 +244,9 @@ impl EditorSession {
             Op::RemovePauses { min } => {
                 let ranges = umi_project::captions::long_pauses(&doc.edit.captions.words, min.max(0.3), 0.3);
                 doc.cut_source_ranges(&ranges);
+            }
+            Op::SpeedUpTyping { speed } => {
+                doc.speed_up_typing(speed.clamp(1.5, 8.0));
             }
             Op::BeginGesture => history.begin_gesture(&doc.edit),
             Op::EndGesture => history.end_gesture(&doc.edit),
