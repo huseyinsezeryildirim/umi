@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 // The mark: sound bars around a record light. Bars take the text color, the light is Umi blue.
 // This is the 11-bar cut for interface sizes; the 15-bar original (public/umi-mark.svg) is for large uses.
 const OUTER = `<rect x="-48.10" y="-10.12" width="4.2" height="20.24" rx="2.1"/><rect x="-38.90" y="-27.60" width="4.2" height="55.20" rx="2.1"/><rect x="-29.70" y="-36.80" width="4.2" height="73.60" rx="2.1"/><rect x="-20.50" y="-42.16" width="4.2" height="84.32" rx="2.1"/><rect x="-11.30" y="-45.07" width="4.2" height="90.14" rx="2.1"/><rect x="-2.10" y="-46.00" width="4.2" height="92.00" rx="2.1"/><rect x="7.10" y="-45.07" width="4.2" height="90.14" rx="2.1"/><rect x="16.30" y="-42.16" width="4.2" height="84.32" rx="2.1"/><rect x="25.50" y="-36.80" width="4.2" height="73.60" rx="2.1"/><rect x="34.70" y="-27.60" width="4.2" height="55.20" rx="2.1"/><rect x="43.90" y="-10.12" width="4.2" height="20.24" rx="2.1"/>`;
@@ -10,5 +13,35 @@ export function Mark({ className = "size-7", mono = false }: { className?: strin
       <g fill="currentColor" dangerouslySetInnerHTML={{ __html: OUTER }} />
       <g fill={mono ? "currentColor" : "#116ff5"} dangerouslySetInnerHTML={{ __html: INNER }} />
     </svg>
+  );
+}
+
+/** A small copy button: copies `text`, shows a check for a moment. */
+export function CopyButton({ text, dark = false, className = "" }: { text: string; dark?: boolean; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label={copied ? "Copied" : "Copy"}
+      title={copied ? "Copied" : "Copy"}
+      onClick={() =>
+        void navigator.clipboard.writeText(text).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        })
+      }
+      className={`grid size-8 shrink-0 place-items-center rounded-lg transition-colors ${dark ? "text-white/45 hover:bg-white/10 hover:text-white" : "text-faint hover:bg-ink/5 hover:text-ink"} ${className}`}
+    >
+      {copied ? (
+        <svg viewBox="0 0 24 24" className="size-4 text-[#30d158]" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="m5 12.5 4.5 4.5L19 7.5" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <rect x="9" y="9" width="12" height="12" rx="2.5" />
+          <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+        </svg>
+      )}
+    </button>
   );
 }
