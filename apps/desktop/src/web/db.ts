@@ -45,8 +45,20 @@ export const listRecordings = () => run<StoredRecording[]>("recordings", "readon
 export const getRecording = (id: string) => run<StoredRecording | undefined>("recordings", "readonly", (s) => s.get(id));
 export const putRecording = (r: StoredRecording) => run("recordings", "readwrite", (s) => s.put(r));
 
-export const getFile = (id: string, name: string) => run<Blob | undefined>("files", "readonly", (s) => s.get(`${id}/${name}`));
-export const putFile = (id: string, name: string, blob: Blob) => run("files", "readwrite", (s) => s.put(blob, `${id}/${name}`));
+/** Safari's private windows can't keep a Blob in IndexedDB: then the bytes go in as they are. */
+type Stored = Blob | { type: string; bytes: ArrayBuffer };
+
+export const getFile = (id: string, name: string) =>
+  run<Stored | undefined>("files", "readonly", (s) => s.get(`${id}/${name}`)).then((v) => (v && !(v instanceof Blob) ? new Blob([v.bytes], { type: v.type }) : v));
+
+export async function putFile(id: string, name: string, blob: Blob) {
+  try {
+    await run("files", "readwrite", (s) => s.put(blob, `${id}/${name}`));
+  } catch {
+    const bytes = await blob.arrayBuffer();
+    await run("files", "readwrite", (s) => s.put({ type: blob.type, bytes } satisfies Stored, `${id}/${name}`));
+  }
+}
 
 /** Names of a recording's files. */
 export async function fileNames(id: string): Promise<string[]> {
