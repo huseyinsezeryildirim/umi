@@ -82,11 +82,26 @@ fn list_recordings() -> Vec<RecordingSummary> {
         .filter_map(|p| {
             let bundle = umi_project::Bundle::new(&p);
             let project = bundle.read_project().ok()?;
-            Some(RecordingSummary { name: bundle.name(), duration: project.duration, created_at: project.created_at.to_rfc3339(), path: p })
+            Some(RecordingSummary { name: project.display_name(bundle.name()), duration: project.duration, created_at: project.created_at.to_rfc3339(), path: p })
         })
         .collect();
     out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     out
+}
+
+/// Renames a recording from the library (an open editor renames through `SetTitle`).
+#[tauri::command]
+fn recording_rename(state: State<'_, AppState>, path: PathBuf, title: String) -> Result<String, String> {
+    if let Ok(editor) = state.editor(&path.to_string_lossy()) {
+        let s = editor.apply(editor::Op::SetTitle { title });
+        editor.save()?;
+        return Ok(s.name);
+    }
+    let bundle = umi_project::Bundle::new(&path);
+    let mut project = bundle.read_project().map_err(|e| e.to_string())?;
+    project.set_title(&title);
+    bundle.write_project(&project).map_err(|e| e.to_string())?;
+    Ok(project.display_name(bundle.name()))
 }
 
 #[tauri::command]
@@ -717,6 +732,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_recordings,
+            recording_rename,
             open_editor,
             editor_apply,
             editor_save,

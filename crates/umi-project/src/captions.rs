@@ -255,6 +255,8 @@ mod tests {
             audio: AudioInfo::default(),
             edit: None,
             camera_only: None,
+            title: None,
+            title_auto: None,
         };
         let mut edit = EditSettings::default();
         edit.captions.words = words;

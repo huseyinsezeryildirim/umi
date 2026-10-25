@@ -125,6 +125,10 @@ pub enum Op {
     HideCameraInSilence {
         min: f64,
     },
+    /// Renames the recording (empty: back to the folder name).
+    SetTitle {
+        title: String,
+    },
     BeginGesture,
     EndGesture,
     Undo,
@@ -229,7 +233,7 @@ impl EditorSession {
         let history = self.history.lock();
         EditorState {
             id: self.id.clone(),
-            name: Bundle::new(&self.bundle).name(),
+            name: doc.project.display_name(Bundle::new(&self.bundle).name()),
             edit: doc.edit.clone(),
             placements: doc.placements(),
             output_duration: doc.output_duration(),
@@ -350,6 +354,10 @@ impl EditorSession {
             }
             Op::SpeedUpTyping { speed } => {
                 doc.speed_up_typing(speed.clamp(1.5, 8.0));
+            }
+            Op::SetTitle { title } => {
+                doc.project.set_title(&title);
+                *self.save_pending.lock() = true;
             }
             Op::BeginGesture => history.begin_gesture(&doc.edit),
             Op::EndGesture => history.end_gesture(&doc.edit),
@@ -492,6 +500,12 @@ impl EditorSession {
             .collect();
         edit.captions.language = detected;
         edit.captions.enabled = true;
+        // What was said names the recording, unless someone already typed a title.
+        if let Some(found) = umi_project::insights::insights(&edit.captions.words) {
+            if self.doc.lock().project.suggest_title(&found.title) {
+                *self.save_pending.lock() = true;
+            }
+        }
         Ok(self.apply(Op::SetEdit { edit: Box::new(edit) }))
     }
 

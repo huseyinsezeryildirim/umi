@@ -551,6 +551,8 @@ mod tests {
             audio: AudioInfo::default(),
             edit: None,
             camera_only: None,
+            title: None,
+            title_auto: None,
         };
         Document::new(project, EditSettings::default(), CursorData::default(), duration)
     }

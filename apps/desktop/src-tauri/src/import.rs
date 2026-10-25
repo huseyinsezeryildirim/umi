@@ -41,6 +41,8 @@ pub fn import_file(library: &Path, file: &Path, name: Option<&str>) -> Result<Pa
             audio: AudioInfo { system_track: None, microphone_track: (audio > 0).then_some(0) },
             edit: None,
             camera_only: None,
+            title: None,
+            title_auto: None,
         };
         bundle.write_project(&project).map_err(|e| e.to_string())?;
         bundle.write_cursor(&CursorData::default()).map_err(|e| e.to_string())

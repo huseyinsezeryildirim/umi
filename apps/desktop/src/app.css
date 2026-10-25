@@ -413,3 +413,18 @@
   background: var(--umi-ice-top);
   color: var(--umi-accent);
 }
+
+/* Renaming a title in place (library cards, the editor's top bar). */
+.title-input {
+  width: 100%;
+  min-width: 0;
+  margin: -3px -6px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--umi-surface, #fff);
+  box-shadow: 0 0 0 2px var(--umi-accent, #116ff5);
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
