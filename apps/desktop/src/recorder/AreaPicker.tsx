@@ -1,4 +1,5 @@
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import { invoke } from "@tauri-apps/api/core";
 import { recorder } from "./api";
 
 /** Drag a rectangle over the screen; Enter or double-click keeps it, Esc cancels. */
@@ -8,16 +9,26 @@ export function AreaPicker() {
 
   const done = async (keep: boolean) => {
     const r = rect();
-    if (keep && r && r.w > 40 && r.h > 40) {
-      const settings = await recorder.settings();
-      const { displays } = await recorder.sources();
-      const display = displays[0];
-      settings.target = { kind: "area", display: display?.id ?? 1, x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.w), height: Math.round(r.h) };
-      settings.cameraOnly = false;
-      await recorder.save(settings);
-    }
+    const mode = await invoke<string>("area_mode");
     setRect(null);
     await recorder.hide("area");
+    if (!keep || !r || r.w < 40 || r.h < 40) {
+      if (mode !== "screenshot") await recorder.show("launcher");
+      return;
+    }
+    const { displays } = await recorder.sources();
+    const target = { kind: "area" as const, display: displays[0]?.id ?? 1, x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.w) & ~1, height: Math.round(r.h) & ~1 };
+    if (mode === "screenshot") {
+      // Let the picker fade away first so it isn't in the picture.
+      await new Promise((ok) => setTimeout(ok, 120));
+      await invoke("screenshot_take", { target });
+      await recorder.show("shot");
+      return;
+    }
+    const settings = await recorder.settings();
+    settings.target = target;
+    settings.cameraOnly = false;
+    await recorder.save(settings);
     await recorder.show("launcher");
   };
 

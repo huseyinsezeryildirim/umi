@@ -10,6 +10,7 @@ mod windows;
 mod tray;
 mod shortcuts;
 mod share;
+mod screenshot;
 
 use editor::{EditorSession, EditorState, Op};
 use parking_lot::Mutex;
@@ -30,6 +31,10 @@ pub(crate) struct AppState {
     /// Library hover previews by recording path (JPEG data URLs).
     previews: Mutex<HashMap<PathBuf, Arc<Vec<String>>>>,
     pub(crate) recorder: recording::Recorder,
+    /// What the area picker is for: "record" or "screenshot".
+    pub(crate) area_mode: Mutex<String>,
+    /// The latest screenshot, waiting for the screenshot editor.
+    pub(crate) last_shot: Mutex<Option<PathBuf>>,
     /// The AI voice, loaded on first use.
     voice: Mutex<Option<umi_ai::tts::Voice>>,
     /// Running exports by editor id (cancel flags).
@@ -592,6 +597,12 @@ pub fn run() {
             editor_export,
             editor_export_cancel,
             export_default_path,
+            screenshot::screenshot_take,
+            screenshot::area_pick,
+            screenshot::area_mode,
+            screenshot::screenshot_current,
+            screenshot::screenshot_copy,
+            screenshot::screenshot_save,
             share::cloud_status,
             share::cloud_connect,
             share::cloud_disconnect,

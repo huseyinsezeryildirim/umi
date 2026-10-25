@@ -13,7 +13,8 @@ const ready = import.meta.env.DEV && !("__TAURI_INTERNALS__" in window) ? import
 void ready.then(async () => {
   const root = document.getElementById("root")!;
   if (view === "main") return render(() => <App />, root);
-  document.documentElement.classList.add("umi-overlay");
+  // The screenshot editor is a normal window; the rest float with their own shapes.
+  if (view !== "shot") document.documentElement.classList.add("umi-overlay");
   const views = {
     launcher: () => import("./recorder/Launcher").then((m) => m.Launcher),
     bubble: () => import("./recorder/Bubble").then((m) => m.Bubble),
@@ -21,6 +22,7 @@ void ready.then(async () => {
     countdown: () => import("./recorder/Countdown").then((m) => m.Countdown),
     area: () => import("./recorder/AreaPicker").then((m) => m.AreaPicker),
     prompter: () => import("./recorder/Prompter").then((m) => m.Prompter),
+    shot: () => import("./recorder/ScreenshotEditor").then((m) => m.ScreenshotEditor),
   } as const;
   const View = await (views[view as keyof typeof views] ?? views.launcher)();
   render(() => <View />, root);

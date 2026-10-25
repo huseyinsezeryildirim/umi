@@ -550,3 +550,102 @@ html.umi-overlay body {
   font: inherit;
   line-height: 1.5;
 }
+
+/* ───── Screenshot editor ───── */
+.shot {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: linear-gradient(180deg, var(--umi-ice-top), var(--umi-ice-bottom, #e1effc));
+}
+.shot__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px 10px 84px;
+}
+.shot__tools,
+.shot__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.shot__actions {
+  gap: 8px;
+}
+.shot__sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 6px;
+  background: var(--umi-hairline);
+}
+.shot__color {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(14, 17, 30, 0.15);
+}
+.shot__color[data-on="true"] {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--umi-accent);
+}
+.shot__main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+.shot__stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+  overflow: hidden;
+}
+.shot__stage > * {
+  grid-area: 1 / 1;
+}
+.shot__empty {
+  color: var(--umi-text-3);
+}
+.shot__side {
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+}
+.shot__bgs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.shot__bg {
+  aspect-ratio: 1.4;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(14, 17, 30, 0.1);
+}
+.shot__bg[data-on="true"] {
+  box-shadow: 0 0 0 2.5px var(--umi-accent);
+}
+.shot__text {
+  position: absolute;
+  z-index: 2;
+  min-width: 160px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 7px;
+  outline: 2px solid var(--umi-accent);
+  background: rgba(255, 255, 255, 0.95);
+  font: 700 16px -apple-system, "Segoe UI", sans-serif;
+  grid-area: unset !important;
+}
