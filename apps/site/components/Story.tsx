@@ -188,9 +188,9 @@ export function Footer() {
     ["Platforms", [["macOS", "#download"], ["Windows", "#download"], ["Linux", "#download"], ["Chrome", "#download"]]],
   ];
   return (
-    <footer className="px-4 pt-20 pb-12">
-      <div className="mx-auto grid max-w-6xl gap-10 sm:grid-cols-[1.4fr_repeat(3,1fr)]">
-        <div>
+    <footer className="px-5 pt-20 pb-12">
+      <div className="mx-auto grid max-w-6xl grid-cols-3 gap-x-4 gap-y-10 border-t border-line pt-12 sm:grid-cols-[1.4fr_repeat(3,1fr)]">
+        <div className="col-span-3 sm:col-span-1">
           <a href="#top" className="flex items-center gap-2 text-lg font-semibold">
             <Mark className="size-6" /> Umi
           </a>
@@ -211,7 +211,10 @@ export function Footer() {
           </div>
         ))}
       </div>
-      <p className="mx-auto mt-14 max-w-6xl text-xs text-faint">© 2026 Umi · Photos from Pexels</p>
+      <div className="mx-auto mt-14 flex max-w-6xl items-center justify-between text-xs text-faint">
+        <p>© 2026 Umi</p>
+        <p>Photos from Pexels</p>
+      </div>
     </footer>
   );
 }
