@@ -29,6 +29,8 @@
   //   R2_SECRET_ACCESS_KEY  only with R2_S3_ENDPOINT
   //   RESEND_API_KEY        with EMAIL_PROVIDER "resend"
   //   BREVO_API_KEY         with EMAIL_PROVIDER "brevo"
+  // Rate limits (per key, per Cloudflare location).
+  "ratelimits": [{ "name": "VIEW_LIMIT", "namespace_id": "1001", "simple": { "limit": 600, "period": 60 } }, { "name": "ACTION_LIMIT", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } }],
   "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "umi-videos" }],
   "d1_databases": [
     {
@@ -60,6 +62,7 @@
         "EMAIL_PROVIDER": "log",
         "EMAIL_FROM": "Umi <hello@umi.cam>"
       },
+      "ratelimits": [{ "name": "VIEW_LIMIT", "namespace_id": "1001", "simple": { "limit": 600, "period": 60 } }, { "name": "ACTION_LIMIT", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } }],
       "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "umi-videos-staging" }],
       "d1_databases": [
         {
@@ -91,6 +94,7 @@
         "EMAIL_PROVIDER": "resend",
         "EMAIL_FROM": "Umi <hello@umi.cam>"
       },
+      "ratelimits": [{ "name": "VIEW_LIMIT", "namespace_id": "1001", "simple": { "limit": 600, "period": 60 } }, { "name": "ACTION_LIMIT", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } }],
       "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "umi-videos" }],
       "d1_databases": [
         {
