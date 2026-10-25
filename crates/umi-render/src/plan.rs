@@ -10,6 +10,7 @@ use crate::ops::*;
 use crate::raster::Assets;
 use crate::scene::{DeviceFrameGeometry, SceneLayoutEngine};
 use umi_project::edit::*;
+use umi_project::project::KeyPress;
 use umi_project::{CursorData, RecordingProject};
 use uuid::Uuid;
 
@@ -22,6 +23,7 @@ pub struct FramePlanner {
     cursor: CursorTrack,
     zoom: ZoomTrack,
     scenes: SceneLayoutEngine,
+    keys: Vec<KeyPress>,
 }
 
 /// Per-frame inputs: times and which video textures are available this frame.
@@ -58,6 +60,7 @@ impl FramePlanner {
             cursor: CursorTrack::new(cursor_data, project.duration, settings.cursor.smoothing.spring()),
             zoom: ZoomTrack::new(&settings.zoom, cursor_data, project.duration),
             scenes: SceneLayoutEngine::new(settings.clone(), aspect, project.camera.is_some()),
+            keys: cursor_data.keys.clone(),
             settings,
             project,
             apply_zoom_and_moves,
@@ -174,6 +177,9 @@ impl FramePlanner {
             self.plan_text(text, t, canvas, assets, graded, ops);
         }
         self.plan_captions(t, canvas, assets, graded, ops);
+        if s.keystrokes.enabled {
+            self.plan_keystrokes(t, canvas, assets, graded, ops);
+        }
         if let Some(mark) = &s.watermark {
             self.plan_watermark(mark, canvas, assets, graded, ops);
         }
@@ -584,6 +590,23 @@ impl FramePlanner {
         ops.push(Op::Draw { target, draw: textured(Rect::new(center.x - w / 2.0, center.y - h / 2.0, w, h), TexRef::Raster(key), 1.0) });
     }
 
+    /// The latest shortcut (or, if wanted, the words being typed) as keycaps, held 1.4 s
+    /// after the key and faded out.
+    fn plan_keystrokes(&self, t: f64, canvas: Rect, assets: &mut dyn Assets, target: Target, ops: &mut Vec<Op>) {
+        let k = &self.settings.keystrokes;
+        let Some((caps, last)) = keystroke_caps(&self.keys, t, k.include_typing) else { return };
+        let alpha = ease(((t - last) / 0.08).min((last + 1.4 - t) / 0.3).clamp(0.0, 1.0));
+        if alpha <= 0.0 {
+            return;
+        }
+        let Some((key, (w, h))) = assets.keycaps(&caps, canvas.height() * k.size) else { return };
+        let (w, h) = (w as f64, h as f64);
+        let center = Point::new(canvas.mid_x(), (1.0 - k.position) * canvas.height());
+        let pop = 0.9 + 0.1 * alpha;
+        let (w, h) = (w * pop, h * pop);
+        ops.push(Op::Draw { target, draw: textured(Rect::new(center.x - w / 2.0, center.y - h / 2.0, w, h), TexRef::Raster(key), alpha) });
+    }
+
     fn plan_watermark(&self, mark: &Watermark, canvas: Rect, assets: &mut dyn Assets, target: Target, ops: &mut Vec<Op>) {
         let Some((key, (lw, lh))) = assets.image(&mark.file) else { return };
         let w = canvas.width() * mark.size;
@@ -604,6 +627,35 @@ impl FramePlanner {
 }
 
 // MARK: Helpers
+
+/// What the keystroke overlay shows at recording time `t`: the newest shortcut as separate
+/// caps (["⌘", "⇧", "K"]) or, with `typing`, the text typed in the current burst as one cap.
+/// Also returns the time of the key that set it.
+pub fn keystroke_caps(keys: &[KeyPress], t: f64, typing: bool) -> Option<(Vec<String>, f64)> {
+    const HOLD: f64 = 1.4;
+    let end = keys.partition_point(|k| k.t <= t);
+    let last = keys[..end].last().filter(|k| t - k.t <= HOLD)?;
+    let is_shortcut = |k: &KeyPress| k.modifiers.iter().any(|m| m != "⇧") || k.key.chars().count() > 1;
+    if is_shortcut(last) {
+        let mut caps = last.modifiers.clone();
+        caps.push(last.key.clone());
+        return Some((caps, last.t));
+    }
+    if !typing {
+        return None;
+    }
+    // The run of plain characters typed with short gaps, newest last (up to 28).
+    let mut text = String::new();
+    let mut previous = last.t;
+    for k in keys[..end].iter().rev() {
+        if is_shortcut(k) || previous - k.t > 1.0 || text.chars().count() >= 28 {
+            break;
+        }
+        text.insert_str(0, &k.key);
+        previous = k.t;
+    }
+    (!text.trim().is_empty()).then(|| (vec![text], last.t))
+}
 
 /// Media items fade in and out over a quarter second.
 pub fn overlay_fade(overlay: &MediaOverlay, t: f64) -> f64 {
@@ -736,4 +788,23 @@ fn perspective(screen: Rect, extent: Rect, pose: &MovePose) -> Option<Homography
         Point::new(extent.min_x(), extent.min_y()),
     ];
     Homography::from_points(from, [tl, tr, br, bl])
+}
+
+#[cfg(test)]
+mod keystroke_tests {
+    use super::*;
+
+    fn key(t: f64, key: &str, modifiers: &[&str]) -> KeyPress {
+        KeyPress { t, key: key.into(), modifiers: modifiers.iter().map(|m| m.to_string()).collect() }
+    }
+
+    #[test]
+    fn shows_shortcuts_and_typing() {
+        let keys = vec![key(1.0, "h", &[]), key(1.2, "i", &[]), key(1.4, "!", &["⇧"]), key(3.0, "K", &["⇧", "⌘"])];
+        assert_eq!(keystroke_caps(&keys, 0.5, true), None);
+        assert_eq!(keystroke_caps(&keys, 1.5, true).unwrap().0, vec!["hi!"]);
+        assert_eq!(keystroke_caps(&keys, 1.5, false), None, "typing hidden unless asked");
+        assert_eq!(keystroke_caps(&keys, 3.5, false).unwrap().0, vec!["⇧", "⌘", "K"]);
+        assert_eq!(keystroke_caps(&keys, 5.0, true), None, "gone after the hold");
+    }
 }

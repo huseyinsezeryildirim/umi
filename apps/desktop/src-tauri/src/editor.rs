@@ -82,6 +82,8 @@ pub struct RecordingInfo {
     pub height: u32,
     pub has_camera: bool,
     pub bundle: PathBuf,
+    /// Key presses were recorded (for the keystroke overlay).
+    pub has_keys: bool,
 }
 
 enum Job {
@@ -150,6 +152,7 @@ impl EditorSession {
                 height: doc.project.screen.pixel_height,
                 has_camera: doc.project.camera.is_some(),
                 bundle: self.bundle.clone(),
+                has_keys: !doc.cursor.keys.is_empty(),
             },
             can_undo: history.can_undo(),
             can_redo: history.can_redo(),

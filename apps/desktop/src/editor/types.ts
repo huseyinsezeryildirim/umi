@@ -165,6 +165,7 @@ export interface EditSettings {
   overlays: MediaOverlay[];
   watermark?: { file: string; corner: "topLeft" | "topRight" | "bottomLeft" | "bottomRight"; size: number; opacity: number };
   voiceovers?: Voiceover[];
+  keystrokes?: { enabled: boolean; includeTyping: boolean; size: number; position: number };
   sound?: { denoise: boolean; levelVoice: boolean; microphoneVolume: number; systemVolume: number; clickSounds?: boolean };
 }
 
@@ -194,7 +195,7 @@ export interface EditorState {
   placements: Placement[];
   outputDuration: number;
   zoomSegments: ZoomSegment[];
-  recording: { duration: number; width: number; height: number; hasCamera: boolean; bundle: string };
+  recording: { duration: number; width: number; height: number; hasCamera: boolean; bundle: string; hasKeys?: boolean };
   canUndo: boolean;
   canRedo: boolean;
   selection: Selection | null;

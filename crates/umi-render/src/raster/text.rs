@@ -347,3 +347,44 @@ pub fn caption(words: &[String], active: Option<usize>, height: f64, accent: [f3
     }
     Some(from_pixmap(pm))
 }
+
+/// Keys as keycaps on a dark pill: ["⌘", "⇧", "K"]. A long entry (typed text) gets a wide cap.
+pub fn keycaps(keys: &[String], height: f64) -> Option<RasterImage> {
+    let height = height as f32;
+    let size = height * 0.52;
+    let mut guard = fonts().lock();
+    let shaped: Vec<Shaped> = keys.iter().map(|k| shape(&mut guard, &Line { text: k.clone(), face: Face::Sans(600), size, color: WHITE })).collect();
+    drop(guard);
+    let gap = height * 0.14;
+    let pad = height * 0.18;
+    let cap_h = height;
+    let caps: Vec<f32> = shaped.iter().map(|s| (s.width + height * 0.5).max(cap_h)).collect();
+    let w = caps.iter().sum::<f32>() + gap * (caps.len() as f32 - 1.0).max(0.0) + pad * 2.0;
+    let h = cap_h + pad * 2.0;
+    let mut pm = Pixmap::new(w.ceil().max(1.0) as u32, h.ceil().max(1.0) as u32)?;
+    let mut back = Paint::default();
+    back.set_color_rgba8(14, 17, 30, 238);
+    back.anti_alias = true;
+    pm.fill_path(&rounded_rect(0.0, 0.0, w, h, h * 0.3)?, &back, FillRule::Winding, Transform::identity(), None);
+    let mut cap = Paint::default();
+    cap.set_color_rgba8(58, 63, 78, 255);
+    cap.anti_alias = true;
+    let mut edge = Paint::default();
+    edge.set_color_rgba8(30, 34, 46, 255);
+    edge.anti_alias = true;
+    let mut x = pad;
+    for (s, cw) in shaped.iter().zip(&caps) {
+        // A key: lighter face over a slightly darker base (a hint of depth).
+        if let Some(r) = rounded_rect(x, pad + cap_h * 0.06, *cw, cap_h * 0.94, cap_h * 0.22) {
+            pm.fill_path(&r, &edge, FillRule::Winding, Transform::identity(), None);
+        }
+        if let Some(r) = rounded_rect(x, pad, *cw, cap_h * 0.9, cap_h * 0.22) {
+            pm.fill_path(&r, &cap, FillRule::Winding, Transform::identity(), None);
+        }
+        let ty = pad + (cap_h * 0.9 - (s.ascent + s.descent)) / 2.0;
+        blend_coverage(&mut pm, s, x + (cw - s.width) / 2.0, ty, WHITE);
+        x += cw + gap;
+    }
+    Some(from_pixmap(pm))
+}
+
