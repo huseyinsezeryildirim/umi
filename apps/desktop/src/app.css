@@ -134,3 +134,39 @@
   display: flex;
   gap: 8px;
 }
+.lib__card[data-picked="true"] {
+  box-shadow: 0 0 0 2.5px var(--umi-accent), var(--umi-shadow-lg);
+}
+.lib__pick {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--umi-accent);
+}
+.lib__pickbar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 16px;
+  border-radius: 14px;
+  background: #fff;
+  font-size: var(--umi-text-md);
+  z-index: 10;
+}
+.lib__pickbar-progress {
+  padding: 0 8px;
+  color: var(--umi-accent);
+  font-weight: 600;
+}
