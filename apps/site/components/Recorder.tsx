@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type BrowserInfo, browserInfo } from "@/lib/browser";
 import type { CameraShape, Corner } from "@/lib/look";
 import { type CameraBackground, cameraWithBackground, loadSegmenter } from "@/lib/segment";
-import { Mark } from "./ui";
+import { Mark, copyText } from "./ui";
 import { Editor, type Take } from "./WebEditor";
 
 const EASE = [0.25, 1, 0.5, 1] as const;
@@ -638,7 +638,7 @@ function SoundNote({ browser, dismissed, onDismiss }: { browser: BrowserInfo; di
         <button type="button" onClick={onDismiss} className="h-7 rounded-full bg-[#7a4b00] px-3 text-[12px] font-medium text-white">
           Continue in {browser.name}
         </button>
-        <button type="button" onClick={() => void navigator.clipboard.writeText(location.href).then(() => setCopied(true))} className="h-7 rounded-full px-3 text-[12px] font-medium text-[#7a4b00] shadow-[inset_0_0_0_1px_rgb(122_75_0/0.3)]">
+        <button type="button" onClick={() => void copyText(location.href).then(() => setCopied(true))} className="h-7 rounded-full px-3 text-[12px] font-medium text-[#7a4b00] shadow-[inset_0_0_0_1px_rgb(122_75_0/0.3)]">
           {copied ? "Link copied" : "Copy link"}
         </button>
       </div>
