@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "build:demo": "VITE_DEMO=1 vite build --base /demo/ --outDir ../site/public/demo --emptyOutDir",
     "build:web": "VITE_WEB=1 vite build --base /editor/ --outDir ../site/public/editor --emptyOutDir",
-    "wasm": "cd ../.. && cargo build -p umi-web --target wasm32-unknown-unknown --release && wasm-bindgen --target web --out-dir apps/desktop/src/web/pkg target/wasm32-unknown-unknown/release/umi_web.wasm"
+    "wasm": "cd ../.. && cargo build -p umi-web --target wasm32-unknown-unknown --release && wasm-bindgen --target web --out-dir apps/desktop/src/web/pkg target/wasm32-unknown-unknown/release/umi_web.wasm",
+    "build:mac": "tauri build --bundles app && python3 scripts/bundle-libs.py"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.1",
