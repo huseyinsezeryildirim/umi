@@ -4,165 +4,30 @@
 
 use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
 use parking_lot::Mutex;
-use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use umi_engine::audio_mix::AudioMixer;
 use umi_engine::{Composer, ExportSettings, Schedule};
-use umi_project::edit::{EditSettings, MediaKind, MoveKind, SceneLayout, TextStyle, ZoomSegment};
+use umi_project::edit::EditSettings;
 use umi_project::timeline::render_size;
-use umi_project::{Bundle, Document, History, Placement, Selection};
+use umi_project::{Bundle, Document, Selection};
 use umi_render::Gpu;
 
-/// Editing operations the UI can ask for.
-#[derive(Debug, Deserialize)]
-#[serde(tag = "op", rename_all = "camelCase", rename_all_fields = "camelCase")]
-pub enum Op {
-    /// Replace the whole edit (inspector changes).
-    SetEdit {
-        edit: Box<EditSettings>,
-    },
-    Split {
-        time: f64,
-    },
-    Cut {
-        start: f64,
-        end: f64,
-    },
-    DeleteClip {
-        index: usize,
-    },
-    JoinClips {
-        index: usize,
-    },
-    TrimClip {
-        index: usize,
-        start: Option<f64>,
-        end: Option<f64>,
-    },
-    SetSpeed {
-        index: usize,
-        speed: f64,
-    },
-    MoveClip {
-        from: usize,
-        to: usize,
-    },
-    ClipToVideo2 {
-        index: usize,
-        time: f64,
-    },
-    AddZoom {
-        time: f64,
-    },
-    AddMask {
-        time: f64,
-        style: Option<umi_project::edit::MaskStyle>,
-    },
-    AddScene {
-        layout: SceneLayout,
-        time: f64,
-    },
-    AddText {
-        style: TextStyle,
-        time: f64,
-    },
-    AddMove {
-        kind: MoveKind,
-        time: f64,
-    },
-    AddOverlay {
-        file: String,
-        kind: MediaKind,
-        duration: Option<f64>,
-        time: f64,
-    },
-    Retime {
-        selection: Selection,
-        start: f64,
-        end: f64,
-    },
-    Delete {
-        selection: Selection,
-    },
-    DeleteMany {
-        selections: Vec<Selection>,
-    },
-    /// Moves several timed items by the same amount (multi-selection drag).
-    ShiftMany {
-        selections: Vec<Selection>,
-        delta: f64,
-    },
-    /// Puts a voiceover on the Voice track, or replaces `replace`'s audio and text in place.
-    AddVoiceover {
-        file: String,
-        text: String,
-        start: f64,
-        duration: f64,
-        replace: Option<uuid::Uuid>,
-    },
-    /// Replaces the words of one caption line.
-    EditCaptionLine {
-        ids: Vec<uuid::Uuid>,
-        text: String,
-    },
-    /// Text-based editing: cuts these words out of the video.
-    CutWords {
-        ids: Vec<uuid::Uuid>,
-    },
-    /// Cuts every filler word ("um", "uh", "şey"…).
-    RemoveFillers,
-    /// Shortens silences longer than `min` seconds.
-    RemovePauses {
-        min: f64,
-    },
-    /// Plays long typing faster.
-    SpeedUpTyping {
-        speed: f64,
-    },
-    /// Hides the camera while nobody speaks for `min` seconds or more.
-    HideCameraInSilence {
-        min: f64,
-    },
-    /// Renames the recording (empty: back to the folder name).
-    SetTitle {
-        title: String,
-    },
-    BeginGesture,
-    EndGesture,
-    Undo,
-    Redo,
-}
+pub use umi_editor::{EditorState, Op};
 
-/// What the UI shows, sent after every change.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EditorState {
-    pub id: String,
-    pub name: String,
-    pub edit: EditSettings,
-    pub placements: Vec<Placement>,
-    pub output_duration: f64,
-    /// Manual and generated zooms (generated ones aren't in the edit until touched).
-    pub zoom_segments: Vec<ZoomSegment>,
-    pub recording: RecordingInfo,
-    pub can_undo: bool,
-    pub can_redo: bool,
-    /// Set by operations that create something, so the UI can select it.
-    pub selection: Option<Selection>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RecordingInfo {
-    pub duration: f64,
-    pub width: u32,
-    pub height: u32,
-    pub has_camera: bool,
-    pub bundle: PathBuf,
-    /// Key presses were recorded (for the keystroke overlay).
-    pub has_keys: bool,
+/// What only the files can tell the editing session: a video's length, where it's quiet.
+struct BundleMedia<'a>(&'a Path, Option<u32>);
+impl umi_editor::Media for BundleMedia<'_> {
+    fn duration(&self, file: &str) -> Option<f64> {
+        umi_media::duration(&self.0.join(file)).ok()
+    }
+    fn silences(&self, min: f64) -> Vec<(f64, f64)> {
+        let screen = Bundle::new(self.0).screen();
+        let tracks = umi_media::audio_streams(&screen).map(|t| t.len()).unwrap_or(0);
+        let track = self.1.map(|t| t as usize).filter(|t| *t < tracks).unwrap_or(0);
+        umi_media::waveform(&screen, track, 50).map(|levels| umi_project::captions::silences(&levels, 50.0, min)).unwrap_or_default()
+    }
 }
 
 enum Job {
@@ -187,12 +52,10 @@ enum Job {
 pub struct EditorSession {
     pub id: String,
     pub bundle: PathBuf,
-    doc: Mutex<Document>,
-    history: Mutex<History>,
+    ed: Mutex<umi_editor::Session>,
     /// Edit the render worker last saw (to send changes only).
     rendered_edit: Mutex<Option<EditSettings>>,
     jobs: Sender<Job>,
-    save_pending: Mutex<bool>,
     /// Preview soundtrack: the mixer for the edit it was built for.
     audio: Mutex<Option<(EditSettings, AudioMixer)>>,
 }
@@ -219,183 +82,42 @@ impl EditorSession {
         Ok(Arc::new(Self {
             id,
             bundle: path.to_path_buf(),
-            doc: Mutex::new(doc),
-            history: Mutex::new(History::new(200)),
+            ed: Mutex::new(umi_editor::Session::new(doc)),
             rendered_edit: Mutex::new(None),
             jobs: tx,
-            save_pending: Mutex::new(false),
             audio: Mutex::new(None),
         }))
     }
 
+    /// The document, locked.
+    fn doc(&self) -> parking_lot::MappedMutexGuard<'_, Document> {
+        parking_lot::MutexGuard::map(self.ed.lock(), |e| &mut e.doc)
+    }
+
     pub fn state(&self, selection: Option<Selection>) -> EditorState {
-        let doc = self.doc.lock();
-        let history = self.history.lock();
-        EditorState {
-            id: self.id.clone(),
-            name: doc.project.display_name(Bundle::new(&self.bundle).name()),
-            edit: doc.edit.clone(),
-            placements: doc.placements(),
-            output_duration: doc.output_duration(),
-            zoom_segments: doc.zoom_segments(),
-            recording: RecordingInfo {
-                duration: doc.project.duration,
-                width: doc.project.screen.pixel_width,
-                height: doc.project.screen.pixel_height,
-                has_camera: doc.project.camera.is_some(),
-                bundle: self.bundle.clone(),
-                has_keys: !doc.cursor.keys.is_empty(),
-            },
-            can_undo: history.can_undo(),
-            can_redo: history.can_redo(),
-            selection,
-        }
+        self.ed.lock().state(&self.id, Bundle::new(&self.bundle).name(), self.bundle.clone(), selection)
     }
 
     /// Applies an operation and returns the new state.
     pub fn apply(&self, op: Op) -> EditorState {
-        let mut doc = self.doc.lock();
-        let mut history = self.history.lock();
-        let before = doc.edit.clone();
-        let mut selection = None;
-        let is_history_op = matches!(op, Op::Undo | Op::Redo);
-        match op {
-            Op::SetEdit { edit } => doc.edit = *edit,
-            Op::Split { time } => {
-                doc.split(time);
-            }
-            Op::Cut { start, end } => {
-                doc.cut((start, end));
-            }
-            Op::DeleteClip { index } => {
-                doc.delete_clip(index);
-            }
-            Op::JoinClips { index } => {
-                if doc.join_clips(index) {
-                    selection = Some(Selection::Clip(index));
-                }
-            }
-            Op::TrimClip { index, start, end } => doc.trim_clip(index, start, end),
-            Op::SetSpeed { index, speed } => doc.set_speed(index, speed),
-            Op::MoveClip { from, to } => {
-                if doc.move_clip(from, to) {
-                    selection = Some(Selection::Clip(to));
-                }
-            }
-            Op::ClipToVideo2 { index, time } => selection = doc.move_clip_to_video2(index, time).map(Selection::Overlay),
-            Op::AddZoom { time } => selection = doc.add_zoom(time),
-            Op::AddMask { time, style } => selection = doc.add_mask_with(time, style.unwrap_or_default()),
-            Op::AddScene { layout, time } => selection = doc.add_scene(layout, time),
-            Op::AddText { style, time } => selection = doc.add_text(style, time),
-            Op::AddMove { kind, time } => selection = doc.add_move(kind, time),
-            Op::AddOverlay { file, kind, duration, time } => {
-                // A video plays for its own length unless told otherwise.
-                let duration =
-                    duration.or_else(|| (kind == MediaKind::Video).then(|| umi_media::duration(&self.bundle.join(&file)).ok()).flatten());
-                selection = Some(Selection::Overlay(doc.add_overlay(file, kind, duration, time)));
-            }
-            Op::Retime { selection: s, start, end } => doc.retime(s, start, end),
-            Op::Delete { selection: s } => {
-                doc.delete(s);
-            }
-            Op::DeleteMany { selections } => doc.delete_many(&selections),
-            Op::ShiftMany { selections, delta } => {
-                for s in selections {
-                    if let Some((start, end)) = item_span(&doc, s) {
-                        doc.retime(s, start + delta, end + delta);
-                    }
-                }
-            }
-            Op::AddVoiceover { file, text, start, duration, replace } => {
-                let existing = replace.and_then(|id| doc.edit.voiceovers.iter_mut().find(|v| v.id == id));
-                let id = match existing {
-                    Some(v) => {
-                        v.file = file;
-                        v.text = text;
-                        v.end = v.start + duration;
-                        v.id
-                    }
-                    None => {
-                        let v = umi_project::edit::Voiceover {
-                            id: uuid::Uuid::new_v4(),
-                            file,
-                            start: start.max(0.0),
-                            end: start.max(0.0) + duration,
-                            text,
-                            volume: 1.0,
-                        };
-                        let id = v.id;
-                        doc.edit.voiceovers.push(v);
-                        id
-                    }
-                };
-                selection = Some(Selection::Voiceover(id));
-            }
-            Op::EditCaptionLine { ids, text } => doc.edit_caption_line(&ids, &text),
-            Op::CutWords { ids } => {
-                doc.cut_words(&ids);
-            }
-            Op::RemoveFillers => {
-                let ids = umi_project::captions::filler_words(&doc.edit.captions.words);
-                doc.cut_words(&ids);
-            }
-            Op::RemovePauses { min } => {
-                let ranges = umi_project::captions::long_pauses(&doc.edit.captions.words, min.max(0.3), 0.3);
-                doc.cut_source_ranges(&ranges);
-            }
-            Op::HideCameraInSilence { min } => {
-                let screen = Bundle::new(&self.bundle).screen();
-                let tracks = umi_media::audio_streams(&screen).map(|t| t.len()).unwrap_or(0);
-                let track = doc.project.audio.microphone_track.map(|t| t as usize).filter(|t| *t < tracks).unwrap_or(0);
-                if let Ok(levels) = umi_media::waveform(&screen, track, 50) {
-                    let quiet = umi_project::captions::silences(&levels, 50.0, min.max(1.5));
-                    doc.hide_camera_in_silences(&quiet);
-                }
-            }
-            Op::SpeedUpTyping { speed } => {
-                doc.speed_up_typing(speed.clamp(1.5, 8.0));
-            }
-            Op::SetTitle { title } => {
-                doc.project.set_title(&title);
-                *self.save_pending.lock() = true;
-            }
-            Op::BeginGesture => history.begin_gesture(&doc.edit),
-            Op::EndGesture => history.end_gesture(&doc.edit),
-            Op::Undo => {
-                if let Some(previous) = history.undo(&doc.edit) {
-                    doc.edit = previous;
-                }
-            }
-            Op::Redo => {
-                if let Some(next) = history.redo(&doc.edit) {
-                    doc.edit = next;
-                }
-            }
-        }
-        let after = doc.edit.clone();
-        if before != after {
-            // Undo/redo move through the history; recording them would loop back.
-            if !is_history_op {
-                history.record(&before, &after);
-            }
-            *self.save_pending.lock() = true;
-        }
-        drop(history);
-        drop(doc);
+        let selection = {
+            let mut ed = self.ed.lock();
+            let mic = ed.doc.project.audio.microphone_track;
+            ed.apply(op, &BundleMedia(&self.bundle, mic))
+        };
         self.state(selection)
     }
 
     /// Writes the edit to project.json if it changed since the last save.
     pub fn save(&self) -> Result<(), String> {
-        let mut pending = self.save_pending.lock();
-        if !*pending {
+        let mut ed = self.ed.lock();
+        if !ed.dirty {
             return Ok(());
         }
-        let doc = self.doc.lock();
-        let mut project = doc.project.clone();
-        project.edit = Some(doc.edit.clone());
+        let mut project = ed.doc.project.clone();
+        project.edit = Some(ed.doc.edit.clone());
         Bundle::new(&self.bundle).write_project(&project).map_err(|e| e.to_string())?;
-        *pending = false;
+        ed.dirty = false;
         Ok(())
     }
 
@@ -403,7 +125,7 @@ impl EditorSession {
     /// Returns `[width u32 LE][height u32 LE][RGBA…]`.
     pub fn frame(&self, time: f64, max_width: u32, max_height: u32, flat: bool) -> Result<Vec<u8>, String> {
         let (edit, size) = {
-            let doc = self.doc.lock();
+            let doc = self.doc();
             let full = render_size(&doc.project, &doc.edit, 2160);
             let k = (max_width as f64 / full.0 as f64).min(max_height as f64 / full.1 as f64).min(1.0);
             let size = (((full.0 as f64 * k) as u32).max(2) & !1, ((full.1 as f64 * k) as u32).max(2) & !1);
@@ -431,7 +153,7 @@ impl EditorSession {
     /// (little-endian bytes), exactly what export mixes.
     pub fn audio(&self, time: f64, seconds: f64) -> Result<Vec<u8>, String> {
         let (edit, total) = {
-            let doc = self.doc.lock();
+            let doc = self.doc();
             (doc.edit.clone(), doc.total())
         };
         let mut slot = self.audio.lock();
@@ -455,7 +177,7 @@ impl EditorSession {
         progress: &(dyn Fn(f64) + Sync),
         cancel: &AtomicBool,
     ) -> Result<(), String> {
-        let edit = self.doc.lock().edit.clone();
+        let edit = self.doc().edit.clone();
         umi_engine::export(gpu, &self.bundle, edit, settings, destination, progress, cancel).map_err(|e| e.to_string())
     }
 
@@ -464,7 +186,7 @@ impl EditorSession {
     pub fn transcribe(&self, language: Option<String>, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<EditorState, String> {
         let model = umi_ai::models::Model::WhisperBase.ensure(&|p| progress("download", p)).map_err(|e| e.to_string())?;
         let (screen, track) = {
-            let doc = self.doc.lock();
+            let doc = self.doc();
             let tracks = umi_media::audio_streams(&Bundle::new(&self.bundle).screen()).map(|t| t.len()).unwrap_or(0);
             if tracks == 0 {
                 return Err("This recording has no sound.".into());
@@ -493,7 +215,7 @@ impl EditorSession {
         if words.is_empty() {
             return Err("No speech found.".into());
         }
-        let mut edit = self.doc.lock().edit.clone();
+        let mut edit = self.doc().edit.clone();
         edit.captions.words = words
             .into_iter()
             .map(|w| umi_project::edit::CaptionWord { id: uuid::Uuid::new_v4(), start: w.start, end: w.end, text: w.text })
@@ -502,8 +224,9 @@ impl EditorSession {
         edit.captions.enabled = true;
         // What was said names the recording, unless someone already typed a title.
         if let Some(found) = umi_project::insights::insights(&edit.captions.words) {
-            if self.doc.lock().project.suggest_title(&found.title) {
-                *self.save_pending.lock() = true;
+            let mut ed = self.ed.lock();
+            if ed.doc.project.suggest_title(&found.title) {
+                ed.dirty = true;
             }
         }
         Ok(self.apply(Op::SetEdit { edit: Box::new(edit) }))
@@ -512,7 +235,7 @@ impl EditorSession {
     /// Title, summary and chapters from the transcript (chapters in output time, plus a
     /// ready-to-paste "0:00 Intro" list).
     pub fn insights(&self) -> Option<(umi_project::insights::Insights, String)> {
-        let doc = self.doc.lock();
+        let doc = self.doc();
         let mut found = umi_project::insights::insights(&doc.edit.captions.words)?;
         // Chapters inside cut-out parts move to the next kept moment.
         found.chapters.retain(|c| doc.output_time(c.start).is_some() || c.start == 0.0);
@@ -522,7 +245,7 @@ impl EditorSession {
 
     /// Captions as SRT or WebVTT on the edited timeline.
     pub fn subtitles(&self, vtt: bool) -> String {
-        let doc = self.doc.lock();
+        let doc = self.doc();
         umi_project::captions::subtitles(
             &doc,
             if vtt { umi_project::captions::SubtitleFormat::Vtt } else { umi_project::captions::SubtitleFormat::Srt },
@@ -536,7 +259,7 @@ impl EditorSession {
     }
 
     fn edit_change(&self) -> Option<Box<EditSettings>> {
-        let edit = self.doc.lock().edit.clone();
+        let edit = self.doc().edit.clone();
         let mut seen = self.rendered_edit.lock();
         if seen.as_ref() == Some(&edit) {
             return None;
@@ -558,35 +281,20 @@ impl EditorSession {
     /// placed it), following it forward and backward across the mask's span.
     pub fn track_mask(&self, mask: uuid::Uuid, anchor: Option<f64>, progress: &dyn Fn(f64)) -> Result<EditorState, String> {
         let (rect, anchor, start, end) = {
-            let doc = self.doc.lock();
+            let doc = self.doc();
             let m = doc.edit.masks.iter().find(|m| m.id == mask).ok_or("mask not found")?;
             let anchor = anchor.unwrap_or(m.start).clamp(m.start, m.end);
             (m.rect_at(anchor), anchor, m.start, m.end)
         };
         let keys = umi_engine::track::track_region(&Bundle::new(&self.bundle).screen(), rect, anchor, start, end, progress)
             .map_err(|e| e.to_string())?;
-        let mut edit = self.doc.lock().edit.clone();
+        let mut edit = self.doc().edit.clone();
         if let Some(m) = edit.masks.iter_mut().find(|m| m.id == mask) {
             m.rect = rect;
             m.keyframes = keys;
             m.follow = true;
         }
         Ok(self.apply(Op::SetEdit { edit: Box::new(edit) }))
-    }
-}
-
-/// Start and end of a timed item (source time; output time for media).
-fn item_span(doc: &Document, s: Selection) -> Option<(f64, f64)> {
-    let e = &doc.edit;
-    match s {
-        Selection::Zoom(id) => doc.zoom_segments().into_iter().find(|z| z.id == id).map(|z| (z.start, z.end)),
-        Selection::Mask(id) => e.masks.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
-        Selection::Scene(id) => e.scenes.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
-        Selection::Text(id) => e.texts.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
-        Selection::Move(id) => e.moves.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
-        Selection::Overlay(id) => e.overlays.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
-        Selection::Voiceover(id) => e.voiceovers.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
-        Selection::Clip(_) | Selection::Music => None,
     }
 }
 

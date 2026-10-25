@@ -1,0 +1,4 @@
+
+# The web build of the editor session gets randomness from the page (see crates/umi-wasm).
+[target.wasm32-unknown-unknown]
+rustflags = ["--cfg", 'getrandom_backend="custom"']
