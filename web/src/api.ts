@@ -1,4 +1,4 @@
-import { type Account, authenticate, requirePaid } from "./auth";
+import { type Account, authenticate, can, requirePaid } from "./auth";
 import { type AppEnv, gifKey, maxUploadBytes, thumbnailKey, videoKey } from "./env";
 import { hashPassword, randomId } from "./crypto";
 import { HttpError, json, readJson } from "./http";
@@ -94,6 +94,15 @@ async function createVideo(request: Request, env: AppEnv, account: Account): Pro
     throw new HttpError(400, "invalid_field", "sizeBytes must be a positive integer.");
   }
   if (size > maxUploadBytes(env)) throw new HttpError(413, "too_large", "Video exceeds the maximum upload size.");
+  // Plan limits: length of one video and total storage.
+  const plan = can(account);
+  if (plan.maxVideoMinutes !== null && typeof body.durationMs === "number" && body.durationMs > plan.maxVideoMinutes * 60_000) {
+    throw new HttpError(402, "plan_limit", `Share links on your plan hold videos up to ${plan.maxVideoMinutes} minutes. Export the file, or upgrade for longer links.`);
+  }
+  if (plan.storageGB !== null) {
+    const used = await env.DB.prepare("SELECT COALESCE(SUM(size_bytes), 0) AS n FROM videos WHERE account_id = ? AND status != 'deleted'").bind(account.id).first<{ n: number }>();
+    if ((used?.n ?? 0) + size > plan.storageGB * 1e9) throw new HttpError(402, "plan_limit", `Your plan includes ${plan.storageGB} GB of cloud storage. Delete old links or upgrade.`);
+  }
   const contentType = body.contentType ?? "video/mp4";
   // MP4 from the desktop app; WebM from the Chrome extension (plays in every current browser).
   if (contentType !== "video/mp4" && contentType !== "video/webm") throw new HttpError(400, "invalid_field", "Only video/mp4 and video/webm are supported.");

@@ -14,3 +14,6 @@ VALUES ('acc_team', 'team@umi.local', 'b5b5b19a9ee94f22d5b720d10d43c7922cf87f568
 -- Email: demo@umi.local  Password: p6vfN4JAUtPFeN
 INSERT OR REPLACE INTO accounts (id, email, token_hash, password_hash, is_paid, created_at)
 VALUES ('acc_demo', 'demo@umi.local', '1fb7d733310422623836ea927edf529e46ff2fa2fecc0fa9feaa3059c9bb3c95', 'pbkdf2-sha256$100000$8fIRbe6iYZkvzoYjuxs4gw$GtFRXL_jzkqz9UZ9Ev30fCjDEPKPbSz4-kCD-vGfVI8', 0, 0);
+
+-- Plans (migration 0007): the paid seeds get Team so the workspace tests can run.
+UPDATE accounts SET plan = 'team' WHERE id IN ('acc_dev', 'acc_team');

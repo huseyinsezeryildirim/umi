@@ -2,12 +2,14 @@ import type { AppEnv } from "./env";
 import { hashPassword, randomId, sha256Hex, verifyPassword } from "./crypto";
 import { HttpError, json, readJson } from "./http";
 import { buttonEmail, sendEmail } from "./email";
+import { type Entitlements, type Plan, entitlements, isPlan } from "./plans";
 
 export interface Account {
   id: string;
   email: string | null;
   is_paid: number;
   email_verified?: number;
+  plan?: string;
 }
 
 function bearer(request: Request): string {
@@ -23,7 +25,7 @@ function bearer(request: Request): string {
 export async function authenticate(request: Request, env: AppEnv): Promise<Account> {
   const hash = await sha256Hex(bearer(request));
   const session = await env.DB.prepare(
-    "SELECT a.id, a.email, a.is_paid, a.email_verified FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.token_hash = ?",
+    "SELECT a.id, a.email, a.is_paid, a.email_verified, a.plan FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.token_hash = ?",
   )
     .bind(hash)
     .first<Account>();
@@ -31,7 +33,7 @@ export async function authenticate(request: Request, env: AppEnv): Promise<Accou
     await env.DB.prepare("UPDATE sessions SET last_used = ? WHERE token_hash = ?").bind(Date.now(), hash).run();
     return session;
   }
-  const account = await env.DB.prepare("SELECT id, email, is_paid, email_verified FROM accounts WHERE token_hash = ?").bind(hash).first<Account>();
+  const account = await env.DB.prepare("SELECT id, email, is_paid, email_verified, plan FROM accounts WHERE token_hash = ?").bind(hash).first<Account>();
   if (!account) throw new HttpError(401, "unauthorized", "Invalid or expired sign-in.");
   return account;
 }
@@ -56,7 +58,18 @@ function credentials(body: { email?: unknown; password?: unknown }): { email: st
   return { email, password };
 }
 
-const publicAccount = (a: Account) => ({ id: a.id, email: a.email, isPaid: a.is_paid === 1, emailVerified: a.email_verified === 1 });
+const publicAccount = (a: Account) => ({
+  id: a.id,
+  email: a.email,
+  isPaid: planOf(a) !== "free",
+  emailVerified: a.email_verified === 1,
+  plan: planOf(a),
+  entitlements: entitlements(planOf(a)),
+});
+
+/** The account's plan (older rows only have the paid flag). */
+export const planOf = (a: Account): Plan => (isPlan(a.plan) ? a.plan : a.is_paid === 1 ? "pro" : "free");
+export const can = (a: Account): Entitlements => entitlements(planOf(a));
 
 // ───── Wrong-password limit ─────
 
@@ -148,7 +161,7 @@ export async function handleAuth(request: Request, env: AppEnv, path: string): P
       .bind(id, email, await sha256Hex(randomId(40)), await hashPassword(password), Date.now())
       .run();
     await sendVerification(env, id, email);
-    return json({ token: await newSession(env, id), account: publicAccount({ id, email, is_paid: 0, email_verified: 0 }) }, 201);
+    return json({ token: await newSession(env, id), account: publicAccount({ id, email, is_paid: 0, email_verified: 0, plan: "free" }) }, 201);
   }
   if (path === "/api/auth/login" && method === "POST") {
     const { email, password } = credentials(await readJson(request));
@@ -157,7 +170,7 @@ export async function handleAuth(request: Request, env: AppEnv, path: string): P
       [`email:${email}`, MAX_PER_EMAIL],
       [`ip:${ip}`, MAX_PER_IP],
     ]);
-    const row = await env.DB.prepare("SELECT id, email, is_paid, email_verified, password_hash FROM accounts WHERE email = ?")
+    const row = await env.DB.prepare("SELECT id, email, is_paid, email_verified, plan, password_hash FROM accounts WHERE email = ?")
       .bind(email)
       .first<Account & { password_hash: string | null }>();
     // Same answer whether the email or the password is wrong.
@@ -217,9 +230,18 @@ export async function handleAuth(request: Request, env: AppEnv, path: string): P
     // A reset signs out every device and proves the email works.
     await env.DB.prepare("UPDATE accounts SET password_hash = ?, email_verified = 1 WHERE id = ?").bind(await hashPassword(password), accountId).run();
     await env.DB.prepare("DELETE FROM sessions WHERE account_id = ?").bind(accountId).run();
-    const row = await env.DB.prepare("SELECT id, email, is_paid, email_verified FROM accounts WHERE id = ?").bind(accountId).first<Account>();
+    const row = await env.DB.prepare("SELECT id, email, is_paid, email_verified, plan FROM accounts WHERE id = ?").bind(accountId).first<Account>();
     if (row?.email) await env.DB.prepare("DELETE FROM login_failures WHERE key = ?").bind(`email:${row.email}`).run();
     return json({ token: await newSession(env, accountId), account: publicAccount(row!) });
+  }
+  // Local development only (DEV_TOOLS=1 in .dev.vars): switch your own plan to try each one.
+  if (path === "/api/auth/dev-plan" && method === "POST") {
+    if (String(env.DEV_TOOLS ?? "") !== "1") throw new HttpError(404, "not_found", "Not found.");
+    const a = await authenticate(request, env);
+    const plan = (await readJson<{ plan?: unknown }>(request)).plan;
+    if (!isPlan(plan)) throw new HttpError(400, "invalid_field", "plan must be free, pro or team.");
+    await env.DB.prepare("UPDATE accounts SET plan = ?, is_paid = ? WHERE id = ?").bind(plan, plan === "free" ? 0 : 1, a.id).run();
+    return json({ account: publicAccount({ ...a, plan, is_paid: plan === "free" ? 0 : 1 }) });
   }
   return null;
 }
@@ -229,17 +251,18 @@ function checkPassword(password: string) {
   if (password.length > 200) throw new HttpError(400, "weak_password", "That password is too long.");
 }
 
-/**
- * Hook for the paid-only cloud sharing rule. Local recording/editing is free; only uploads need a plan.
- * TODO(billing): check the account's subscription (e.g. via a Stripe/App Store webhook-maintained table)
- * instead of the `is_paid` flag, and add per-plan storage quotas here.
- */
+/** Share links on Umi Cloud, if the plan has them. */
 export function canShareToCloud(account: Account): boolean {
-  return account.is_paid === 1;
+  return can(account).cloudLinks;
 }
 
 export function requirePaid(account: Account): void {
   if (!canShareToCloud(account)) {
-    throw new HttpError(402, "payment_required", "Cloud sharing requires an Umi Cloud plan.");
+    throw new HttpError(402, "payment_required", "Cloud sharing isn't part of your plan.");
   }
+}
+
+/** Shared workspaces are a Team feature. */
+export function requireTeam(account: Account): void {
+  if (!can(account).workspaces) throw new HttpError(402, "payment_required", "Shared workspaces are part of Umi Team.");
 }

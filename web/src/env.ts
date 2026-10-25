@@ -4,6 +4,8 @@ export interface AppEnv extends Env {
   R2_SECRET_ACCESS_KEY?: string;
   RESEND_API_KEY?: string;
   BREVO_API_KEY?: string;
+  /** "1" in local development only: enables /api/auth/dev-plan. */
+  DEV_TOOLS?: string;
 }
 
 export function baseUrl(env: AppEnv, request: Request): string {

@@ -1,7 +1,7 @@
 // Team workspaces (Umi Cloud): create one, invite people with a code, put videos in it so
 // everyone in the team sees them (and their insights), and share styles (presets).
 
-import { type Account, requirePaid } from "./auth";
+import { type Account, requireTeam } from "./auth";
 import { randomId } from "./crypto";
 import type { AppEnv } from "./env";
 import { HttpError, json, readJson } from "./http";
@@ -96,7 +96,7 @@ export async function handleWorkspaces(request: Request, env: AppEnv, account: A
       return json({ workspaces: await Promise.all(results.map((w) => workspaceJson(env, w, w.role))) });
     }
     if (method === "POST") {
-      requirePaid(account);
+      requireTeam(account);
       const body = await readJson<{ name?: unknown }>(request);
       const name = parseName(body.name);
       const owned = await env.DB.prepare("SELECT COUNT(*) AS n FROM workspaces WHERE owner_id = ?").bind(account.id).first<{ n: number }>();
@@ -120,7 +120,7 @@ export async function handleWorkspaces(request: Request, env: AppEnv, account: A
     }
   }
   if (path === "/api/workspaces/join" && method === "POST") {
-    requirePaid(account);
+    requireTeam(account);
     const body = await readJson<{ code?: unknown }>(request);
     const code = typeof body.code === "string" ? body.code.trim() : "";
     const w = code ? await env.DB.prepare("SELECT * FROM workspaces WHERE invite_code = ?").bind(code).first<WorkspaceRow>() : null;
