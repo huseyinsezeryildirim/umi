@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from "solid-js";
+import { createAudioPlayer } from "./audio";
 import { MaskHandles } from "./Handles";
 import type { Editor } from "./store";
 
@@ -74,25 +75,36 @@ export function Preview(props: { editor: Editor }) {
   // Re-render on time, edit or size changes.
   createEffect(on([ed.time, () => ed.state().edit, box, flat], () => request(ed.time())));
 
-  // Playback clock: advances the playhead in real time; frames follow as fast as they render.
+  // Playback: the soundtrack plays and its clock moves the playhead; frames follow as fast
+  // as they render. Seeking while playing restarts the sound at the new place.
+  const audio = createAudioPlayer(() => ed.state().id);
+  onCleanup(audio.stop);
   createEffect(
     on(ed.playing, (playing) => {
-      if (!playing) return;
-      let last = performance.now();
+      if (!playing) return audio.stop();
       let raf = 0;
-      const tick = (now: number) => {
-        const next = ed.time() + (now - last) / 1000;
-        last = now;
+      let shown = ed.time();
+      audio.start(shown, ed.state().outputDuration);
+      const tick = () => {
+        if (Math.abs(ed.time() - shown) > 0.05) {
+          shown = ed.time();
+          audio.start(shown, ed.state().outputDuration);
+        }
+        const next = audio.clock();
         if (next >= ed.state().outputDuration) {
           ed.setTime(ed.state().outputDuration);
           ed.setPlaying(false);
           return;
         }
         ed.setTime(next);
+        shown = next;
         raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
-      onCleanup(() => cancelAnimationFrame(raf));
+      onCleanup(() => {
+        cancelAnimationFrame(raf);
+        audio.stop();
+      });
     }),
   );
 

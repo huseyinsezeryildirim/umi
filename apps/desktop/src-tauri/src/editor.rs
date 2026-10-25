@@ -7,7 +7,9 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use umi_engine::Composer;
+use std::sync::atomic::AtomicBool;
+use umi_engine::audio_mix::AudioMixer;
+use umi_engine::{Composer, ExportSettings, Schedule};
 use umi_project::edit::{EditSettings, MediaKind, MoveKind, SceneLayout, TextStyle, ZoomSegment};
 use umi_project::timeline::render_size;
 use umi_project::{Bundle, Document, History, Placement, Selection};
@@ -87,6 +89,8 @@ pub struct EditorSession {
     rendered_edit: Mutex<Option<EditSettings>>,
     jobs: Sender<Job>,
     save_pending: Mutex<bool>,
+    /// Preview soundtrack: the mixer for the edit it was built for.
+    audio: Mutex<Option<(EditSettings, AudioMixer)>>,
 }
 
 impl EditorSession {
@@ -115,6 +119,7 @@ impl EditorSession {
             rendered_edit: Mutex::new(None),
             jobs: tx,
             save_pending: Mutex::new(false),
+            audio: Mutex::new(None),
         }))
     }
 
@@ -258,6 +263,31 @@ impl EditorSession {
 }
 
 impl EditorSession {
+    /// The soundtrack from output time `time` for `seconds`: 48 kHz stereo interleaved f32
+    /// (little-endian bytes), exactly what export mixes.
+    pub fn audio(&self, time: f64, seconds: f64) -> Result<Vec<u8>, String> {
+        let (edit, total) = {
+            let doc = self.doc.lock();
+            (doc.edit.clone(), doc.total())
+        };
+        let mut slot = self.audio.lock();
+        if slot.as_ref().is_none_or(|(e, _)| *e != edit) {
+            let mixer = AudioMixer::new(&self.bundle, Schedule::new(&edit, total), edit.music.as_ref()).map_err(|e| e.to_string())?;
+            *slot = Some((edit, mixer));
+        }
+        let Some((_, mixer)) = slot.as_mut() else { unreachable!() };
+        let frames = (seconds.clamp(0.0, 10.0) * umi_media::SAMPLE_RATE as f64) as usize;
+        let mut out = vec![0f32; frames * umi_media::CHANNELS];
+        mixer.render(time, &mut out).map_err(|e| e.to_string())?;
+        Ok(out.iter().flat_map(|s| s.to_le_bytes()).collect())
+    }
+
+    /// Exports the current edit to `destination`.
+    pub fn export(&self, gpu: Arc<Gpu>, settings: &ExportSettings, destination: &Path, progress: &(dyn Fn(f64) + Sync), cancel: &AtomicBool) -> Result<(), String> {
+        let edit = self.doc.lock().edit.clone();
+        umi_engine::export(gpu, &self.bundle, edit, settings, destination, progress, cancel).map_err(|e| e.to_string())
+    }
+
     fn edit_change(&self) -> Option<Box<EditSettings>> {
         let edit = self.doc.lock().edit.clone();
         let mut seen = self.rendered_edit.lock();

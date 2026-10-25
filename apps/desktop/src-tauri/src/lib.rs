@@ -8,6 +8,7 @@ use parking_lot::Mutex;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use tauri::ipc::Response;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -20,6 +21,8 @@ struct AppState {
     gpu: OnceLock<Arc<Gpu>>,
     /// Library hover previews by recording path (JPEG data URLs).
     previews: Mutex<HashMap<PathBuf, Arc<Vec<String>>>>,
+    /// Running exports by editor id (cancel flags).
+    exports: Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
 
 impl AppState {
@@ -217,6 +220,79 @@ async fn editor_track_mask(state: State<'_, AppState>, id: String, mask: uuid::U
     .map_err(|e| e.to_string())?
 }
 
+/// Preview soundtrack chunk: f32 stereo interleaved at 48 kHz.
+#[tauri::command]
+async fn editor_audio(state: State<'_, AppState>, id: String, time: f64, seconds: f64) -> Result<Response, String> {
+    let editor = state.editor(&id)?;
+    let bytes = tauri::async_runtime::spawn_blocking(move || editor.audio(time, seconds)).await.map_err(|e| e.to_string())??;
+    Ok(Response::new(bytes))
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportRequest {
+    /// "mp4", "mov" or "gif".
+    format: String,
+    resolution: u32,
+    fps: u32,
+    destination: PathBuf,
+}
+
+/// Exports the editor's video; progress (0…1) is streamed on `progress`.
+#[tauri::command]
+async fn editor_export(state: State<'_, AppState>, id: String, request: ExportRequest, progress: tauri::ipc::Channel<f64>) -> Result<PathBuf, String> {
+    let editor = state.editor(&id)?;
+    let gpu = state.gpu()?;
+    let cancel = Arc::new(AtomicBool::new(false));
+    state.exports.lock().insert(id.clone(), cancel.clone());
+    let format = match request.format.as_str() {
+        "mov" => umi_engine::Format::Mov,
+        "gif" => umi_engine::Format::Gif,
+        _ => umi_engine::Format::Mp4,
+    };
+    let settings = umi_engine::ExportSettings { format, resolution: request.resolution, fps: request.fps, hardware: true };
+    let destination = request.destination.clone();
+    let flag = cancel.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let last = std::sync::atomic::AtomicU32::new(0);
+        editor.export(gpu, &settings, &destination, &|p| {
+            let step = (p * 200.0) as u32;
+            if step != last.swap(step, Ordering::Relaxed) {
+                let _ = progress.send(p);
+            }
+        }, &flag)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    state.exports.lock().remove(&id);
+    if cancel.load(Ordering::Relaxed) {
+        return Err("cancelled".into());
+    }
+    result.map(|_| request.destination)
+}
+
+#[tauri::command]
+fn editor_export_cancel(state: State<'_, AppState>, id: String) {
+    if let Some(flag) = state.exports.lock().get(&id) {
+        flag.store(true, Ordering::Relaxed);
+    }
+}
+
+/// Where exports go by default: ~/Movies/Umi/Exports/<name>.<ext> (not overwriting).
+#[tauri::command]
+fn export_default_path(name: String, extension: String) -> PathBuf {
+    let folder = library_folder().join("Exports");
+    let _ = std::fs::create_dir_all(&folder);
+    let clean: String = name.chars().map(|c| if "/\\:*?\"<>|".contains(c) { '-' } else { c }).collect();
+    let mut path = folder.join(format!("{clean}.{extension}"));
+    let mut n = 2;
+    while path.exists() {
+        path = folder.join(format!("{clean} {n}.{extension}"));
+        n += 1;
+    }
+    path
+}
+
 #[tauri::command]
 fn editor_close(state: State<'_, AppState>, id: String) -> Result<(), String> {
     if let Some(editor) = state.editors.lock().remove(&id) {
@@ -296,6 +372,10 @@ pub fn run() {
             recording_reveal,
             editor_layout,
             editor_track_mask,
+            editor_audio,
+            editor_export,
+            editor_export_cancel,
+            export_default_path,
             recording_waveform
         ])
         .run(tauri::generate_context!())
