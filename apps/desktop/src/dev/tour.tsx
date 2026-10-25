@@ -1,7 +1,7 @@
 // The website's guided demo (demo build, `?tour`): first a recording on a Mac desktop
 // (`?view=desktop`), then the real editor (`?open&from=N` continues the tour there).
-// One thing is lit at a time with a numbered hint; clicking it moves on. Clicks elsewhere
-// are held back (the hint gives a little shake) so people can't get lost.
+// A small card suggests the next thing and rings it; doing it moves on, and Back/Next are
+// always there. Nothing is dimmed or blocked: visitors can click around the app freely.
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import "./tour.css";
 
@@ -50,15 +50,12 @@ const FIRST_EDITOR_STEP = STEPS.findIndex((s) => s.chapter !== "Record");
 
 export function Tour() {
   const [rect, setRect] = createSignal<DOMRect | null>(null);
-  const [shake, setShake] = createSignal(0);
   const step = () => STEPS[index()];
   const chapter = () => CHAPTERS.find((c) => c.name === step()?.chapter) ?? CHAPTERS[0];
   const done = () => index() >= STEPS.length;
 
   let frame = 0;
   let waiting = 0;
-  /** Set while the tour clicks something itself (closing the share window). */
-  let bypass = false;
   const follow = () => {
     const s = step();
     const el = s?.target?.();
@@ -74,11 +71,7 @@ export function Tour() {
     }
     // Close the share window when the tour moves past it.
     const close = byText("[role=dialog] button", "Done")() as HTMLElement | null;
-    if (STEPS[i]?.text.startsWith("Or export") && close) {
-      bypass = true;
-      close.click();
-      bypass = false;
-    }
+    if (STEPS[i]?.text.startsWith("Or export") && close) close.click();
     setIndex(i);
     const s = STEPS[i];
     if (s && !s.target) waiting = window.setTimeout(() => go(i + 1), s.wait ?? 3000);
@@ -87,26 +80,22 @@ export function Tour() {
   onMount(() => {
     setTimeout(() => go(Number(params.get("from")) || 0), 900);
     frame = requestAnimationFrame(follow);
-    // Only the lit thing (and the tour itself) can be clicked.
-    const guard = (e: MouseEvent) => {
+    // Doing the suggested thing moves on; everything else still works as usual.
+    const watch = (e: MouseEvent) => {
       const s = step();
-      if (bypass || !s || done()) return;
+      if (!s || done() || !s.target) return;
+      const el = s.target();
       const t = e.target as Element;
-      if (t.closest(".demo-tour")) return;
-      const el = s.target?.();
-      if (el && el.contains(t)) {
-        if (e.type === "click") setTimeout(() => go(index() + 1), s.text.startsWith("Press play") ? 400 : 450);
-        return;
+      if (el && el.contains(t) && !t.closest(".demo-tour")) {
+        const at = index();
+        setTimeout(() => index() === at && go(at + 1), s.text.startsWith("Press play") ? 400 : 450);
       }
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.type === "click") setShake((v) => v + 1);
     };
-    for (const type of ["pointerdown", "mousedown", "click"]) document.addEventListener(type, guard as EventListener, true);
+    document.addEventListener("click", watch, true);
     onCleanup(() => {
       cancelAnimationFrame(frame);
       clearTimeout(waiting);
-      for (const type of ["pointerdown", "mousedown", "click"]) document.removeEventListener(type, guard as EventListener, true);
+      document.removeEventListener("click", watch, true);
     });
   });
 
@@ -120,6 +109,15 @@ export function Tour() {
     return { left: Math.min(Math.max(16, r.left + r.width / 2 - W / 2), innerWidth - W - 16), top: below ? r.bottom + 16 : r.top - 126 };
   };
 
+  /** Next: does the suggested thing (so the app keeps up), or just moves on. */
+  const next = () => {
+    const el = step()?.target?.() as HTMLElement | null | undefined;
+    if (el) el.click();
+    else go(index() + 1);
+  };
+  // Back within this page (the desktop scene and the editor are separate pages).
+  const canBack = () => index() > (onDesktop ? 0 : FIRST_EDITOR_STEP);
+
   const restart = () => {
     setIndex(-1);
     location.replace("?view=desktop&demo&tour");
@@ -128,19 +126,11 @@ export function Tour() {
   return (
     <div class="demo-tour">
       <Show when={!done() && index() >= 0}>
-        {/* Dim everything but the target. */}
-        <Show
-          when={rect()}
-          fallback={<div class="demo-tour__dim" />}
-        >
-          {(r) => (
-            <>
-              <div class="demo-tour__hole" style={{ left: `${r().left - 6}px`, top: `${r().top - 6}px`, width: `${r().width + 12}px`, height: `${r().height + 12}px` }} />
-              <div class="demo-tour__ring" style={{ left: `${r().left - 6}px`, top: `${r().top - 6}px`, width: `${r().width + 12}px`, height: `${r().height + 12}px`, "border-color": chapter().color }} />
-            </>
-          )}
+        {/* A ring around the suggestion; the rest of the app stays as it is. */}
+        <Show when={rect()}>
+          {(r) => <div class="demo-tour__ring" style={{ left: `${r().left - 6}px`, top: `${r().top - 6}px`, width: `${r().width + 12}px`, height: `${r().height + 12}px`, "border-color": chapter().color }} />}
         </Show>
-        <div class="demo-tour__hint" data-shake={shake() % 2 ? "a" : "b"} style={{ left: `${hint().left}px`, top: `${hint().top}px` }}>
+        <div class="demo-tour__hint" style={{ left: `${hint().left}px`, top: `${hint().top}px` }}>
           <span class="demo-tour__chip" style={{ background: chapter().tint, color: chapter().color }}>
             {step().chapter}
           </span>
@@ -148,6 +138,22 @@ export function Tour() {
             <b style={{ background: chapter().tint, color: chapter().color }}>{index() + 1}</b>
             <span>{step().text}</span>
           </p>
+          <Show when={!step().target}>
+            {/* Moves on by itself: how long until it does. */}
+            <span class="demo-tour__wait">
+              <i style={{ "animation-duration": `${step().wait ?? 3000}ms` }} />
+            </span>
+          </Show>
+          <div class="demo-tour__nav">
+            <Show when={canBack()}>
+              <button type="button" onClick={() => go(index() - 1)}>
+                Back
+              </button>
+            </Show>
+            <button type="button" class="demo-tour__next" style={{ background: chapter().color }} onClick={next}>
+              Next
+            </button>
+          </div>
         </div>
       </Show>
 

@@ -210,3 +210,49 @@
   color: #116ff5;
   font-weight: 500;
 }
+
+/* Back / Next under the hint, and the wait bar for steps that move on by themselves. */
+.demo-tour__nav {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 12px;
+}
+.demo-tour__nav button {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.06);
+  color: #111827;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.demo-tour__nav .demo-tour__next {
+  color: #fff;
+}
+.demo-tour__wait {
+  display: block;
+  height: 3px;
+  margin-top: 10px;
+  border-radius: 2px;
+  background: rgba(17, 24, 39, 0.08);
+  overflow: hidden;
+}
+.demo-tour__wait i {
+  display: block;
+  height: 100%;
+  background: rgba(17, 24, 39, 0.35);
+  transform-origin: left;
+  animation: tour-wait linear both;
+}
+@keyframes tour-wait {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
