@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, onMount, Show, type JSX } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 
 // ───── Switch ─────
 
@@ -140,8 +140,12 @@ export function Segmented<const T>(props: { options: SegmentOption<T>[]; value: 
   };
   onMount(() => {
     measure();
+    // Items change width without the group changing (fonts loading, labels changing).
     const ro = new ResizeObserver(measure);
     ro.observe(root);
+    for (const item of root.querySelectorAll(".umi-segmented__item")) ro.observe(item);
+    void document.fonts?.ready.then(measure);
+    onCleanup(() => ro.disconnect());
   });
   createEffect(() => {
     void props.value;

@@ -13,7 +13,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.7", features = [] }
 
 [dependencies]
-tauri = { version = "2.12", features = ["macos-private-api"] }
+tauri = { version = "2.12", features = ["macos-private-api", "tray-icon", "image-png"] }
+tauri-plugin-global-shortcut = "2.4"
 tauri-plugin-dialog = "2.8"
 tauri-plugin-opener = "2.7"
 serde.workspace = true
@@ -33,6 +34,8 @@ umi-render = { path = "../../../crates/umi-render" }
 umi-media = { path = "../../../crates/umi-media" }
 umi-engine = { path = "../../../crates/umi-engine" }
 umi-ai = { path = "../../../crates/umi-ai" }
+umi-capture = { path = "../../../crates/umi-capture" }
+umi-recorder = { path = "../../../crates/umi-recorder" }
 
 [lints]
 workspace = true

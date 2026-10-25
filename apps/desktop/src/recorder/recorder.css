@@ -1,0 +1,479 @@
+/* Recorder windows: launcher, camera bubble, control bar, countdown, area picker.
+   Their windows are transparent; each view draws its own shape. */
+
+html.umi-overlay,
+html.umi-overlay body {
+  background: transparent !important;
+  overflow: hidden;
+}
+
+/* ───── Launcher ───── */
+.rec-shell {
+  padding: 8px 12px 16px;
+}
+.rec-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #f6faff 0%, #e8f2fd 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.9) inset,
+    0 0 0 1px rgba(14, 17, 30, 0.08),
+    0 18px 40px rgba(14, 17, 30, 0.18),
+    0 4px 10px rgba(14, 17, 30, 0.06);
+}
+.rec-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rec-header strong {
+  font-size: 19px;
+  letter-spacing: -0.02em;
+  color: var(--umi-ink, #0e111e);
+}
+.rec-mark {
+  width: 28px;
+  height: 28px;
+}
+.rec-spacer {
+  flex: 1;
+}
+.rec-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rec-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 52px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(14, 17, 30, 0.07), 0 1px 2px rgba(14, 17, 30, 0.05);
+  color: var(--umi-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: var(--umi-weight-medium);
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow var(--umi-fast), transform var(--umi-fast);
+}
+.rec-row:hover {
+  box-shadow: 0 0 0 1px rgba(17, 111, 245, 0.35), 0 2px 6px rgba(14, 17, 30, 0.08);
+}
+.rec-row:active {
+  transform: scale(0.99);
+}
+.rec-row[data-on="false"] {
+  color: var(--umi-text-3);
+  background: rgba(255, 255, 255, 0.6);
+}
+.rec-row__icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: var(--umi-accent);
+  background: rgba(17, 111, 245, 0.1);
+}
+.rec-row[data-on="false"] .rec-row__icon {
+  color: var(--umi-text-3);
+  background: rgba(14, 17, 30, 0.05);
+}
+.rec-row__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rec-row__chevron {
+  color: var(--umi-text-3);
+}
+.rec-meter {
+  display: flex;
+  gap: 2px;
+}
+.rec-meter i {
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: rgba(14, 17, 30, 0.12);
+  transition: background 80ms;
+}
+.rec-meter i[data-lit="true"] {
+  background: #13a874;
+}
+.rec-switch {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(14, 17, 30, 0.15);
+  transition: background var(--umi-fast);
+}
+.rec-switch i {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform var(--umi-normal) var(--umi-ease);
+}
+.rec-switch[data-on="true"] {
+  background: var(--umi-accent);
+}
+.rec-switch[data-on="true"] i {
+  transform: translateX(14px);
+}
+.rec-start {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  height: 50px;
+  border: 0;
+  border-radius: 15px;
+  background: var(--umi-ink, #0e111e);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: var(--umi-weight-semibold);
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(14, 17, 30, 0.25);
+  transition: transform var(--umi-fast), box-shadow var(--umi-fast);
+}
+.rec-start:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 9px 22px rgba(14, 17, 30, 0.3);
+}
+.rec-start i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff4d4d;
+  box-shadow: 0 0 0 3px rgba(255, 77, 77, 0.25);
+}
+.rec-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--umi-text-3);
+}
+.rec-permission {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  color: #a35200;
+  background: #fff6e8;
+  box-shadow: 0 0 0 1px #ffd8a8;
+}
+.rec-permission strong {
+  display: block;
+  color: var(--umi-ink, #0e111e);
+}
+.rec-permission p {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--umi-text-2);
+}
+.rec-permission button {
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--umi-ink, #0e111e);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* ───── Camera bubble ───── */
+.bubble {
+  position: fixed;
+  inset: 6px;
+  overflow: hidden;
+  background: #1a1d29;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 0 0 2px rgba(255, 255, 255, 0.85);
+  cursor: grab;
+  transition: border-radius var(--umi-normal) var(--umi-ease);
+}
+.bubble[data-shape="circle"] {
+  border-radius: 50%;
+}
+.bubble[data-shape="squircle"] {
+  border-radius: 28%;
+}
+.bubble[data-shape="square"] {
+  border-radius: 14px;
+}
+.bubble img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.bubble__wait {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.bubble__pill {
+  position: absolute;
+  left: 50%;
+  bottom: 10%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(14, 17, 30, 0.72);
+  backdrop-filter: blur(12px);
+}
+.bubble__pill i {
+  width: 1px;
+  height: 14px;
+  margin: 0 2px;
+  background: rgba(255, 255, 255, 0.2);
+}
+.bubble__pill button {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bubble__pill button[data-on="true"] {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+}
+.bubble__shape {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid currentColor;
+}
+.bubble__shape--circle {
+  border-radius: 50%;
+}
+.bubble__shape--squircle {
+  border-radius: 35%;
+}
+.bubble__shape--square {
+  border-radius: 2px;
+}
+
+/* ───── Control bar ───── */
+.controls {
+  position: fixed;
+  inset: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: 18px;
+  color: #fff;
+  background: rgba(14, 17, 30, 0.86);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+  cursor: grab;
+}
+.controls__stop {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 12px;
+  background: #ff4d4d;
+  color: #fff;
+  cursor: pointer;
+}
+.controls__stop:hover {
+  background: #ff3333;
+}
+.controls__time {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.controls__time i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff4d4d;
+  animation: rec-blink 1.2s ease-in-out infinite;
+}
+.controls__time i[data-paused="true"] {
+  background: #ffb020;
+  animation: none;
+}
+@keyframes rec-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+.controls__level {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 18px;
+}
+.controls__level i {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: #13d18e;
+  transform-origin: center;
+  transition: transform 90ms;
+}
+.controls__spacer {
+  flex: 1;
+  align-self: stretch;
+}
+.controls__btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+}
+.controls__btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.controls__text {
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.controls__text--danger {
+  background: #ff4d4d;
+}
+
+/* ───── Countdown ───── */
+.countdown {
+  position: fixed;
+  inset: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(14, 17, 30, 0.72);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+.countdown__n {
+  font-size: 96px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  animation: count-in 900ms var(--umi-ease) both;
+}
+@keyframes count-in {
+  from {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0.9;
+    transform: scale(0.94);
+  }
+}
+
+/* ───── Area picker ───── */
+.area {
+  position: fixed;
+  inset: 0;
+  cursor: crosshair;
+  background: rgba(14, 17, 30, 0.25);
+}
+.area__hint {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 15px;
+  background: rgba(14, 17, 30, 0.75);
+}
+.area__box {
+  position: absolute;
+  border: 2px solid #fff;
+  border-radius: 4px;
+  box-shadow: 0 0 0 9999px rgba(14, 17, 30, 0.45);
+  cursor: move;
+}
+.area__size {
+  position: absolute;
+  left: 50%;
+  top: -30px;
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border-radius: 7px;
+  color: #fff;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  background: rgba(14, 17, 30, 0.8);
+}
+.area__actions {
+  position: absolute;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+}
+.area__actions button {
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--umi-accent);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.area__actions .area__cancel {
+  background: rgba(14, 17, 30, 0.8);
+}
