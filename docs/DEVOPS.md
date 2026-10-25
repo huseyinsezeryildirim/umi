@@ -9,8 +9,8 @@ Everything is automated in `.github/workflows/`. Until a step below is done, the
 | `deploy-cloud.yml` | push to `main` touching `web/` → **staging**; tag `v*` → **production** | D1 migrations, then `wrangler deploy` of the share-link Worker, then `/healthz` |
 | `deploy-site.yml` | push to `main` → **staging**; tag `v*` → **production** | wasm engine + web editor + Next.js export → Cloudflare Pages |
 | `release.yml` | tag `v*` | signed installers for macOS (arm64, Intel), Windows, Linux → **draft** GitHub release + `latest.json` |
-| `health.yml` | hourly | `/healthz` on staging and production; opens an issue on failure, closes it on recovery |
-| `dependabot.yml` | weekly | grouped updates for cargo, pnpm, `web/` npm and GitHub Actions |
+| `health.yml` | every 3 hours | `/healthz` on staging and production; opens an issue on failure, closes it on recovery |
+| `dependabot.yml` | monthly | one grouped minor/patch PR each for cargo, pnpm, `web/` npm and GitHub Actions |
 
 Both deploy workflows can also be run by hand (Actions → the workflow → **Run workflow** → staging or production).
 
@@ -158,7 +158,12 @@ The release installs `trusted-signing-cli` and Tauri signs `umi-desktop.exe` and
 
 ## 8. Monitoring and backups
 
-- **Health**: `health.yml` probes `/healthz` hourly and opens an issue titled "Health check failing: …".
+- **GitHub Actions minutes**: on a private repository macOS minutes count 10× and Windows 2×, and every
+  push and PR runs CI on all three. Settings → **Billing and plans** → set a spending limit you're happy with
+  (jobs that don't start say "spending limit needs to be increased"). Making the repository public makes
+  Actions free.
+
+- **Health**: `health.yml` probes `/healthz` every three hours and opens an issue titled "Health check failing: …".
   GitHub emails you about new issues if you watch the repository.
 - **Billing alerts**: Cloudflare dashboard → **Manage Account → Billing → Billable usage / Budget alerts**:
   set a monthly budget alert; **Notifications → Add → Usage Based Billing** for Workers, R2 and D1.
