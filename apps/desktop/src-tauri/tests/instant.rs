@@ -23,8 +23,13 @@ fn exports_and_uploads_at_the_same_time() {
     let video = std::thread::scope(|scope| {
         scope.spawn(|| {
             let gpu = umi_render::Gpu::new().unwrap();
-            let settings =
-                umi_engine::ExportSettings { format: umi_engine::Format::StreamingMp4, resolution: 1080, fps: 60, hardware: true };
+            let settings = umi_engine::ExportSettings {
+                format: umi_engine::Format::StreamingMp4,
+                resolution: 1080,
+                fps: 60,
+                hardware: true,
+                bit_rate: 0,
+            };
             let r = umi_engine::export(gpu, bundle, edit, &settings, &out, &|_| {}, &AtomicBool::new(false)).map_err(|e| e.to_string());
             exporting.store(false, Ordering::SeqCst);
             let info = umi_media::VideoDecoder::open(&out, false).unwrap().info();

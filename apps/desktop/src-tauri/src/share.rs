@@ -111,6 +111,13 @@ pub struct ShareProgress {
     video: Option<Video>,
 }
 
+/// What a share link holds: 1080p at 30 fps, ~4 Mb/s. Screen text stays sharp and an hour is
+/// ~1.8 GB (a full-quality 1080p60 export is ~5.6 GB): uploads finish sooner and cloud storage
+/// costs a third. Exporting a file keeps the full quality.
+fn share_settings(format: umi_engine::Format) -> umi_engine::ExportSettings {
+    umi_engine::ExportSettings { format, resolution: 1080, fps: 30, hardware: true, bit_rate: 4_000_000 }
+}
+
 /// Exports (1080p MP4), creates the link (copied at once), uploads poster, GIF preview and
 /// the video, then completes it.
 #[tauri::command]
@@ -127,7 +134,7 @@ pub async fn share_start(state: State<'_, AppState>, id: String, progress: Chann
         std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
         let mp4 = folder.join("video.mp4");
         let cancel = std::sync::atomic::AtomicBool::new(false);
-        let settings = umi_engine::ExportSettings { format: umi_engine::Format::Mp4, resolution: 1080, fps: 60, hardware: true };
+        let settings = share_settings(umi_engine::Format::Mp4);
         editor.export(gpu, &settings, &mp4, &|p| send("export", p, None), &cancel)?;
 
         let mut decoder = umi_media::VideoDecoder::open(&mp4, false).map_err(|e| e.to_string())?;
@@ -344,8 +351,7 @@ pub async fn instant_share(
         let result = std::thread::scope(|scope| {
             scope.spawn(|| {
                 let cancel = std::sync::atomic::AtomicBool::new(false);
-                let settings =
-                    umi_engine::ExportSettings { format: umi_engine::Format::StreamingMp4, resolution: 1080, fps: 60, hardware: true };
+                let settings = share_settings(umi_engine::Format::StreamingMp4);
                 let outcome = editor
                     .export(
                         gpu,

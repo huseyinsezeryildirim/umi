@@ -315,7 +315,7 @@ async fn editor_export(
         "gif" => umi_engine::Format::Gif,
         _ => umi_engine::Format::Mp4,
     };
-    let settings = umi_engine::ExportSettings { format, resolution: request.resolution, fps: request.fps, hardware: true };
+    let settings = umi_engine::ExportSettings { format, resolution: request.resolution, fps: request.fps, hardware: true, bit_rate: 0 };
     let destination = request.destination.clone();
     let flag = cancel.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -551,7 +551,8 @@ async fn library_combine(state: State<'_, AppState>, paths: Vec<PathBuf>, progre
             let mut edit = project.effective_edit(crate::presets::load().default_preset());
             edit.aspect = aspect;
             let out = folder.join(format!("take-{i}.mp4"));
-            let settings = umi_engine::ExportSettings { format: umi_engine::Format::Mp4, resolution: 1080, fps: 30, hardware: true };
+            let settings =
+                umi_engine::ExportSettings { format: umi_engine::Format::Mp4, resolution: 1080, fps: 30, hardware: true, bit_rate: 0 };
             let cancel = AtomicBool::new(false);
             umi_engine::export(
                 gpu.clone(),

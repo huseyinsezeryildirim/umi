@@ -45,7 +45,8 @@ async function begin({ streamId, source, mic, sound }) {
   }
   const tracks = [...display.getVideoTracks(), ...mix.stream.getAudioTracks()];
   const type = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((t) => MediaRecorder.isTypeSupported(t));
-  recorder = new MediaRecorder(new MediaStream(tracks), { mimeType: type, videoBitsPerSecond: 8_000_000 });
+  // ~4 Mb/s, like the desktop app's share copies: screen text stays sharp, links stay small.
+  recorder = new MediaRecorder(new MediaStream(tracks), { mimeType: type, videoBitsPerSecond: 4_000_000 });
   chunks = [];
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   recorder.onstop = async () => {

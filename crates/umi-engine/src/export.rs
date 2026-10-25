@@ -29,6 +29,8 @@ pub struct ExportSettings {
     pub resolution: u32,
     pub fps: u32,
     pub hardware: bool,
+    /// Video bits per second; 0 = sharp enough for screen text at any size (~0.1 bit per pixel).
+    pub bit_rate: usize,
 }
 
 enum Sink {
@@ -70,7 +72,7 @@ pub fn export(
                 Format::StreamingMp4 => Container::StreamingMp4,
                 _ => Container::Mp4,
             },
-            bit_rate: 0,
+            bit_rate: settings.bit_rate,
             audio: true,
             hardware: settings.hardware,
         };
