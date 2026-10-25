@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="card">
+    <header><img src="icons/32.png" alt="" /> <strong>Umi</strong></header>
+    <section id="setup">
+      <div class="seg" id="source">
+        <button data-v="tab" class="on">This tab</button>
+        <button data-v="screen">Screen or window</button>
+      </div>
+      <label class="row"><span>Camera</span><input type="checkbox" id="camera" /></label>
+      <label class="row"><span>Microphone</span><input type="checkbox" id="mic" checked /></label>
+      <label class="row"><span>Tab / computer sound</span><input type="checkbox" id="sound" checked /></label>
+      <button id="start" class="start"><i></i> Start recording</button>
+      <p class="fine">Alt+Shift+L to start or stop · Free</p>
+    </section>
+    <section id="recording" hidden>
+      <div class="timer"><i></i><span id="time">0:00</span></div>
+      <div class="actions">
+        <button id="pause">Pause</button>
+        <button id="stop" class="stop">Stop</button>
+      </div>
+    </section>
+    <footer><a href="#" id="settings">Umi Cloud settings</a></footer>
+  </div>
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

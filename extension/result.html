@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Your recording — Umi</title>
+  <link rel="stylesheet" href="result.css" />
+</head>
+<body>
+  <main>
+    <header><img src="icons/48.png" alt="" width="32" /> <h1>Your recording</h1></header>
+    <video id="video" controls></video>
+    <div class="actions">
+      <button id="download" class="ink">Download</button>
+      <button id="share">Get a link</button>
+      <button id="discard" class="quiet">Discard</button>
+    </div>
+    <p id="status" class="status"></p>
+    <section id="link" hidden>
+      <input id="url" readonly />
+      <button id="copy">Copy</button>
+    </section>
+    <section id="settings" class="settings">
+      <h2>Umi Cloud</h2>
+      <p>Links are made by Umi Cloud. Paste your access token from your account page.</p>
+      <label>Server <input id="server" placeholder="https://umi.cam" /></label>
+      <label>Token <input id="token" type="password" placeholder="umi_…" /></label>
+      <button id="save">Save</button>
+      <p class="fine">Tip: open the video in the Umi app (File → Import video) to edit it with zooms, captions and more.</p>
+    </section>
+  </main>
+  <script src="result.js" type="module"></script>
+</body>
+</html>

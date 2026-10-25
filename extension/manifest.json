@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Umi — screen recorder",
+  "short_name": "Umi",
+  "version": "0.2.0",
+  "description": "Record a tab, window or your whole screen with your camera and voice. Download it or share a link.",
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "action": { "default_popup": "popup.html", "default_title": "Record with Umi" },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["offscreen", "storage", "desktopCapture", "tabCapture", "activeTab", "scripting"],
+  "host_permissions": ["https://umi.cam/*", "http://localhost/*"],
+  "web_accessible_resources": [{ "resources": ["camera.html"], "matches": ["<all_urls>"] }],
+  "commands": {
+    "toggle-recording": { "suggested_key": { "default": "Alt+Shift+L" }, "description": "Start or stop recording" }
+  }
+}
