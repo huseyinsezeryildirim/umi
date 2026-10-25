@@ -587,7 +587,8 @@ export function AgentKit() {
                 <h3 className="mt-5 text-[22px] font-semibold tracking-tight">{k.title}</h3>
                 <p className="mt-2 flex-1 text-[15px] text-muted">{k.text}</p>
                 <div className={`mt-6 flex items-center gap-2 rounded-xl bg-white py-1.5 pl-4 font-mono text-[13px] text-ink shadow-[0_0_0_1px_rgb(17_24_39/0.06)] ${k.cmd.startsWith("$ ") ? "pr-1.5" : "pr-4"}`}>
-                  <p className="min-w-0 flex-1 py-1.5">
+                  {/* One line always: the text gets smaller instead of wrapping. */}
+                  <p className="min-w-0 flex-1 overflow-hidden py-1.5 text-[clamp(10px,0.95vw,13px)] whitespace-nowrap">
                     <span className="text-faint">{k.cmd.slice(0, 2).trim() === "$" || k.cmd.startsWith("→") ? k.cmd.slice(0, 2) : ""}</span>
                     {k.cmd.startsWith("$ ") || k.cmd.startsWith("→ ") ? k.cmd.slice(2) : k.cmd}
                   </p>
