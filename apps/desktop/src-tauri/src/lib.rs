@@ -329,6 +329,21 @@ async fn editor_transcribe(state: State<'_, AppState>, id: String, language: Opt
     .map_err(|e| e.to_string())?
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InsightsOut {
+    title: String,
+    summary: String,
+    chapters: Vec<umi_project::insights::Chapter>,
+    chapter_text: String,
+}
+
+/// Title, summary and chapters from what was said (needs captions).
+#[tauri::command]
+fn editor_insights(state: State<'_, AppState>, id: String) -> Result<Option<InsightsOut>, String> {
+    Ok(state.editor(&id)?.insights().map(|(i, text)| InsightsOut { title: i.title, summary: i.summary, chapters: i.chapters, chapter_text: text }))
+}
+
 /// Writes the captions as an .srt or .vtt file.
 #[tauri::command]
 fn editor_save_subtitles(state: State<'_, AppState>, id: String, destination: PathBuf) -> Result<(), String> {
@@ -610,6 +625,7 @@ pub fn run() {
             editor_camera_effects,
             editor_voiceover,
             editor_save_subtitles,
+            editor_insights,
             ai_models,
             assets::bundle_import,
             presets::presets_list,

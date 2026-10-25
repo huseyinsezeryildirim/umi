@@ -7,6 +7,7 @@ pub mod captions;
 pub mod edit;
 pub mod geometry;
 pub mod history;
+pub mod insights;
 pub mod presets;
 pub mod project;
 pub mod serde_util;
