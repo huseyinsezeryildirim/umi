@@ -34,7 +34,7 @@ fn token() -> Option<String> {
     keyring::Entry::new(KEYCHAIN_SERVICE, "token").ok()?.get_password().ok()
 }
 
-fn client() -> Result<Client, String> {
+pub(crate) fn client() -> Result<Client, String> {
     let token = token().ok_or("Connect to Umi Cloud first.")?;
     Ok(Client::new(&server(), &token))
 }
@@ -217,6 +217,8 @@ pub struct SettingsInput {
     password: Option<String>,
     #[serde(default, deserialize_with = "double_option")]
     expires_at: Option<Option<String>>,
+    #[serde(default, deserialize_with = "double_option")]
+    workspace_id: Option<Option<String>>,
 }
 
 fn double_option<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Option<String>>, D::Error> {
@@ -231,6 +233,7 @@ impl From<SettingsInput> for Settings {
             allow_comments: s.allow_comments,
             password: s.password,
             expires_at: s.expires_at,
+            workspace_id: s.workspace_id,
         }
     }
 }

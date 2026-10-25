@@ -59,6 +59,9 @@ pub struct Video {
     pub expires_at: Option<String>,
     #[serde(default)]
     pub expired: Option<bool>,
+    /// The team workspace it's shared with.
+    #[serde(default)]
+    pub workspace_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -106,6 +109,9 @@ pub struct Settings {
     /// `Some(None)` removes the expiry; ISO 8601 date otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<Option<String>>,
+    /// `Some(None)` takes it out of its workspace.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<Option<String>>,
 }
 
 /// What's being uploaded, for the progress bar.
@@ -202,6 +208,7 @@ impl Client {
             ("GET", _) => agent.get(&url).header("Authorization", &auth).call().map_err(net)?,
             ("DELETE", _) => agent.delete(&url).header("Authorization", &auth).call().map_err(net)?,
             ("PATCH", Some(b)) => agent.patch(&url).header("Authorization", &auth).send_json(b).map_err(net)?,
+            ("PUT", Some(b)) => agent.put(&url).header("Authorization", &auth).send_json(b).map_err(net)?,
             (_, b) => agent.post(&url).header("Authorization", &auth).send_json(b.unwrap_or(serde_json::json!({}))).map_err(net)?,
         };
         Self::read(response)
@@ -400,6 +407,124 @@ impl Client {
         let body = serde_json::json!({ "parts": parts, "durationMs": details.duration_ms, "width": details.width, "height": details.height });
         let done: VideoBody = self.send("POST", &format!("/api/videos/{}/complete", reservation.video.id), Some(body))?;
         Ok(done.video)
+    }
+}
+
+// ───── Team workspaces ─────
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Workspace {
+    pub id: String,
+    pub name: String,
+    /// "owner" or "member".
+    pub role: String,
+    pub members: u32,
+    /// Only shown to the owner.
+    #[serde(default)]
+    pub invite_code: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Member {
+    pub id: String,
+    pub email: Option<String>,
+    pub role: String,
+    #[serde(default)]
+    pub you: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamVideo {
+    #[serde(flatten)]
+    pub video: Video,
+    pub owner: Option<String>,
+    pub yours: bool,
+    #[serde(default)]
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamPreset {
+    pub id: String,
+    pub name: String,
+    /// The style's settings (a `StylePreset` from the app).
+    pub edit: serde_json::Value,
+    pub updated_by: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct WorkspaceBody {
+    workspace: Workspace,
+}
+
+impl Client {
+    pub fn workspaces(&self) -> Result<Vec<Workspace>, CloudError> {
+        #[derive(Deserialize)]
+        struct Body {
+            workspaces: Vec<Workspace>,
+        }
+        Ok(self.send::<Body>("GET", "/api/workspaces", None)?.workspaces)
+    }
+
+    pub fn create_workspace(&self, name: &str) -> Result<Workspace, CloudError> {
+        Ok(self.send::<WorkspaceBody>("POST", "/api/workspaces", Some(serde_json::json!({ "name": name })))?.workspace)
+    }
+
+    pub fn join_workspace(&self, code: &str) -> Result<Workspace, CloudError> {
+        Ok(self.send::<WorkspaceBody>("POST", "/api/workspaces/join", Some(serde_json::json!({ "code": code.trim() })))?.workspace)
+    }
+
+    pub fn workspace(&self, id: &str) -> Result<(Workspace, Vec<Member>), CloudError> {
+        #[derive(Deserialize)]
+        struct Body {
+            workspace: Workspace,
+            members: Vec<Member>,
+        }
+        let b: Body = self.send("GET", &format!("/api/workspaces/{id}"), None)?;
+        Ok((b.workspace, b.members))
+    }
+
+    /// A new invite code (the old one stops working).
+    pub fn rotate_invite(&self, id: &str) -> Result<Workspace, CloudError> {
+        Ok(self.send::<WorkspaceBody>("POST", &format!("/api/workspaces/{id}/invite-code"), None)?.workspace)
+    }
+
+    /// Removes someone (owner), or leaves (your own id).
+    pub fn remove_member(&self, id: &str, account: &str) -> Result<(), CloudError> {
+        self.send::<serde_json::Value>("DELETE", &format!("/api/workspaces/{id}/members/{account}"), None).map(|_| ())
+    }
+
+    pub fn delete_workspace(&self, id: &str) -> Result<(), CloudError> {
+        self.send::<serde_json::Value>("DELETE", &format!("/api/workspaces/{id}"), None).map(|_| ())
+    }
+
+    pub fn team_videos(&self, id: &str) -> Result<Vec<TeamVideo>, CloudError> {
+        #[derive(Deserialize)]
+        struct Body {
+            videos: Vec<TeamVideo>,
+        }
+        Ok(self.send::<Body>("GET", &format!("/api/workspaces/{id}/videos"), None)?.videos)
+    }
+
+    pub fn team_presets(&self, id: &str) -> Result<Vec<TeamPreset>, CloudError> {
+        #[derive(Deserialize)]
+        struct Body {
+            presets: Vec<TeamPreset>,
+        }
+        Ok(self.send::<Body>("GET", &format!("/api/workspaces/{id}/presets"), None)?.presets)
+    }
+
+    pub fn share_preset(&self, id: &str, preset_id: &str, name: &str, edit: &serde_json::Value) -> Result<(), CloudError> {
+        let body = serde_json::json!({ "name": name, "edit": edit });
+        self.send::<serde_json::Value>("PUT", &format!("/api/workspaces/{id}/presets/{preset_id}"), Some(body)).map(|_| ())
+    }
+
+    pub fn delete_preset(&self, id: &str, preset_id: &str) -> Result<(), CloudError> {
+        self.send::<serde_json::Value>("DELETE", &format!("/api/workspaces/{id}/presets/{preset_id}"), None).map(|_| ())
     }
 }
 

@@ -14,6 +14,7 @@ interface Video {
   hasPassword: boolean;
   allowComments?: boolean;
   expiresAt?: string | null;
+  workspaceId?: string | null;
 }
 interface Insights {
   views: number;
@@ -46,6 +47,7 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
   const [password, setPassword] = createSignal("");
   const [copied, setCopied] = createSignal<string | null>(null);
   const [insights, setInsights] = createSignal<Insights | null>(null);
+  const [teams, setTeams] = createSignal<{ id: string; name: string }[]>([]);
 
   createEffect(
     on(
@@ -59,6 +61,7 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
         setVideo(shared);
         setInsights(null);
         if (shared?.status === "ready") invoke<Insights | null>("share_insights", { id: ed.state().id }).then(setInsights, () => {});
+        if (status.connected) invoke<{ id: string; name: string }[]>("team_list").then(setTeams, () => setTeams([]));
       },
     ),
   );
@@ -189,6 +192,21 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
                 </div>
                 <Show when={insights()}>{(i) => <ViewerInsights insights={i()} />}</Show>
                 <SwitchRow label={`Start at ${Math.floor(ed.time() / 60)}:${String(Math.floor(ed.time() % 60)).padStart(2, "0")}`} checked={atTime()} onChange={setAtTime} />
+                <Show when={teams().length}>
+                  <div class="umi-field-label">Team</div>
+                  <div class="ed-chips">
+                    <button type="button" class="ed-chip" data-selected={!v().workspaceId ? "true" : "false"} onClick={() => void update({ workspaceId: null })}>
+                      Only me
+                    </button>
+                    <For each={teams()}>
+                      {(t) => (
+                        <button type="button" class="ed-chip" data-selected={v().workspaceId === t.id ? "true" : "false"} onClick={() => void update({ workspaceId: t.id })}>
+                          {t.name}
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </Show>
                 <SwitchRow label="Viewers can download" checked={v().allowDownload} onChange={(on) => void update({ allowDownload: on })} />
                 <SwitchRow label="Comments" checked={v().allowComments ?? true} onChange={(on) => void update({ allowComments: on })} />
                 <div class="umi-field-label">Expires</div>

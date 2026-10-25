@@ -217,6 +217,25 @@ mockIPC(
         return { id: "s2Zty2QoHiLz", url: "https://umi.cam/v/s2Zty2QoHiLz", title: "Product demo", status: "ready", allowDownload: true, hasPassword: false, allowComments: true, expiresAt: null };
       case "share_insights":
         return { views: 42, watchedSeconds: 2310, averageSeconds: 55, completion: 0.62, retention: [1, 0.97, 0.95, 0.93, 0.9, 0.88, 0.86, 0.85, 0.83, 0.82, 0.8, 0.79, 0.77, 0.75, 0.74, 0.72, 0.7, 0.68, 0.65, 0.62], embeddedViews: 9, countries: [{ country: "TR", count: 30 }, { country: "DE", count: 8 }, { country: "US", count: 4 }] };
+      case "team_list":
+        return [{ id: "W1", name: "Umi Team", role: "owner", members: 3, inviteCode: "k3Jd9aQpLx2mZt7RbV0c" }];
+      case "team_detail":
+        return {
+          workspace: { id: "W1", name: "Umi Team", role: "owner", members: 3, inviteCode: "k3Jd9aQpLx2mZt7RbV0c" },
+          members: [
+            { id: "a", email: "you@umi.cam", role: "owner", you: true },
+            { id: "b", email: "ada@umi.cam", role: "member", you: false },
+            { id: "c", email: "lin@umi.cam", role: "member", you: false },
+          ],
+        };
+      case "team_videos":
+        return [
+          { id: "v1", url: "https://umi.cam/v/v1", title: "Onboarding walkthrough", durationMs: 184000, thumbnailUrl: frame1, owner: "ada@umi.cam", yours: false },
+          { id: "v2", url: "https://umi.cam/v/v2", title: "Q4 roadmap", durationMs: 312000, thumbnailUrl: frame4, owner: "you@umi.cam", yours: true },
+          { id: "v3", url: "https://umi.cam/v/v3", title: "Bug repro: export", durationMs: 46000, thumbnailUrl: frame8, owner: "lin@umi.cam", yours: false },
+        ];
+      case "team_presets":
+        return [{ id: "P1", name: "Brand look", edit: {}, updatedBy: "ada@umi.cam" }];
       case "pexels_status":
         return true;
       case "pexels_search":

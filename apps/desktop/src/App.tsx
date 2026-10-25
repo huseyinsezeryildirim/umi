@@ -1,11 +1,12 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { Button, Dialog, IconButton, Menu, Progress, Spinner, toast } from "@umi/ui";
+import { Button, Dialog, IconButton, Menu, Progress, Segmented, Spinner, toast } from "@umi/ui";
 import { Circle, CircleHelp, Combine, Download, Film, FolderOpen, MoreHorizontal, Trash2, Upload } from "lucide-solid";
 import { Editor } from "./editor/Editor";
 import { installRecordingFlow } from "./recorder/flow";
 import { ShortcutsDialog } from "./ShortcutsDialog";
+import { TeamView } from "./TeamView";
 import { shouldTour, Tour } from "./Tour";
 import { listen } from "@tauri-apps/api/event";
 import { createEditor, formatTime, type Editor as EditorModel } from "./editor/store";
@@ -65,6 +66,7 @@ export function App() {
 
 function Library(props: { recordings: RecordingSummary[]; loading: boolean; opening: string | null; onOpen: (path: string) => void; onChanged: () => void; onTour: () => void }) {
   const [loom, setLoom] = createSignal(false);
+  const [tab, setTab] = createSignal<"mine" | "team">("mine");
   /** Recordings picked with Shift/⌘-click, in the order picked (for combining). */
   const [picked, setPicked] = createSignal<string[]>([]);
   const [combining, setCombining] = createSignal<number | null>(null);
@@ -99,7 +101,17 @@ function Library(props: { recordings: RecordingSummary[]; loading: boolean; open
   return (
     <div class="lib" data-tauri-drag-region>
       <header class="lib__header" data-tauri-drag-region>
-        <h1>Recordings</h1>
+        <div class="lib__title">
+          <h1>{tab() === "team" ? "Team" : "Recordings"}</h1>
+          <Segmented
+            value={tab()}
+            onChange={setTab}
+            options={[
+              { value: "mine", label: "Mine" },
+              { value: "team", label: "Team" },
+            ]}
+          />
+        </div>
         <div class="lib__actions">
           <Button size="sm" variant="ink" onClick={() => void invoke("window_show", { view: "launcher" })}>
             <Circle size={10} fill="#ff4d4d" stroke="none" /> New recording
@@ -135,7 +147,10 @@ function Library(props: { recordings: RecordingSummary[]; loading: boolean; open
           </Show>
         </div>
       </Show>
-      <Show when={!props.loading} fallback={<Spinner />}>
+      <Show when={tab() === "team"}>
+        <TeamView />
+      </Show>
+      <Show when={tab() === "mine" && !props.loading} fallback={<Show when={tab() === "mine"}><Spinner /></Show>}>
         <div class="lib__grid">
           <For each={props.recordings} fallback={<p class="lib__empty">No recordings yet.</p>}>
             {(r, i) => (

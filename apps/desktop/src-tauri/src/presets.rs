@@ -73,3 +73,14 @@ pub fn preset_set_default(preset: Option<uuid::Uuid>) -> Result<PresetLibrary, S
     store(&library)?;
     Ok(library)
 }
+
+/// Adds `style`, or replaces the saved one with the same id.
+pub fn upsert(style: StylePreset) -> Result<PresetLibrary, String> {
+    let mut library = load();
+    match library.presets.iter_mut().find(|p| p.id == style.id) {
+        Some(existing) => *existing = style,
+        None => library.presets.push(style),
+    }
+    store(&library)?;
+    Ok(library)
+}
