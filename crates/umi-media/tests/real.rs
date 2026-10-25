@@ -100,3 +100,53 @@ fn encodes_mp4_with_audio() {
     assert_eq!(dec.info().width, 640);
     assert!(dec.frame_at(1.0).unwrap().is_some());
 }
+
+/// A live-style recording: irregular frame times, two audio tracks with a gap, fragmented.
+#[test]
+fn writes_a_recording_as_it_happens() {
+    use umi_media::{Pixels, StreamWriter, VideoCodec, WriterSettings};
+    let path = std::env::temp_dir().join("umi-record-test.mov");
+    let (w, h) = (640u32, 360u32);
+    let mut writer = StreamWriter::create(&path, &WriterSettings { width: w, height: h, fps: 60, codec: VideoCodec::H264, bit_rate: 0, audio_tracks: 2, fragmented: true, hardware: true }).unwrap();
+    let y = vec![128u8; (w * h) as usize];
+    let uv = vec![128u8; (w * h / 2) as usize];
+    let bgra = vec![200u8; (w * h * 4) as usize];
+    // 2 s: frames at uneven times (static screens send fewer), alternating NV12 and BGRA.
+    let mut t = 0.0;
+    let mut k = 0;
+    while t < 2.0 {
+        if k % 2 == 0 {
+            writer.push_video(Pixels::Nv12 { y: &y, y_stride: w as usize, uv: &uv, uv_stride: w as usize }, t).unwrap();
+        } else {
+            writer.push_video(Pixels::Bgra { data: &bgra, stride: (w * 4) as usize }, t).unwrap();
+        }
+        t += if k % 5 == 0 { 0.1 } else { 1.0 / 60.0 };
+        k += 1;
+    }
+    // Track 0 continuous; track 1 starts late (0.5 s) — silence is filled in.
+    let tone: Vec<f32> = (0..48_000 * 2).flat_map(|i| { let v = (i as f32 * 0.05).sin() * 0.3; [v, v] }).collect();
+    for (i, chunk) in tone.chunks(960 * 2).enumerate() {
+        writer.push_audio(0, chunk, i as f64 * 0.02).unwrap();
+        if i as f64 * 0.02 >= 0.5 {
+            writer.push_audio(1, chunk, i as f64 * 0.02).unwrap();
+        }
+    }
+    let frames = writer.frames_written();
+    writer.finish().unwrap();
+    assert!(frames > 50);
+    let streams = umi_media::audio_streams(&path).unwrap();
+    assert_eq!(streams.len(), 2);
+    let duration = umi_media::duration(&path).unwrap();
+    assert!((duration - 2.0).abs() < 0.2, "{duration}");
+    // Both audio tracks are ~2 s long (the late one padded at the start).
+    for track in 0..2 {
+        let mut reader = umi_media::AudioReader::open(&path, track).unwrap();
+        let mut buf = vec![0f32; 48_000 * 2 * 3];
+        let n = reader.read(&mut buf).unwrap() / 2;
+        assert!((n as f64 / 48_000.0 - 2.0).abs() < 0.1, "track {track}: {n}");
+        if track == 1 {
+            let early: f32 = buf[..2 * 20_000].iter().map(|s| s.abs()).sum();
+            assert!(early < 1.0, "silence before the late start");
+        }
+    }
+}
