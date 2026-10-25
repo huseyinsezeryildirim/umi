@@ -857,11 +857,38 @@ pub struct Captions {
     /// Vertical center of the caption line, normalized (top-left origin).
     pub position: f64,
     pub highlight_active_word: bool,
+    /// Look of the caption line (older files: the dark pill).
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub style: CaptionStyle,
+    /// Words appear one by one as they're spoken.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reveal: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CaptionStyle {
+    /// White text on a dark rounded box.
+    #[default]
+    Pill,
+    /// Big bold white text with a dark outline (short-video style).
+    Bold,
+    /// Plain text with a soft shadow.
+    Minimal,
 }
 
 impl Default for Captions {
     fn default() -> Self {
-        Self { enabled: false, words: vec![], language: "en-US".into(), size: 0.045, position: 0.86, highlight_active_word: true }
+        Self {
+            enabled: false,
+            words: vec![],
+            language: "en-US".into(),
+            size: 0.045,
+            position: 0.86,
+            highlight_active_word: true,
+            style: CaptionStyle::Pill,
+            reveal: false,
+        }
     }
 }
 

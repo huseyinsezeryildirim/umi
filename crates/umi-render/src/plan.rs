@@ -621,7 +621,8 @@ impl FramePlanner {
         let Some(line) = lines.iter().find(|l| t >= l[0].start - 0.05 && t <= l[l.len() - 1].end + 0.4) else { return };
         let active = if c.highlight_active_word { line.iter().position(|w| t >= w.start && t < w.end) } else { None };
         let words: Vec<String> = line.iter().map(|w| w.text.clone()).collect();
-        let Some((key, (w, h))) = assets.caption(&words, active, canvas.height() * c.size, ACCENT) else { return };
+        let shown = if c.reveal { line.iter().filter(|w| w.start <= t + 0.02).count().max(1) } else { words.len() };
+        let Some((key, (w, h))) = assets.caption(&words, active, canvas.height() * c.size, ACCENT, c.style, shown) else { return };
         let (w, h) = (w as f64, h as f64);
         let center = Point::new(canvas.mid_x(), (1.0 - c.position) * canvas.height());
         ops.push(Op::Draw { target, draw: textured(Rect::new(center.x - w / 2.0, center.y - h / 2.0, w, h), TexRef::Raster(key), 1.0) });

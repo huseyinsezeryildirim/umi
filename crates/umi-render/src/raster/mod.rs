@@ -11,7 +11,7 @@ use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use umi_project::edit::{DeviceFrame, TextOverlay};
+use umi_project::edit::{CaptionStyle, DeviceFrame, TextOverlay};
 use umi_project::{Point, Size};
 
 /// Premultiplied sRGB RGBA8 pixels.
@@ -41,7 +41,7 @@ pub trait Assets: SizeSource {
     /// An image file (absolute, or relative to the project bundle): key and pixel size.
     fn image(&mut self, path: &str) -> Option<(String, (u32, u32))>;
     fn text_card(&mut self, text: &TextOverlay, characters: usize, canvas_height: f64) -> Option<(String, (u32, u32))>;
-    fn caption(&mut self, words: &[String], active: Option<usize>, height: f64, accent: [f32; 4]) -> Option<(String, (u32, u32))>;
+    fn caption(&mut self, words: &[String], active: Option<usize>, height: f64, accent: [f32; 4], style: CaptionStyle, shown: usize) -> Option<(String, (u32, u32))>;
     fn cursor_arrow(&mut self) -> CursorRaster;
     /// Keycaps for the keystroke overlay.
     fn keycaps(&mut self, keys: &[String], height: f64) -> Option<(String, (u32, u32))>;
@@ -115,9 +115,9 @@ impl Assets for FrameAssets<'_> {
         Some((key, size_of(&image)))
     }
 
-    fn caption(&mut self, words: &[String], active: Option<usize>, height: f64, accent: [f32; 4]) -> Option<(String, (u32, u32))> {
-        let key = format!("caption:{}:{active:?}:{}", words.join(" "), height as u32);
-        let image = self.cache.get_or_insert(&key, || text::caption(words, active, height, accent))?;
+    fn caption(&mut self, words: &[String], active: Option<usize>, height: f64, accent: [f32; 4], style: CaptionStyle, shown: usize) -> Option<(String, (u32, u32))> {
+        let key = format!("caption:{}:{active:?}:{}:{style:?}:{shown}", words.join(" "), height as u32);
+        let image = self.cache.get_or_insert(&key, || text::caption(words, active, height, accent, style, shown))?;
         Some((key, size_of(&image)))
     }
 

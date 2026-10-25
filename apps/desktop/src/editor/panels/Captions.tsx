@@ -1,7 +1,7 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { Button, Progress, Section, SliderField, SwitchRow, toast } from "@umi/ui";
+import { Button, Progress, Section, Segmented, SliderField, SwitchRow, toast } from "@umi/ui";
 import { Captions, FileDown, Scissors, Sparkles, Timer, Wand2 } from "lucide-solid";
 import type { Editor } from "../store";
 import type { EditorState, EditSettings } from "../types";
@@ -94,6 +94,16 @@ export function CaptionsSection(props: { editor: Editor; gesture: object }) {
         </Show>
         <Show when={words().length}>
           <SwitchRow label="Show captions in the video" checked={edit().captions.enabled} onChange={(v) => set((e) => (e.captions.enabled = v))} />
+          <Segmented
+            value={edit().captions.style ?? "pill"}
+            onChange={(v) => set((e) => (e.captions.style = v))}
+            options={[
+              { value: "pill", label: "Box" },
+              { value: "bold", label: "Bold" },
+              { value: "minimal", label: "Minimal" },
+            ]}
+          />
+          <SwitchRow label="Words appear as they're said" checked={edit().captions.reveal ?? false} onChange={(v) => set((e) => (e.captions.reveal = v))} />
           <SwitchRow label="Highlight the spoken word" checked={edit().captions.highlightActiveWord} onChange={(v) => set((e) => (e.captions.highlightActiveWord = v))} />
           <SliderField label="Size" value={edit().captions.size} min={0.025} max={0.08} format={(v) => `${Math.round(v * 1000) / 10}%`} onInput={(v) => set((e) => (e.captions.size = v))} {...props.gesture} />
           <SliderField label="Position" value={edit().captions.position} min={0.1} max={0.95} format={(v) => `${Math.round(v * 100)}%`} onInput={(v) => set((e) => (e.captions.position = v))} {...props.gesture} />
