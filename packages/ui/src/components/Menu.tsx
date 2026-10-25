@@ -36,15 +36,30 @@ function MenuPopover(props: { rect: DOMRect; entries: MenuEntry[]; align?: "star
   const [hi, setHi] = createSignal(-1);
   const items = () => props.entries.map((e, i) => ({ e, i })).filter(({ e }) => (e.kind ?? "item") === "item" && !(e as { disabled?: boolean }).disabled);
   const [pos, setPos] = createSignal({ x: props.rect.left, y: props.rect.bottom + 6 });
+  const [maxHeight, setMaxHeight] = createSignal<number | undefined>(undefined);
 
   onMount(() => {
     // Keep the menu on screen, flipping above the trigger when there's no room below.
     const r = el.getBoundingClientRect();
     let x = props.align === "end" ? props.rect.right - r.width : props.rect.left;
     x = Math.min(Math.max(8, x), window.innerWidth - r.width - 8);
-    let y = props.rect.bottom + 6;
-    if (y + r.height > window.innerHeight - 8) y = Math.max(8, props.rect.top - r.height - 6);
+    // Below the trigger if it fits, else above, else on whichever side has more room
+    // (scrolling inside).
+    const below = window.innerHeight - props.rect.bottom - 14;
+    const above = props.rect.top - 14;
+    let y: number;
+    let max: number | undefined;
+    if (r.height <= below) y = props.rect.bottom + 6;
+    else if (r.height <= above) y = props.rect.top - r.height - 6;
+    else if (above > below) {
+      max = above;
+      y = 8;
+    } else {
+      max = below;
+      y = props.rect.bottom + 6;
+    }
     setPos({ x, y });
+    setMaxHeight(max);
     const outside = (e: PointerEvent) => !el.contains(e.target as Node) && props.onClose();
     const key = (e: KeyboardEvent) => {
       const list = items();
@@ -73,7 +88,7 @@ function MenuPopover(props: { rect: DOMRect; entries: MenuEntry[]; align?: "star
 
   return (
     <Portal>
-      <div ref={el} class="umi-popover umi-floating" role="menu" style={{ left: `${pos().x}px`, top: `${pos().y}px`, "min-width": `${props.width ?? 200}px` }}>
+      <div ref={el} class="umi-popover umi-floating" role="menu" style={{ left: `${pos().x}px`, top: `${pos().y}px`, "min-width": `${props.width ?? 200}px`, ...(maxHeight() ? { "max-height": `${maxHeight()}px`, "overflow-y": "auto" } : {}) }}>
         <For each={props.entries}>
           {(entry, index) => {
             if (entry.kind === "separator") return <div class="umi-menu__separator" />;

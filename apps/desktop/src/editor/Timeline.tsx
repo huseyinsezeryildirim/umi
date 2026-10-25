@@ -593,16 +593,13 @@ function AddMenu(props: { editor: Editor }) {
         { kind: "label", label: "Text" },
         { label: "Title", icon: <Type size={15} />, onSelect: () => void ed.apply({ op: "addText", style: "title", time: ed.time() }) },
         { label: "Lower third", icon: <Type size={15} />, onSelect: () => void ed.apply({ op: "addText", style: "lowerThird", time: ed.time() }) },
-        { label: "Kicker", icon: <Type size={15} />, onSelect: () => void ed.apply({ op: "addText", style: "kicker", time: ed.time() }) },
         { label: "Big stat", icon: <Type size={15} />, onSelect: () => void ed.apply({ op: "addText", style: "bigStat", time: ed.time() }) },
-        { label: "Quote", icon: <Type size={15} />, onSelect: () => void ed.apply({ op: "addText", style: "quote", time: ed.time() }) },
         { kind: "separator" },
         { kind: "label", label: "Layout" },
         { label: "Camera only", icon: <Clapperboard size={15} />, onSelect: () => void ed.apply({ op: "addScene", layout: "cameraOnly", time: ed.time() }) },
         { label: "Split screen", icon: <Layers size={15} />, onSelect: () => void ed.apply({ op: "addScene", layout: "splitScreen", time: ed.time() }) },
         { label: "Floating camera", icon: <Layers size={15} />, onSelect: () => void ed.apply({ op: "addScene", layout: "floating", time: ed.time() }) },
-        { label: "3D glide", icon: <Cuboid size={15} />, onSelect: () => void ed.apply({ op: "addMove", kind: "glide", time: ed.time() }) },
-        { label: "3D pull back", icon: <Cuboid size={15} />, onSelect: () => void ed.apply({ op: "addMove", kind: "pullBack", time: ed.time() }) },
+        { label: "3D move", icon: <Cuboid size={15} />, onSelect: () => void ed.apply({ op: "addMove", kind: "glide", time: ed.time() }) },
       ]}
     />
   );

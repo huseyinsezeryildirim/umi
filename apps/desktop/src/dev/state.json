@@ -1,0 +1,124 @@
+{
+  "edit": {
+    "aspect": "auto",
+    "background": {
+      "gradient": {
+        "_0": "sky"
+      }
+    },
+    "backgroundAngle": 135.0,
+    "backgroundNoise": 0.0,
+    "border": 0.0,
+    "camera": {
+      "mirrored": true,
+      "position": [
+        0.8993055555555556,
+        0.7905102954341987
+      ],
+      "shape": "circle",
+      "size": 0.26857654431512984,
+      "visible": true
+    },
+    "captions": {
+      "enabled": false,
+      "highlightActiveWord": true,
+      "language": "en-US",
+      "position": 0.86,
+      "size": 0.045,
+      "words": []
+    },
+    "clips": [
+      {
+        "end": 5.322283017653828,
+        "speed": 1.0,
+        "start": 0.0
+      },
+      {
+        "end": 10.110041666666667,
+        "speed": 1.0,
+        "start": 5.322283017653828
+      }
+    ],
+    "cornerRadius": 0.025,
+    "cornerStyle": "rounded",
+    "crossfade": 0.0,
+    "cursor": {
+      "clickRings": true,
+      "hideWhenIdle": false,
+      "motionBlur": true,
+      "size": 1.5,
+      "smoothing": "smooth",
+      "style": "arrow",
+      "visible": true
+    },
+    "frame": "none",
+    "grade": {
+      "contrast": 0.0,
+      "exposure": 0.0,
+      "grain": 0.0,
+      "preset": "none",
+      "saturation": 0.0,
+      "vignette": 0.0
+    },
+    "masks": [],
+    "moves": [],
+    "overlays": [],
+    "padding": 0.08,
+    "scenes": [],
+    "shadow": 0.6,
+    "texts": [],
+    "zoom": {
+      "auto": true,
+      "glide": true,
+      "scale": 1.8,
+      "segments": []
+    }
+  },
+  "outputDuration": 10.110041666666667,
+  "placements": [
+    {
+      "clip": {
+        "end": 5.322283017653828,
+        "speed": 1.0,
+        "start": 0.0
+      },
+      "outputStart": 0.0
+    },
+    {
+      "clip": {
+        "end": 10.110041666666667,
+        "speed": 1.0,
+        "start": 5.322283017653828
+      },
+      "outputStart": 5.322283017653828
+    }
+  ],
+  "recording": {
+    "bundle": "/tmp/umi-fixtures/Real.umi",
+    "duration": 10.110071125,
+    "hasCamera": true,
+    "hasKeys": true,
+    "height": 2234,
+    "width": 3456
+  },
+  "zoomSegments": [
+    {
+      "end": 2.726107917,
+      "id": "00000000-0000-4000-8000-000000000146",
+      "scale": 1.8,
+      "start": 0.32610791699999997
+    },
+    {
+      "end": 6.467894,
+      "id": "00000000-0000-4000-8000-000000000FE3",
+      "scale": 1.8,
+      "start": 4.067894000000001
+    },
+    {
+      "end": 10.110071125,
+      "id": "00000000-0000-4000-8000-000000001F99",
+      "scale": 1.8,
+      "start": 8.089362917
+    }
+  ]
+}

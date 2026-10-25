@@ -6,6 +6,7 @@ import {
   Camera,
   Clapperboard,
   Crop,
+  Cuboid,
   Crosshair,
   EyeOff,
   Sun,
@@ -31,13 +32,27 @@ import { CaptionsSection } from "./panels/Captions";
 import { BrandSection } from "./panels/Brand";
 import { MusicSection } from "./panels/Music";
 import type { Editor } from "./store";
-import { maskRectAt, sourceTimeAt, type AspectRatio, type Background, type DeviceFrame, type EditSettings, type GradePreset, type MediaOverlay, type GradientPreset, type Selection } from "./types";
+import { maskRectAt, sourceTimeAt, type AspectRatio, type Background, type DeviceFrame, type EditSettings, type GradePreset, type MediaOverlay, type TextOverlay, type GradientPreset, type Selection } from "./types";
 
 type Tab = "background" | "screen" | "cursor" | "camera" | "zoom" | "color" | "captions" | "audio";
 
 const GRADES: GradePreset[] = ["none", "cinematic", "vivid", "golden", "frost", "midnight", "vintage", "noir", "dreamy"];
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
+/** A small outline of the shape (Auto shows the recording's own). */
+const aspectBox = (a: AspectRatio) => {
+  const r: Record<AspectRatio, [number, number]> = { auto: [16, 11], wide: [18, 10], vertical: [10, 18], square: [14, 14], classic: [16, 12], portrait: [12, 15] };
+  const [w, h] = r[a];
+  return { width: `${w}px`, height: `${h}px`, "border-style": a === "auto" ? "dashed" : "solid" };
+};
+const TEXT_STYLES: [TextOverlay["style"], string][] = [
+  ["title", "Title"],
+  ["lowerThird", "Lower third"],
+  ["kicker", "Kicker"],
+  ["bigStat", "Big stat"],
+  ["quote", "Quote"],
+  ["typewriter", "Typewriter"],
+];
 const ASPECTS: [AspectRatio, string][] = [
   ["auto", "Auto"],
   ["wide", "16:9"],
@@ -108,11 +123,12 @@ export function Inspector(props: { editor: Editor }) {
           <Match when={tab() === "background"}>
             <BackgroundSection editor={ed} gesture={gesture} />
             <Section title="Shape" icon={<Clapperboard size={15} />}>
-              <div class="ed-chips">
+              <div class="ed-aspects">
                 <For each={ASPECTS}>
                   {([value, label]) => (
-                    <button type="button" class="ed-chip" data-selected={edit().aspect === value ? "true" : "false"} onClick={() => set((e) => (e.aspect = value))}>
-                      {label}
+                    <button type="button" class="ed-aspect" data-selected={edit().aspect === value ? "true" : "false"} onClick={() => set((e) => (e.aspect = value))} title={label}>
+                      <i style={aspectBox(value)} />
+                      <span>{label}</span>
                     </button>
                   )}
                 </For>
@@ -288,8 +304,8 @@ export function Inspector(props: { editor: Editor }) {
               <SwitchRow label="Remove background noise" checked={sound().denoise} onChange={(v) => setSound((x) => (x.denoise = v))} />
               <SwitchRow label="Even out voice volume" checked={sound().levelVoice} onChange={(v) => setSound((x) => (x.levelVoice = v))} />
               <SliderField label="Microphone" value={sound().microphoneVolume} max={2} format={pct} onInput={(v) => setSound((x) => (x.microphoneVolume = v))} {...gesture} />
-              <SwitchRow label="Click sounds" checked={sound().clickSounds ?? false} onChange={(v) => setSound((x) => (x.clickSounds = v))} />
               <SliderField label="Computer sound" value={sound().systemVolume} max={2} format={pct} onInput={(v) => setSound((x) => (x.systemVolume = v))} {...gesture} />
+              <SwitchRow label="Click sounds" checked={sound().clickSounds ?? false} onChange={(v) => setSound((x) => (x.clickSounds = v))} />
             </Section>
             <Section title="Clips" icon={<Scissors size={15} />} hint="Blends each cut into the next clip.">
               <SliderField label="Crossfade" value={edit().crossfade} max={1.5} format={(v) => `${v.toFixed(1)}s`} onInput={(v) => set((e) => (e.crossfade = v))} {...gesture} />
@@ -427,6 +443,15 @@ function SelectionPanel(props: { editor: Editor; selection: Selection }) {
           {(t) => (
             <>
               {header("Text", <Type size={15} />)}
+              <div class="ed-chips">
+                <For each={TEXT_STYLES}>
+                  {([value, label]) => (
+                    <button type="button" class="ed-chip" data-selected={t().style === value ? "true" : "false"} onClick={() => set((e) => (e.texts.find((x) => x.id === t().id)!.style = value))}>
+                      {label}
+                    </button>
+                  )}
+                </For>
+              </div>
               <TextField value={t().text} onInput={(ev) => set((e) => (e.texts.find((x) => x.id === t().id)!.text = ev.currentTarget.value))} />
               <Show when={t().style === "lowerThird" || t().style === "bigStat" || t().style === "quote"}>
                 <TextField value={t().detail} placeholder="Second line" onInput={(ev) => set((e) => (e.texts.find((x) => x.id === t().id)!.detail = ev.currentTarget.value))} />
@@ -441,6 +466,25 @@ function SelectionPanel(props: { editor: Editor; selection: Selection }) {
                   { value: "typewriter", label: "Type" },
                 ]}
               />
+            </>
+          )}
+        </Match>
+        <Match when={s.kind === "move" && edit().moves.find((x) => x.id === (s as { id: string }).id)}>
+          {(m) => (
+            <>
+              {header("3D move", <Cuboid size={15} />)}
+              <Segmented
+                value={m().kind}
+                onChange={(v) => set((e) => (e.moves.find((x) => x.id === m().id)!.kind = v))}
+                options={[
+                  { value: "glide", label: "Glide" },
+                  { value: "unfold", label: "Unfold" },
+                  { value: "pullBack", label: "Pull back" },
+                ]}
+              />
+              <div class="umi-section__hint">
+                {m().kind === "glide" ? "The screen tilts and slides across, like a product shot." : m().kind === "unfold" ? "The screen starts leaning back and flattens out." : "Starts close and tilted, then pulls back to show everything."}
+              </div>
             </>
           )}
         </Match>
