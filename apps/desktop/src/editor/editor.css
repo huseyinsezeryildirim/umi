@@ -184,7 +184,8 @@
   flex-direction: column;
   gap: 6px;
   min-height: 100%;
-  padding-bottom: 6px;
+  padding-bottom: 24px;
+  cursor: default;
 }
 .ed-tl-content[data-blade="true"] {
   cursor: crosshair;

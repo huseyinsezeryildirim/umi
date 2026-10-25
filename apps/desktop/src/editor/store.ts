@@ -14,7 +14,7 @@ type Op =
   | { op: "moveClip"; from: number; to: number }
   | { op: "clipToVideo2"; index: number; time: number }
   | { op: "addZoom"; time: number }
-  | { op: "addMask"; time: number }
+  | { op: "addMask"; time: number; style?: "blur" | "pixelate" | "highlight" }
   | { op: "addScene"; layout: string; time: number }
   | { op: "addText"; style: string; time: number }
   | { op: "addMove"; kind: string; time: number }
