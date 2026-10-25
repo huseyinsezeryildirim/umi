@@ -2,7 +2,8 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Button, Dialog, IconButton, Menu, Progress, Segmented, Spinner, toast } from "@umi/ui";
-import { ChevronDown, Circle, CircleHelp, Combine, Download, Film, FolderOpen, MoreHorizontal, Trash2, Upload } from "lucide-solid";
+import { ChevronDown, Circle, CircleHelp, Combine, Download, Film, FolderOpen, MoreHorizontal, PencilLine, Trash2, Upload } from "lucide-solid";
+import { onWeb, revealLabel } from "./platform";
 import { EditableTitle } from "./EditableTitle";
 import { Editor } from "./editor/Editor";
 import { installRecordingFlow } from "./recorder/flow";
@@ -200,6 +201,7 @@ function Library(props: { recordings: RecordingSummary[]; loading: boolean; open
 /** A recording: poster, and on hover short snippets from across it (not the whole video). */
 function RecordingCard(props: { recording: RecordingSummary; index: number; opening: boolean; picked: number; onOpen: () => void; onPick: () => void; onChanged: () => void }) {
   const [confirm, setConfirm] = createSignal(false);
+  let rename = () => {};
   const trash = async () => {
     try {
       await invoke("recording_trash", { path: props.recording.path });
@@ -261,7 +263,9 @@ function RecordingCard(props: { recording: RecordingSummary; index: number; open
             )}
             entries={[
               { label: "Open", icon: <Film size={15} />, onSelect: props.onOpen },
-              { label: "Show in Finder", icon: <FolderOpen size={15} />, onSelect: () => void invoke("recording_reveal", { path: props.recording.path }) },
+              { label: "Rename", icon: <PencilLine size={15} />, onSelect: () => rename() },
+              // The web keeps recordings in the browser: there's no folder to show.
+              ...(onWeb ? [] : [{ label: revealLabel, icon: <FolderOpen size={15} />, onSelect: () => void invoke("recording_reveal", { path: props.recording.path }) }]),
               { kind: "separator" },
               { label: "Move to Trash", icon: <Trash2 size={15} />, onSelect: () => setConfirm(true) },
             ]}
@@ -289,6 +293,8 @@ function RecordingCard(props: { recording: RecordingSummary; index: number; open
         <EditableTitle
           class="lib__name"
           value={props.recording.name}
+          pencil="hover"
+          rename={(start) => (rename = start)}
           onClick={props.onOpen}
           onRename={(title) => void invoke("recording_rename", { path: props.recording.path, title }).then(props.onChanged, (e) => toast(`Couldn't rename: ${e}`))}
         />

@@ -1,11 +1,22 @@
 import { createSignal, onCleanup, Show } from "solid-js";
+import { PencilLine } from "lucide-solid";
 
 /**
- * A title you can rename by double-clicking. A single click still does `onClick` (after a beat,
- * so a double click doesn't trigger it); Enter or clicking away saves, Escape cancels.
+ * A title you can rename by double-clicking it or with the pencil beside it (`pencil: "hover"`
+ * shows the pencil only while the pointer is over the parent card). A single click still does
+ * `onClick` (after a beat, so a double click doesn't trigger it); Enter or clicking away saves,
+ * Escape cancels. `rename` hands over a function that starts renaming (for a "Rename" menu item).
  */
-export function EditableTitle(props: { value: string; class: string; onRename: (title: string) => void; onClick?: () => void }) {
+export function EditableTitle(props: {
+  value: string;
+  class: string;
+  onRename: (title: string) => void;
+  onClick?: () => void;
+  pencil?: "always" | "hover";
+  rename?: (start: () => void) => void;
+}) {
   const [editing, setEditing] = createSignal(false);
+  props.rename?.(() => setEditing(true));
   let timer = 0;
   onCleanup(() => window.clearTimeout(timer));
   const commit = (text: string) => {
@@ -16,6 +27,7 @@ export function EditableTitle(props: { value: string; class: string; onRename: (
     <Show
       when={editing()}
       fallback={
+        <div class="editable-title" data-pencil={props.pencil ?? "always"}>
         <div
           class={props.class}
           title="Double-click to rename"
@@ -32,6 +44,21 @@ export function EditableTitle(props: { value: string; class: string; onRename: (
           }}
         >
           {props.value}
+        </div>
+        <button
+          type="button"
+          class="editable-title__pencil"
+          aria-label="Rename"
+          title="Rename"
+          onClick={(e) => {
+            e.stopPropagation();
+            window.clearTimeout(timer);
+            setEditing(true);
+          }}
+          onDblClick={(e) => e.stopPropagation()}
+        >
+          <PencilLine size={13} />
+        </button>
         </div>
       }
     >
