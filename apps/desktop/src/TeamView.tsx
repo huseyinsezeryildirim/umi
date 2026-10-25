@@ -231,7 +231,7 @@ function Workspace(props: { workspace: Workspace; onChanged: () => void }) {
                 <Palette size={15} />
                 <span class="team__item-name">{p.name}</span>
                 <span class="team__item-sub">{p.updatedBy ?? ""}</span>
-                <Button size="sm" onClick={() => void run("team_preset_save", { preset: p }).then(() => toast(`“${p.name}” added to your presets`))}>
+                <Button size="sm" variant="ghost" onClick={() => void run("team_preset_save", { preset: p }).then(() => toast(`“${p.name}” added to your presets`))}>
                   Add to my presets
                 </Button>
                 <Show when={owner()}>

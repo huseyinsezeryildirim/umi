@@ -538,19 +538,19 @@
   height: 24px;
   padding: 0 10px 0 8px;
   border: 0;
-  border-radius: var(--umi-radius-pill);
+  border-radius: var(--umi-radius-sm);
   font-size: var(--umi-text-sm);
   font-weight: var(--umi-weight-semibold);
-  color: #fff;
-  background: var(--umi-accent);
-  box-shadow: 0 2px 6px rgba(17, 111, 245, 0.3);
+  /* Secondary: the ink Export stays the one main action. */
+  color: var(--umi-accent);
+  background: var(--umi-accent-tint);
   transition:
     transform var(--umi-fast) var(--umi-ease),
     background var(--umi-fast);
 }
 .ed-add:hover,
 .ed-add[data-open="true"] {
-  background: var(--umi-accent-hover);
+  background: rgba(17, 111, 245, 0.16);
 }
 .ed-add:active {
   transform: scale(0.96);

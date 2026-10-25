@@ -44,7 +44,7 @@ export function Tour(props: { open: boolean; onClose: () => void }) {
           <For each={STEPS}>{(_, i) => <i data-on={i() === step() ? "true" : "false"} />}</For>
         </div>
         <div class="tour__actions">
-          <Button onClick={close}>Skip</Button>
+          <Button variant="ghost" onClick={close}>Skip</Button>
           <Show when={step() < STEPS.length - 1} fallback={<Button variant="ink" onClick={close}>Start recording</Button>}>
             <Button variant="ink" onClick={() => setStep(step() + 1)}>
               Next

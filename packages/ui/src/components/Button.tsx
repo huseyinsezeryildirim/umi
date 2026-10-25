@@ -1,7 +1,12 @@
 import { splitProps, type JSX } from "solid-js";
 import { Tooltip } from "./Tooltip";
 
-export type ButtonVariant = "glass" | "ink" | "accent" | "ghost" | "danger";
+/**
+ * Hierarchy: `ink` is the one main action on a screen, `secondary` (the default) every
+ * other action, `ghost` the quiet ones (Cancel, Skip, Clear); `danger` destroys;
+ * `glass` is for controls floating over pictures (video, thumbnails).
+ */
+export type ButtonVariant = "ink" | "secondary" | "ghost" | "danger" | "glass" | "accent";
 export type ButtonSize = "sm" | "md" | "lg";
 
 export interface ButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -17,7 +22,7 @@ export interface ButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement>
 function classes(p: { variant?: ButtonVariant; size?: ButtonSize; block?: boolean; class?: string }, extra = "") {
   return [
     "umi-btn",
-    `umi-btn--${p.variant ?? "glass"}`,
+    `umi-btn--${p.variant ?? "secondary"}`,
     p.size && p.size !== "md" ? `umi-btn--${p.size}` : "",
     p.block ? "umi-btn--block" : "",
     extra,

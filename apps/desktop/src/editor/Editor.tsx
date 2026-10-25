@@ -156,7 +156,7 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
           </IconButton>
           <PresetsMenu editor={ed} />
           <div class="umi-divider umi-divider--vertical" />
-          <Button variant="glass" tip="Get a link to this video" onClick={() => setSharing(true)}>
+          <Button tip="Get a link to this video" onClick={() => setSharing(true)}>
             <Link size={15} /> Share
           </Button>
           <Button variant="ink" tip="Save a video file" shortcut="⌘E" onClick={() => setExporting(true)}>

@@ -62,17 +62,33 @@
     var(--umi-shadow-md);
 }
 
-/* The one main action on a surface. */
+/* The one main action on a screen: same shape as the rest, the only dark one. */
 .umi-btn--ink {
   color: var(--umi-on-ink);
   background: var(--umi-ink);
-  border-radius: var(--umi-radius-pill);
+  font-weight: var(--umi-weight-semibold);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
     var(--umi-shadow-ink);
 }
 .umi-btn--ink:hover:not(:disabled) {
   background: #1d2130;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 6px 14px rgba(14, 17, 30, 0.28);
+}
+
+/* Every other action: a soft blue tint, no outline — clearly second to the ink one. */
+.umi-btn--secondary {
+  color: var(--umi-accent);
+  background: var(--umi-accent-tint);
+}
+.umi-btn--secondary:hover:not(:disabled) {
+  background: rgba(17, 111, 245, 0.16);
+}
+.umi-btn--secondary[data-active="true"] {
+  color: #fff;
+  background: var(--umi-accent);
 }
 
 .umi-btn--accent {
