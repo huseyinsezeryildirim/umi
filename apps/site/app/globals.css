@@ -268,3 +268,23 @@ video::-webkit-media-controls-overlay-play-button {
     transform: translateX(92%);
   }
 }
+
+/* Sections off screen don't animate (Providers marks them). */
+[data-offscreen],
+[data-offscreen] * {
+  animation-play-state: paused !important;
+}
+
+/* A line filling from left to right once (the duration is set where it's used). */
+.progress-line {
+  transform-origin: left;
+  animation: progress-line linear both;
+}
+@keyframes progress-line {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}

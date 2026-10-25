@@ -33,6 +33,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     };
   }, []);
   useAutoplay();
+  usePauseOffscreen();
   return <MotionConfig reducedMotion="user">{children}</MotionConfig>;
 }
 
@@ -88,6 +89,32 @@ function useAutoplay() {
       mo.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
       removeEventListener("touchstart", retry);
+    };
+  }, []);
+}
+
+/**
+ * CSS animations in a section that isn't on screen stop (`data-offscreen`, see globals.css):
+ * a looping animation anywhere on the page otherwise keeps the browser redrawing all the time.
+ */
+function usePauseOffscreen() {
+  useEffect(() => {
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) e.target.toggleAttribute("data-offscreen", !e.isIntersecting);
+    });
+    const watched = new WeakSet<Element>();
+    const watch = () =>
+      document.querySelectorAll("section, footer").forEach((el) => {
+        if (watched.has(el)) return;
+        watched.add(el);
+        io.observe(el);
+      });
+    watch();
+    const mo = new MutationObserver(watch);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      io.disconnect();
+      mo.disconnect();
     };
   }, []);
 }
