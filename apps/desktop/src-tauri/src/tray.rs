@@ -61,5 +61,5 @@ pub fn toggle_launcher(app: &AppHandle, at: Option<(f64, f64)>) {
         let _ = w.hide();
         return;
     }
-    let _ = crate::windows::show(app, &crate::windows::LAUNCHER, at);
+    let _ = crate::windows::show_launcher(app, at);
 }

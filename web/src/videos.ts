@@ -22,6 +22,7 @@ export interface VideoRow {
   created_at: number;
   updated_at: number;
   deleted_at: number | null;
+  workspace_id: string | null;
 }
 
 /** Shape returned to the owner (macOS app). */
@@ -45,6 +46,7 @@ export interface VideoJson {
   expired: boolean;
   createdAt: string;
   updatedAt: string;
+  workspaceId: string | null;
 }
 
 export async function getVideo(env: AppEnv, id: string): Promise<VideoRow | null> {
@@ -78,5 +80,6 @@ export function toJson(video: VideoRow, env: AppEnv, request: Request): VideoJso
     expired: isExpired(video),
     createdAt: new Date(video.created_at).toISOString(),
     updatedAt: new Date(video.updated_at).toISOString(),
+    workspaceId: video.workspace_id ?? null,
   };
 }

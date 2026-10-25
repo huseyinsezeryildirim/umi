@@ -69,6 +69,16 @@ pub fn show(app: &AppHandle, spec: &Spec, at: Option<(f64, f64)>) -> tauri::Resu
     Ok(window)
 }
 
+/// The recorder, with the camera bubble when the camera was left on.
+pub fn show_launcher(app: &AppHandle, at: Option<(f64, f64)>) -> tauri::Result<WebviewWindow> {
+    let window = show(app, &LAUNCHER, at)?;
+    let settings = crate::recording::load_settings();
+    if settings.camera_on || settings.camera_only {
+        show(app, &BUBBLE, None)?;
+    }
+    Ok(window)
+}
+
 pub fn hide(app: &AppHandle, view: &str) {
     if let Some(w) = app.get_webview_window(view) {
         let _ = w.hide();
@@ -134,7 +144,7 @@ pub fn ink_set(app: AppHandle, drawing: bool, color: Option<String>) -> Result<(
 pub fn window_show(app: AppHandle, view: String, x: Option<f64>, y: Option<f64>) -> Result<(), String> {
     let at = x.zip(y);
     match view.as_str() {
-        "launcher" => show(&app, &LAUNCHER, at).map(|_| ()),
+        "launcher" => show_launcher(&app, at).map(|_| ()),
         "bubble" => show(&app, &BUBBLE, at).map(|_| ()),
         "controls" => show(&app, &CONTROLS, at).map(|_| ()),
         "prompter" => show(&app, &PROMPTER, at).map(|_| ()),

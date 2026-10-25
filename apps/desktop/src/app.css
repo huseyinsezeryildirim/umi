@@ -278,3 +278,138 @@
   width: 100%;
   margin-top: 6px;
 }
+
+/* ───── Team ───── */
+.lib__title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.team__tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.team__start {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  max-width: 720px;
+}
+.team__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 20px;
+  color: var(--umi-accent);
+}
+.team__card h2 {
+  margin: 4px 0 0;
+  font-size: var(--umi-text-lg);
+  color: var(--umi-ink);
+}
+.team__card p {
+  margin: 0 0 4px;
+  color: var(--umi-text-3);
+  font-size: var(--umi-text-md);
+}
+.team__card .umi-field,
+.team__card input {
+  align-self: stretch;
+}
+.team__body {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.team__head,
+.team__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.team__head h2 {
+  margin: 0;
+  font-size: var(--umi-text-xl);
+}
+.team__head p {
+  margin: 2px 0 0;
+  color: var(--umi-text-3);
+}
+.team__body h3 {
+  margin: 0 0 12px;
+  font-size: var(--umi-text-md);
+  font-weight: var(--umi-weight-semibold);
+}
+.team__row h3 {
+  margin: 0;
+}
+.team__row {
+  margin-bottom: 12px;
+}
+.team__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 720px;
+}
+.team__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--umi-ice-top);
+  box-shadow: inset 0 0 0 1px var(--umi-hairline);
+  color: var(--umi-accent);
+}
+.team__item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--umi-ink);
+  font-size: var(--umi-text-md);
+}
+.team__item-sub {
+  color: var(--umi-text-3);
+  font-size: var(--umi-text-sm);
+}
+.team__avatar {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--umi-accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+.team__by {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.team__icons {
+  display: flex;
+  gap: 2px;
+}
+.team__icons button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--umi-text-3);
+  cursor: pointer;
+}
+.team__icons button:hover {
+  background: var(--umi-ice-top);
+  color: var(--umi-accent);
+}

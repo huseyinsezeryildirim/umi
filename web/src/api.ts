@@ -4,6 +4,7 @@ import { hashPassword, randomId } from "./crypto";
 import { HttpError, json, readJson } from "./http";
 import { deleteSocialData, ownerDeleteComment, ownerListComments } from "./social";
 import { videoInsights } from "./insights";
+import { handleWorkspaces, parseWorkspaceId, visibleVideo } from "./workspaces";
 import { buildUploadPlan } from "./uploads";
 import { type VideoRow, getVideo, toJson } from "./videos";
 
@@ -18,6 +19,7 @@ interface CreateVideoBody {
   expiresAt?: string | null;
   allowDownload?: boolean;
   allowComments?: boolean;
+  workspaceId?: string | null;
 }
 
 interface UpdateVideoBody {
@@ -26,6 +28,7 @@ interface UpdateVideoBody {
   expiresAt?: string | null;
   allowDownload?: boolean;
   allowComments?: boolean;
+  workspaceId?: string | null;
 }
 
 interface CompleteBody {
@@ -102,11 +105,12 @@ async function createVideo(request: Request, env: AppEnv, account: Account): Pro
   const now = Date.now();
   const expiresAt = parseExpiresAt(body.expiresAt) ?? null;
   const passwordHash = (await parsePassword(body.password)) ?? null;
+  const workspaceId = (await parseWorkspaceId(env, account, body.workspaceId)) ?? null;
 
   await env.DB.prepare(
     `INSERT INTO videos (id, account_id, title, status, upload_id, content_type, size_bytes, duration_ms, width, height,
-       password_hash, expires_at, allow_download, allow_comments, created_at, updated_at)
-     VALUES (?, ?, ?, 'uploading', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       password_hash, expires_at, allow_download, allow_comments, created_at, updated_at, workspace_id)
+     VALUES (?, ?, ?, 'uploading', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -124,6 +128,7 @@ async function createVideo(request: Request, env: AppEnv, account: Account): Pro
       body.allowComments === false ? 0 : 1,
       now,
       now,
+      workspaceId,
     )
     .run();
 
@@ -220,6 +225,8 @@ async function updateVideo(request: Request, env: AppEnv, account: Account, id: 
   if (expiresAt !== undefined) sets.push("expires_at = ?"), values.push(expiresAt);
   const passwordHash = await parsePassword(body.password);
   if (passwordHash !== undefined) sets.push("password_hash = ?"), values.push(passwordHash);
+  const workspaceId = await parseWorkspaceId(env, account, body.workspaceId);
+  if (workspaceId !== undefined) sets.push("workspace_id = ?"), values.push(workspaceId);
   if (sets.length > 0) {
     await env.DB.prepare(`UPDATE videos SET ${sets.join(", ")}, updated_at = ? WHERE id = ?`)
       .bind(...values, Date.now(), id)
@@ -265,24 +272,28 @@ export async function handleApi(request: Request, env: AppEnv, path: string): Pr
   const account = await authenticate(request, env);
   const method = request.method;
 
+  if (path.startsWith("/api/workspaces")) {
+    const response = await handleWorkspaces(request, env, account, path);
+    if (response) return response;
+  }
   if (path === "/api/videos") {
     if (method === "POST") return createVideo(request, env, account);
     if (method === "GET") return listVideos(request, env, account);
   }
   const c = /^\/api\/videos\/([0-9A-Za-z]+)\/comments(?:\/([0-9A-Za-z]+))?$/.exec(path);
   if (c) {
+    if (method === "GET" && !c[2]) return ownerListComments(env, await visibleVideo(env, account, c[1]!));
     const video = await ownedVideo(env, account, c[1]!);
-    if (method === "GET" && !c[2]) return ownerListComments(env, video);
     if (method === "DELETE" && c[2]) return ownerDeleteComment(env, video, c[2]);
   }
   const ins = /^\/api\/videos\/([0-9A-Za-z]+)\/insights$/.exec(path);
-  if (ins && method === "GET") return videoInsights(env, await ownedVideo(env, account, ins[1]!));
+  if (ins && method === "GET") return videoInsights(env, await visibleVideo(env, account, ins[1]!));
   const m = /^\/api\/videos\/([0-9A-Za-z]+)(\/complete|\/upload-urls)?$/.exec(path);
   if (m) {
     const id = m[1]!;
     switch (`${method} ${m[2] ?? ""}`) {
       case "GET ":
-        return json({ video: toJson(await ownedVideo(env, account, id), env, request) });
+        return json({ video: toJson(await visibleVideo(env, account, id), env, request) });
       case "PATCH ":
         return updateVideo(request, env, account, id);
       case "DELETE ":

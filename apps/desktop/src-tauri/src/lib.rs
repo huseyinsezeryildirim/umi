@@ -9,6 +9,7 @@ mod recording;
 mod screenshot;
 mod share;
 mod pexels;
+mod team;
 mod shortcuts;
 mod tray;
 mod windows;
@@ -751,6 +752,18 @@ pub fn run() {
             pexels::pexels_status,
             pexels::pexels_search,
             pexels::pexels_use,
+            team::team_list,
+            team::team_create,
+            team::team_join,
+            team::team_detail,
+            team::team_rotate_invite,
+            team::team_remove_member,
+            team::team_delete,
+            team::team_videos,
+            team::team_presets,
+            team::team_preset_share,
+            team::team_preset_save,
+            team::team_preset_delete,
             share::copy_text_to_clipboard,
             shortcuts::shortcuts_get,
             shortcuts::shortcuts_set,

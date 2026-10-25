@@ -126,3 +126,39 @@ fn stops_when_the_file_fails() {
     assert_eq!(err.to_string(), "export failed");
     client.delete(&reservation.video.id).unwrap();
 }
+
+#[test]
+fn team_workspace_round_trip() {
+    let Ok(base) = std::env::var("UMI_CLOUD_TEST") else { return };
+    let owner = Client::new(&base, "umi_dev_token");
+    let member = Client::new(&base, "umi_team_token");
+    let ws = owner.create_workspace("Rust team").unwrap();
+    let code = ws.invite_code.clone().unwrap();
+    let joined = member.join_workspace(&code).unwrap();
+    assert_eq!((joined.id.as_str(), joined.role.as_str(), joined.invite_code.as_deref()), (ws.id.as_str(), "member", None));
+    let (_, members) = member.workspace(&ws.id).unwrap();
+    assert_eq!(members.len(), 2);
+    let me = members.iter().find(|m| m.you).unwrap().id.clone();
+
+    // A video shared into the team shows up for the member.
+    let reservation = owner.reserve("Team video").unwrap();
+    let path = std::env::temp_dir().join("umi-team-video.bin");
+    std::fs::write(&path, vec![7u8; 2000]).unwrap();
+    let video = owner
+        .upload_growing(&reservation, &path, &|| Some(Ok(umi_cloud::Finished { duration_ms: 1000, width: 640, height: 360, poster: None, gif: None })), &|_| {})
+        .unwrap();
+    let moved = owner.update(&video.id, &Settings { workspace_id: Some(Some(ws.id.clone())), ..Default::default() }).unwrap();
+    assert_eq!(moved.workspace_id.as_deref(), Some(ws.id.as_str()));
+    let videos = member.team_videos(&ws.id).unwrap();
+    assert!(videos.iter().any(|v| v.video.id == video.id && !v.yours));
+
+    let style = serde_json::json!({ "name": "Look", "padding": 0.12 });
+    member.share_preset(&ws.id, "ABC", "Look", &style).unwrap();
+    let presets = owner.team_presets(&ws.id).unwrap();
+    assert_eq!(presets[0].edit["padding"], 0.12);
+
+    member.remove_member(&ws.id, &me).unwrap();
+    assert!(member.team_videos(&ws.id).is_err());
+    owner.delete_workspace(&ws.id).unwrap();
+    owner.delete(&video.id).unwrap();
+}

@@ -14,6 +14,7 @@ const { values: args } = parseArgs({
     base: { type: "string", default: "http://localhost:8787" },
     token: { type: "string", default: "umi_dev_token" },
     "free-token": { type: "string", default: "umi_free_token" },
+    "team-token": { type: "string", default: "umi_team_token" },
     file: { type: "string" },
     thumb: { type: "string" },
   },
@@ -215,12 +216,13 @@ async function main() {
 
   console.log("\nViewer insights");
   const vPath = `${pagePath}/view`;
-  const sA = "a".repeat(20), sB = "b".repeat(20);
+  const session = () => Array.from(crypto.getRandomValues(new Uint8Array(20)), (b) => (b % 36).toString(36)).join("");
+  const sA = session(), sB = session();
   check((await viewer("POST", vPath, { session: sA, buckets: "11111000000000000000", watchedMs: 5000 })).status === 200, "view report → 200");
   check((await viewer("POST", vPath, { session: sA, buckets: "00000111110000000000", watchedMs: 9000 })).status === 200, "same session again (merged)");
   check((await viewer("POST", vPath, { session: sB, buckets: "11111111111111111111", watchedMs: 20000, embedded: true })).status === 200, "second viewer watched it all (embed)");
   check((await viewer("POST", vPath, { session: "bad", buckets: "1", watchedMs: 1 })).status === 400, "malformed report → 400");
-  check((await viewer("POST", vPath, { session: "c".repeat(20), buckets: "1".repeat(20), watchedMs: 1e12 })).status === 200, "huge watch time accepted but capped");
+  check((await viewer("POST", vPath, { session: session(), buckets: "1".repeat(20), watchedMs: 1e12 })).status === 200, "huge watch time accepted but capped");
   const ins = await api("GET", `/api/videos/${video.id}/insights`);
   check(ins.status === 200 && ins.data?.views === 3, `3 views counted (${ins.data?.views})`);
   check(Math.abs(ins.data?.retention?.[0] - 1) < 1e-9 && Math.abs(ins.data?.retention?.[12] - 2 / 3) < 1e-9, "retention per twentieth (merged buckets)");
@@ -228,6 +230,49 @@ async function main() {
   check(ins.data?.watchedSeconds <= 9 + 20 + (video.durationMs ?? 0) * 2 / 1000 + 1, "watch time capped by video length");
   check((await api("GET", `/api/videos/${video.id}/insights`, undefined, args["free-token"])).status === 404, "other account can't read insights → 404");
   check(html.includes('"/view"'), "player reports views");
+
+  console.log("\nWorkspaces");
+  const team = args["team-token"];
+  check((await api("POST", "/api/workspaces", { name: "Nope" }, args["free-token"])).status === 402, "unpaid account can't create a workspace → 402");
+  check((await api("POST", "/api/workspaces", { name: "  " })).status === 400, "empty name → 400");
+  const ws = await api("POST", "/api/workspaces", { name: "Umi Team" });
+  const wsId = ws.data?.workspace?.id;
+  const code = ws.data?.workspace?.inviteCode;
+  check(ws.status === 201 && ws.data.workspace.role === "owner" && typeof code === "string" && code.length >= 16, "create workspace → owner with invite code");
+  check((await api("GET", `/api/workspaces/${wsId}`, undefined, team)).status === 404, "non-member can't see it → 404");
+  check((await api("POST", "/api/workspaces/join", { code: "wrong" }, team)).status === 404, "wrong invite code → 404");
+  const joined = await api("POST", "/api/workspaces/join", { code }, team);
+  check(joined.status === 200 && joined.data.workspace.role === "member" && joined.data.workspace.inviteCode === null, "join with code → member (no invite code shown)");
+  check((await api("POST", "/api/workspaces/join", { code }, team)).status === 200, "joining twice is harmless");
+  const detail = await api("GET", `/api/workspaces/${wsId}`, undefined, team);
+  check(detail.data?.members?.length === 2 && detail.data.members.some((m) => m.you && m.role === "member"), "members listed");
+  check((await api("POST", `/api/workspaces/${wsId}/invite-code`, undefined, team)).status === 403, "member can't rotate the code → 403");
+  check((await api("GET", `/api/videos/${video.id}`, undefined, team)).status === 404, "member can't see a video outside the team");
+  const moved = await api("PATCH", `/api/videos/${video.id}`, { workspaceId: wsId });
+  check(moved.data?.video?.workspaceId === wsId, "owner moves a video into the workspace");
+  check((await api("PATCH", `/api/videos/${video.id}`, { workspaceId: "nonexistent1" })).status === 404, "unknown workspace → 404");
+  const teamVideos = await api("GET", `/api/workspaces/${wsId}/videos`, undefined, team);
+  check(teamVideos.data?.videos?.some((v) => v.id === video.id && v.yours === false && v.owner === "dev@umi.local"), "member sees the team's videos");
+  check((await api("GET", `/api/videos/${video.id}/insights`, undefined, team)).data?.views === 3, "member sees the video's insights");
+  check((await api("PATCH", `/api/videos/${video.id}`, { title: "hijack" }, team)).status === 404, "member can't change someone else's video");
+  check((await api("DELETE", `/api/videos/${video.id}`, undefined, team)).status === 404, "member can't delete someone else's video");
+  const preset = { name: "Brand look", edit: { padding: 0.1, background: { gradient: { _0: "sky" } } } };
+  check((await api("PUT", `/api/workspaces/${wsId}/presets/P1`, preset, team)).status === 200, "member shares a style");
+  check((await api("PUT", `/api/workspaces/${wsId}/presets/P2`, { name: "Bad", edit: "x" })).status === 400, "style must be an object");
+  const presets = await api("GET", `/api/workspaces/${wsId}/presets`);
+  check(presets.data?.presets?.length === 1 && presets.data.presets[0].edit.padding === 0.1 && presets.data.presets[0].updatedBy === "team@umi.local", "owner gets the shared style");
+  const rotated = await api("POST", `/api/workspaces/${wsId}/invite-code`);
+  check(rotated.data?.workspace?.inviteCode && rotated.data.workspace.inviteCode !== code, "owner rotates the invite code");
+  check((await api("POST", "/api/workspaces/join", { code }, args["free-token"])).status === 402, "joining needs a plan → 402");
+  check((await api("DELETE", `/api/workspaces/${wsId}/members/acc_dev`, undefined, team)).status === 403, "member can't remove the owner");
+  check((await api("DELETE", `/api/workspaces/${wsId}/members/acc_team`, undefined, team)).status === 200, "member leaves");
+  check((await api("GET", `/api/workspaces/${wsId}/videos`, undefined, team)).status === 404, "after leaving, the team is gone for them");
+  check((await api("POST", "/api/workspaces/join", { code }, team)).status === 404, "the old invite code no longer works");
+  check((await api("POST", "/api/workspaces/join", { code: rotated.data.workspace.inviteCode }, team)).status === 200, "the new one does");
+  await api("DELETE", `/api/workspaces/${wsId}/members/acc_team`, undefined, team);
+  check((await api("GET", "/api/workspaces")).data?.workspaces?.some((w) => w.id === wsId && w.members === 1), "workspace list with member count");
+  check((await api("DELETE", `/api/workspaces/${wsId}`)).status === 200, "owner deletes the workspace");
+  check((await api("GET", `/api/videos/${video.id}`)).data?.video?.workspaceId === null, "its videos stay with their owner");
 
   console.log("\nEmbed & oEmbed");
   const embed = await get(`/e/${video.id}?t=5`);
