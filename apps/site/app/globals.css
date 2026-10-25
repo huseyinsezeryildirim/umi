@@ -148,11 +148,11 @@ html.lenis body {
   --face: inset 0 0.03em 0 #fff, inset 0 -0.06em 0.1em rgb(17 24 39 / 0.1), inset 0 0.08em 0.14em rgb(255 255 255 / 0.9);
   display: inline-grid;
   place-items: center;
-  min-width: 1.06em;
-  height: 1.02em;
+  min-width: 1.1em;
+  height: 1.06em;
   padding: 0 0.16em;
   border-radius: 0.2em;
-  font-size: 0.62em;
+  font-size: 0.76em;
   font-weight: 500;
   color: #1f2533;
   background: linear-gradient(180deg, #ffffff 0%, #f1f3f7 100%);
@@ -164,6 +164,12 @@ html.lenis body {
     0 calc(var(--edge) + 0.1em) 0.22em rgb(20 40 90 / 0.28);
   transform: translateY(calc(var(--edge) * -0.5));
   animation: key-press 3.2s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+}
+/* The symbol on the key: smaller than the key and heavier, like printed legends. */
+.keycap__g {
+  font-size: 0.64em;
+  font-weight: 650;
+  line-height: 1;
 }
 @keyframes key-press {
   0%,

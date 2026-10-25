@@ -164,7 +164,7 @@ export function Ending() {
             <span className="keys">
               {["⌥", "⇧", "L"].map((k, i) => (
                 <span key={k} className="keycap" style={{ animationDelay: `${i * 0.16}s` }}>
-                  {k}
+                  <span className="keycap__g">{k}</span>
                 </span>
               ))}
             </span>
