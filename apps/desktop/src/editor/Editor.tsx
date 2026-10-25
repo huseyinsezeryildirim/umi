@@ -20,6 +20,7 @@ import { CommandMenu, type Command } from "./CommandMenu";
 import { ExportDialog } from "./ExportDialog";
 import { Inspector } from "./Inspector";
 import { PresetsMenu } from "./Presets";
+import { ShareDialog } from "./ShareDialog";
 import { VoiceoverDialog } from "./VoiceoverDialog";
 import { Preview } from "./Preview";
 import { formatTime, type Editor as EditorModel } from "./store";
@@ -30,6 +31,7 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
   const ed = props.editor;
   const [exporting, setExporting] = createSignal(false);
   const [commanding, setCommanding] = createSignal(false);
+  const [sharing, setSharing] = createSignal(false);
 
   const commands = (): Command[] => {
     const at = () => ed.time();
@@ -154,7 +156,7 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
           </IconButton>
           <PresetsMenu editor={ed} />
           <div class="umi-divider umi-divider--vertical" />
-          <Button variant="glass" tip="Get a link to this video">
+          <Button variant="glass" tip="Get a link to this video" onClick={() => setSharing(true)}>
             <Link size={15} /> Share
           </Button>
           <Button variant="ink" tip="Save a video file" shortcut="⌘E" onClick={() => setExporting(true)}>
@@ -208,6 +210,7 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
       </main>
       <ExportDialog editor={ed} open={exporting()} onClose={() => setExporting(false)} />
       <VoiceoverDialog editor={ed} />
+      <ShareDialog editor={ed} open={sharing()} onClose={() => setSharing(false)} />
       <CommandMenu editor={ed} commands={commands} open={commanding()} onClose={() => setCommanding(false)} />
       <Toaster />
     </div>

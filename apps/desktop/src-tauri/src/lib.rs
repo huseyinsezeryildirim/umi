@@ -9,6 +9,7 @@ mod recording;
 mod windows;
 mod tray;
 mod shortcuts;
+mod share;
 
 use editor::{EditorSession, EditorState, Op};
 use parking_lot::Mutex;
@@ -36,7 +37,7 @@ pub(crate) struct AppState {
 }
 
 impl AppState {
-    fn gpu(&self) -> Result<Arc<Gpu>, String> {
+    pub(crate) fn gpu(&self) -> Result<Arc<Gpu>, String> {
         if let Some(gpu) = self.gpu.get() {
             return Ok(gpu.clone());
         }
@@ -576,6 +577,14 @@ pub fn run() {
             editor_export,
             editor_export_cancel,
             export_default_path,
+            share::cloud_status,
+            share::cloud_connect,
+            share::cloud_disconnect,
+            share::share_state,
+            share::share_start,
+            share::share_update,
+            share::share_delete,
+            share::copy_text_to_clipboard,
             app_quit,
             open_privacy_settings,
             windows::window_show,
