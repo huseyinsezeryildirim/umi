@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
 import { createResource, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { IconButton, Kbd, Menu, Segmented, Toaster, toast, type MenuEntry } from "@umi/ui";
 import { AppWindow, Smartphone, Camera, CameraOff, ChevronDown, Crop, Film, Maximize2, Mic, MicOff, Monitor, MoreHorizontal, ScrollText, ShieldAlert, UserSquare2, Volume2, VolumeX } from "lucide-solid";
@@ -139,6 +140,7 @@ export function Launcher() {
     { kind: "separator" },
     { label: "Take a screenshot", shortcut: "⌥⇧4", icon: <Camera size={15} />, onSelect: () => void invoke("area_pick", { mode: "screenshot" }) },
     { label: "Open library", icon: <Film size={15} />, onSelect: () => void recorder.show("main") },
+    { label: "Keyboard shortcuts…", onSelect: () => void recorder.show("main").then(() => emit("open-shortcuts")) },
     { label: "Quit Umi", onSelect: () => void invoke("app_quit") },
   ];
 

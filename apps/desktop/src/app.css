@@ -170,3 +170,111 @@
   color: var(--umi-accent);
   font-weight: 600;
 }
+.sc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.sc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 4px 0 10px;
+  border-radius: 10px;
+}
+.sc-row:hover {
+  background: var(--umi-ice-top);
+}
+.sc-row > span:first-child {
+  flex: 1;
+}
+.sc-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #c2410c;
+}
+.sc-keys {
+  min-width: 110px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--umi-hairline);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.sc-keys[data-on="true"] {
+  color: var(--umi-accent);
+  box-shadow: inset 0 0 0 2px var(--umi-accent);
+}
+.sc-reset {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--umi-text-3);
+  cursor: pointer;
+}
+.sc-reset:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.tour {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px 2px;
+  text-align: center;
+}
+.tour__icon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  color: var(--umi-accent);
+  background: linear-gradient(135deg, var(--umi-ice-top), #d6e8fb);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.9), 0 6px 18px rgba(17, 111, 245, 0.15);
+}
+.tour h2 {
+  margin: 6px 0 0;
+  font-size: 20px;
+}
+.tour p {
+  margin: 0;
+  max-width: 340px;
+  line-height: 1.5;
+  color: var(--umi-text-2);
+}
+.tour__dots {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0;
+}
+.tour__dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(14, 17, 30, 0.15);
+  transition: width var(--umi-normal) var(--umi-ease);
+}
+.tour__dots i[data-on="true"] {
+  width: 20px;
+  border-radius: 4px;
+  background: var(--umi-accent);
+}
+.tour__actions {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 6px;
+}

@@ -1,6 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { FlipHorizontal2, X } from "lucide-solid";
+import { invoke } from "@tauri-apps/api/core";
+import { FlipHorizontal2, Sparkles, X } from "lucide-solid";
 import { recorder, type CameraStyle, type RecordSettings } from "./api";
 
 const SIZES = { S: 160, M: 220, L: 300 } as const;
@@ -70,6 +71,11 @@ export function Bubble() {
           <button type="button" data-on={style()?.mirrored ? "true" : "false"} onClick={() => update((c) => (c.mirrored = !c.mirrored))} aria-label="Mirror">
             <FlipHorizontal2 size={13} />
           </button>
+          <Show when={navigator.platform.toLowerCase().includes("mac")}>
+            <button type="button" onClick={() => void invoke("show_video_effects")} aria-label="Video effects" title="Center Stage, Portrait, Studio Light">
+              <Sparkles size={13} />
+            </button>
+          </Show>
           <button type="button" onClick={close} aria-label="Turn camera off">
             <X size={13} />
           </button>

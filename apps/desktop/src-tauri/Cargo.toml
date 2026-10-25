@@ -40,5 +40,8 @@ umi-cloud = { path = "../../../crates/umi-cloud" }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 arboard = { version = "3", default-features = false, features = ["image-data"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc = "0.2"
+
 [lints]
 workspace = true
