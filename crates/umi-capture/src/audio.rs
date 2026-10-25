@@ -91,6 +91,56 @@ pub fn start(id: Option<&str>, clock: Clock, sink: Option<Arc<dyn AudioSink>>) -
     Ok(MicSession { _stream: stream, level })
 }
 
+/// The computer's own sound on Windows: WASAPI loopback of the default output device.
+#[cfg(windows)]
+pub fn start_loopback(clock: Clock, sink: Arc<dyn AudioSink>) -> Result<MicSession, CaptureError> {
+    let host = cpal::default_host();
+    let device = host.default_output_device().ok_or_else(|| CaptureError::NotFound("The speakers".into()))?;
+    let config = device.default_output_config().map_err(|e| CaptureError::Other(e.to_string()))?;
+    let rate = config.sample_rate() as f64;
+    let channels = config.channels() as usize;
+    let level = Arc::new(AtomicU32::new(0));
+    let resampler = Arc::new(Mutex::new(Resampler::new(rate, 48_000.0)));
+    let stream = device
+        .build_input_stream(
+            config.into(),
+            move |data: &[f32], _: &_| {
+                // Stereo (first two channels) at 48 kHz.
+                let frames = data.len() / channels.max(1);
+                let duration = Duration::from_secs_f64(frames as f64 / rate);
+                let Some(t) = clock.at(Instant::now().checked_sub(duration).unwrap_or_else(Instant::now)) else { return };
+                let left: Vec<f32> = data.chunks_exact(channels.max(1)).map(|f| f[0]).collect();
+                let right: Vec<f32> = data.chunks_exact(channels.max(1)).map(|f| f[f.len().min(2) - 1]).collect();
+                let mut r = resampler.lock();
+                let phase = (r.position, r.last);
+                let l = r.process(&left);
+                // Same phase for both sides.
+                (r.position, r.last) = phase;
+                let rr = r.process(&right);
+                let stereo: Vec<f32> = l.iter().zip(&rr).flat_map(|(a, b)| [*a, *b]).collect();
+                sink.audio(&stereo, t);
+            },
+            |e| eprintln!("loopback: {e}"),
+            None,
+        )
+        .map_err(|e| CaptureError::Other(e.to_string()))?;
+    stream.play().map_err(|e| CaptureError::Other(e.to_string()))?;
+    Ok(MicSession { _stream: stream, level })
+}
+
+/// The computer's own sound on Linux: the sound server's "Monitor of …" input.
+#[cfg(target_os = "linux")]
+pub fn start_monitor_source(clock: Clock, sink: Arc<dyn AudioSink>) -> Result<MicSession, CaptureError> {
+    let host = cpal::default_host();
+    let monitor = host
+        .input_devices()
+        .map_err(|e| CaptureError::Other(e.to_string()))?
+        .find(|d| d.description().is_ok_and(|n| n.name().to_lowercase().contains("monitor")))
+        .ok_or_else(|| CaptureError::NotFound("A sound monitor source".into()))?;
+    let id = monitor.id().map_err(|e| CaptureError::Other(e.to_string()))?.to_string();
+    start(Some(&id), clock, Some(sink))
+}
+
 /// Linear-interpolation resampler that keeps its phase across calls (fine for speech).
 pub struct Resampler {
     step: f64,
