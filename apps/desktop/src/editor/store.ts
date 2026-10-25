@@ -27,6 +27,7 @@ type Op =
   | { op: "cutWords"; ids: string[] }
   | { op: "removeFillers" }
   | { op: "removePauses"; min: number }
+  | { op: "speedUpTyping"; speed: number }
   | { op: "beginGesture" }
   | { op: "endGesture" }
   | { op: "undo" }

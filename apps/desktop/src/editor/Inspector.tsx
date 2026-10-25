@@ -12,6 +12,7 @@ import {
   Layers,
   Merge,
   Mic,
+  FastForward,
   Image,
   Keyboard,
   Monitor,
@@ -177,6 +178,9 @@ export function Inspector(props: { editor: Editor }) {
               <SwitchRow label="Hide when idle" checked={edit().cursor.hideWhenIdle} onChange={(v) => set((e) => (e.cursor.hideWhenIdle = v))} />
             </Section>
             <Section title="Keystrokes" icon={<Keyboard size={15} />} hint={ed.state().recording.hasKeys ? "Shows keyboard shortcuts on screen as you press them." : "This recording has no key presses. New recordings save them."}>
+              <Button size="sm" disabled={!ed.state().recording.hasKeys} onClick={() => void ed.apply({ op: "speedUpTyping", speed: 3 }).then(() => toast("Long typing plays 3× faster"))}>
+                <FastForward size={14} /> Speed up long typing
+              </Button>
               <SwitchRow label="Show shortcuts" checked={keys().enabled} onChange={(v) => setKeys((k) => (k.enabled = v))} />
               <Show when={keys().enabled}>
                 <SwitchRow label="Show typing too" checked={keys().includeTyping} onChange={(v) => setKeys((k) => (k.includeTyping = v))} />

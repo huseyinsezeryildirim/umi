@@ -52,6 +52,7 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
       { title: "AI voiceover…", group: "Add", keywords: "voice speech narrate tts kokoro", run: () => ed.requestVoiceover() },
       { title: "Remove filler words", group: "Clean up", keywords: "um uh transcript", run: () => void ed.apply({ op: "removeFillers" }) },
       { title: "Shorten long pauses", group: "Clean up", keywords: "silence gaps", run: () => void ed.apply({ op: "removePauses", min: 1.0 }) },
+      { title: "Speed up typing", group: "Clean up", keywords: "keyboard fast skip", run: () => void ed.apply({ op: "speedUpTyping", speed: 3 }) },
       { title: "Export…", group: "File", shortcut: "⌘E", keywords: "save mp4 gif mov", run: () => setExporting(true) },
       panel("background", "Background", "wallpaper gradient color"),
       panel("screen", "Screen frame", "padding corners shadow crop device"),
