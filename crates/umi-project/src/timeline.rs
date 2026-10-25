@@ -360,13 +360,18 @@ impl Document {
     // MARK: Masks, scenes, text, 3D
 
     pub fn add_mask(&mut self, output_time: f64) -> Option<Selection> {
+        self.add_mask_with(output_time, MaskStyle::Blur)
+    }
+
+    /// Adds a blur/pixelate (privacy) or spotlight (highlight) area at the playhead.
+    pub fn add_mask_with(&mut self, output_time: f64, style: MaskStyle) -> Option<Selection> {
         let source = self.source_time(output_time)?;
         let mask = PrivacyMask {
             id: new_id(),
             start: source,
             end: (source + 3.0).min(self.project.duration),
             rect: Rect::new(0.35, 0.35, 0.3, 0.2),
-            style: MaskStyle::Blur,
+            style,
             amount: 0.6,
             keyframes: vec![],
         };

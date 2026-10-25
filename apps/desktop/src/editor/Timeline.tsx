@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, Index, on, For, onCleanup, onMount, Show } from "solid-js";
 import { Menu, tokens, toast } from "@umi/ui";
-import { Clapperboard, Cuboid, EyeOff, Layers, Link2, Plus, Type, ZoomIn } from "lucide-solid";
+import { Clapperboard, Cuboid, EyeOff, Layers, Link2, Plus, Sun, Type, ZoomIn } from "lucide-solid";
 import { formatTime, sameSelection, type Editor } from "./store";
 import { placementEnd, type Placement, type Selection } from "./types";
 
@@ -89,7 +89,18 @@ export function Timeline(props: { editor: Editor }) {
     if (media.length) list.push({ id: "media", title: "Media", items: media.map((o) => ({ selection: { kind: "overlay", id: o.id }, start: o.start, end: o.end, label: o.file, color: c.media, output: true })) });
     if (zooms.length) list.push({ id: "zoom", title: "Zoom", items: zooms });
     if (e.scenes.length) list.push({ id: "scenes", title: "Scenes", items: e.scenes.map((x) => ({ selection: { kind: "scene", id: x.id }, start: x.start, end: x.end, label: SCENE_LABELS[x.layout], color: c.scene })) });
-    if (e.masks.length) list.push({ id: "masks", title: "Masks", items: e.masks.map((x) => ({ selection: { kind: "mask", id: x.id }, start: x.start, end: x.end, label: MASK_LABELS[x.style] + ((x.keyframes?.length ?? 0) > 20 ? " · tracked" : ""), color: c.mask, marks: x.keyframes?.map((k) => k.t) })) });
+    const maskItem = (x: (typeof e.masks)[number]) => ({
+      selection: { kind: "mask", id: x.id } as Selection,
+      start: x.start,
+      end: x.end,
+      label: MASK_LABELS[x.style] + ((x.keyframes?.length ?? 0) > 20 ? " · tracked" : ""),
+      color: x.style === "highlight" ? c.scene : c.mask,
+      marks: x.keyframes?.map((k) => k.t),
+    });
+    const blurs = e.masks.filter((m) => m.style !== "highlight");
+    const spots = e.masks.filter((m) => m.style === "highlight");
+    if (blurs.length) list.push({ id: "blur", title: "Blur", items: blurs.map(maskItem) });
+    if (spots.length) list.push({ id: "spotlight", title: "Spotlight", items: spots.map(maskItem) });
     if (e.texts.length) list.push({ id: "text", title: "Text", items: e.texts.map((x) => ({ selection: { kind: "text", id: x.id }, start: x.start, end: x.end, label: x.text, color: c.text })) });
     if (e.moves.length) list.push({ id: "moves", title: "3D", items: e.moves.map((x) => ({ selection: { kind: "move", id: x.id }, start: x.start, end: x.end, label: MOVE_LABELS[x.kind], color: c.move })) });
     return list;
@@ -108,6 +119,7 @@ export function Timeline(props: { editor: Editor }) {
    * drag draws a box that selects everything it touches (Shift adds to the selection).
    */
   const laneDown = (e: PointerEvent) => {
+    console.warn("TLMARQUEE down", (e.target as HTMLElement).className, e.button);
     if (e.button !== 0) return;
     const r0 = content.getBoundingClientRect();
     const sx = e.clientX - r0.left;
@@ -361,6 +373,10 @@ export function Timeline(props: { editor: Editor }) {
           data-blade={ed.blade() ? "true" : "false"}
           onPointerMove={(e) => ed.blade() && setHoverX(e.clientX - scroller.getBoundingClientRect().left + scroller.scrollLeft - LABEL_W)}
           onPointerLeave={() => setHoverX(null)}
+          onPointerDown={(e) => {
+            // Empty space anywhere in the timeline (below or between lanes) starts a selection box.
+            if (e.target === e.currentTarget) laneDown(e);
+          }}
         >
           {/* Ruler */}
           <div class="ed-ruler" style={{ height: `${RULER_H}px` }} onPointerDown={rulerDown}>
@@ -553,7 +569,8 @@ function AddMenu(props: { editor: Editor }) {
       )}
       entries={[
         { label: "Zoom", icon: <ZoomIn size={15} />, shortcut: "Z", onSelect: () => void ed.apply({ op: "addZoom", time: ed.time() }) },
-        { label: "Privacy mask", icon: <EyeOff size={15} />, onSelect: () => void ed.apply({ op: "addMask", time: ed.time() }) },
+        { label: "Blur", icon: <EyeOff size={15} />, onSelect: () => void ed.apply({ op: "addMask", time: ed.time(), style: "blur" }) },
+        { label: "Spotlight", icon: <Sun size={15} />, onSelect: () => void ed.apply({ op: "addMask", time: ed.time(), style: "highlight" }) },
         { kind: "separator" },
         { kind: "label", label: "Text" },
         { label: "Title", icon: <Type size={15} />, onSelect: () => void ed.apply({ op: "addText", style: "title", time: ed.time() }) },

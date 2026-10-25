@@ -6,6 +6,8 @@ import {
   Camera,
   Clapperboard,
   Crosshair,
+  EyeOff,
+  Sun,
   Layers,
   Merge,
   Image,
@@ -346,17 +348,26 @@ function SelectionPanel(props: { editor: Editor; selection: Selection }) {
         <Match when={s.kind === "mask" && edit().masks.find((m) => m.id === (s as { id: string }).id)}>
           {(m) => (
             <>
-              {header("Privacy mask", <SlidersHorizontal size={15} />)}
-              <Segmented
-                value={m().style}
-                onChange={(v) => set((e) => (e.masks.find((x) => x.id === m().id)!.style = v))}
-                options={[
-                  { value: "blur", label: "Blur" },
-                  { value: "pixelate", label: "Pixelate" },
-                  { value: "highlight", label: "Spotlight" },
-                ]}
-              />
-              <SliderField label="Strength" value={m().amount} format={pct} onInput={(v) => set((e) => (e.masks.find((x) => x.id === m().id)!.amount = v))} {...gesture} />
+              <Show
+                when={m().style === "highlight"}
+                fallback={
+                  <>
+                    {header("Blur", <EyeOff size={15} />)}
+                    <Segmented
+                      value={m().style}
+                      onChange={(v) => set((e) => (e.masks.find((x) => x.id === m().id)!.style = v))}
+                      options={[
+                        { value: "blur", label: "Blur" },
+                        { value: "pixelate", label: "Pixelate" },
+                      ]}
+                    />
+                  </>
+                }
+              >
+                {header("Spotlight", <Sun size={15} />)}
+                <div class="umi-section__hint">Keeps this area bright and dims the rest of the screen.</div>
+              </Show>
+              <SliderField label={m().style === "highlight" ? "Dim the rest" : "Strength"} value={m().amount} format={pct} onInput={(v) => set((e) => (e.masks.find((x) => x.id === m().id)!.amount = v))} {...gesture} />
               <MaskMotion editor={ed} maskId={m().id} />
             </>
           )}

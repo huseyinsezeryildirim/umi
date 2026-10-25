@@ -28,7 +28,7 @@ pub enum Op {
     MoveClip { from: usize, to: usize },
     ClipToVideo2 { index: usize, time: f64 },
     AddZoom { time: f64 },
-    AddMask { time: f64 },
+    AddMask { time: f64, style: Option<umi_project::edit::MaskStyle> },
     AddScene { layout: SceneLayout, time: f64 },
     AddText { style: TextStyle, time: f64 },
     AddMove { kind: MoveKind, time: f64 },
@@ -173,7 +173,7 @@ impl EditorSession {
             }
             Op::ClipToVideo2 { index, time } => selection = doc.move_clip_to_video2(index, time).map(Selection::Overlay),
             Op::AddZoom { time } => selection = doc.add_zoom(time),
-            Op::AddMask { time } => selection = doc.add_mask(time),
+            Op::AddMask { time, style } => selection = doc.add_mask_with(time, style.unwrap_or_default()),
             Op::AddScene { layout, time } => selection = doc.add_scene(layout, time),
             Op::AddText { style, time } => selection = doc.add_text(style, time),
             Op::AddMove { kind, time } => selection = doc.add_move(kind, time),
