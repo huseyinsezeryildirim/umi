@@ -214,9 +214,52 @@ export function Inspector(props: { editor: Editor }) {
           </Match>
 
           <Match when={tab() === "zoom"}>
-            <Section title="Zoom" icon={<ZoomIn size={15} />} hint="Press Z to add a zoom at the playhead. Drag a zoom on the timeline to move it.">
-              <SwitchRow label="Zoom on clicks" checked={edit().zoom.auto} onChange={(v) => set((e) => (e.zoom.auto = v))} />
-              <SliderField label="Default zoom" value={edit().zoom.scale} min={1.2} max={3.5} format={(v) => `${v.toFixed(1)}×`} onInput={(v) => set((e) => (e.zoom.scale = v))} {...gesture} />
+            <Section title="Automatic zoom" icon={<ZoomIn size={15} />}>
+              <SwitchRow label="Zoom automatically" checked={edit().zoom.auto} onChange={(v) => set((e) => (e.zoom.auto = v))} />
+              <Show when={edit().zoom.auto}>
+                <Segmented
+                  value={edit().zoom.trigger ?? "clicks"}
+                  onChange={(v) => set((e) => (e.zoom.trigger = v))}
+                  options={[
+                    { value: "clicks", label: "On clicks" },
+                    { value: "smart", label: "Smart" },
+                  ]}
+                />
+                <div class="umi-section__hint">
+                  {(edit().zoom.trigger ?? "clicks") === "smart"
+                    ? "Zooms where you click and type, just enough to fit the area you work in. Up to the zoom below."
+                    : "Zooms in on every group of clicks, at the zoom below."}
+                </div>
+              </Show>
+              <SliderField label={(edit().zoom.trigger ?? "clicks") === "smart" ? "Max zoom" : "Zoom"} value={edit().zoom.scale} min={1.2} max={3.5} format={(v) => `${v.toFixed(1)}×`} onInput={(v) => set((e) => (e.zoom.scale = v))} {...gesture} />
+            </Section>
+            <Section title="Motion" icon={<Sparkles size={15} />}>
+              <div class="umi-field-label">Speed</div>
+              <Segmented
+                value={edit().zoom.speed ?? "normal"}
+                onChange={(v) => set((e) => (e.zoom.speed = v))}
+                options={[
+                  { value: "slow", label: "Slow" },
+                  { value: "normal", label: "Normal" },
+                  { value: "fast", label: "Fast" },
+                ]}
+              />
+              <div class="umi-field-label">While zoomed in, follow</div>
+              <Segmented
+                value={edit().zoom.follow ?? "cursor"}
+                onChange={(v) => set((e) => (e.zoom.follow = v))}
+                options={[
+                  { value: "cursor", label: "Cursor" },
+                  { value: "clicks", label: "Clicks" },
+                ]}
+              />
+              <div class="umi-section__hint">
+                {(edit().zoom.follow ?? "cursor") === "clicks" ? "The view holds still and pans smoothly to each click." : "The view glides after the cursor."}
+              </div>
+              <SwitchRow label="Glide between zooms" checked={edit().zoom.glide ?? false} onChange={(v) => set((e) => (e.zoom.glide = v))} />
+              <div class="umi-section__hint">Zooms close together stay zoomed in and pan from one to the next instead of zooming out and back in.</div>
+            </Section>
+            <Section title="Manual zoom" icon={<ZoomIn size={15} />} hint="Press Z to add a zoom at the playhead. Drag a zoom on the timeline to move it.">
               <Button size="sm" onClick={() => void ed.apply({ op: "addZoom", time: ed.time() })}>
                 <ZoomIn size={14} /> Add zoom here
               </Button>

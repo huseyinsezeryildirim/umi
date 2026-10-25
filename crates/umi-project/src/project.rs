@@ -85,6 +85,8 @@ impl RecordingProject {
     /// the bubble was while recording.
     pub fn default_edit(&self, preset: Option<&StylePreset>) -> EditSettings {
         let mut edit = EditSettings::default();
+        // New in this app (older files keep zooming out between zooms).
+        edit.zoom.glide = true;
         if let Some(preset) = preset {
             preset.apply(&mut edit);
         }
@@ -117,6 +119,19 @@ pub struct CursorData {
     pub moves: Vec<CursorMove>,
     #[serde(default)]
     pub clicks: Vec<CursorClick>,
+    /// Key presses (for the keystroke overlay and smart zoom); not in older files.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keys: Vec<KeyPress>,
+}
+
+/// A key press in recording time. `key` is what's shown ("A", "Return", "⌘"); `modifiers`
+/// are held keys in display order (e.g. ["⌃", "⌥", "⇧", "⌘"]).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct KeyPress {
+    pub t: f64,
+    pub key: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub modifiers: Vec<String>,
 }
 
 /// Cursor position in recording time, normalized to the captured area (top-left origin).

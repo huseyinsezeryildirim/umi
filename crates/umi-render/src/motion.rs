@@ -1,9 +1,9 @@
 //! Motion over time: the smoothed cursor, the zoom level/focus and 3D camera moves.
 
 use crate::math::{Point, Rect, ease};
-use umi_project::edit::{CameraMove, MoveKind, Zoom, ZoomSegment};
-use umi_project::project::{CursorClick, CursorData, CursorMove};
-use umi_project::zoom::auto_segments;
+use umi_project::edit::{CameraMove, MoveKind, Zoom, ZoomFollow, ZoomSegment};
+use umi_project::project::{CursorClick, CursorData, CursorMove, MouseButton};
+use umi_project::zoom::generated_segments;
 
 /// Cursor position over time, raw or spring-smoothed. Normalized to the captured area,
 /// top-left origin.
@@ -86,27 +86,39 @@ fn interpolate(raw: &[CursorMove], t: f64, index: usize) -> Point {
 #[derive(Debug, Clone)]
 pub struct ZoomTrack {
     pub segments: Vec<ZoomSegment>,
-    /// A slow, heavily damped cursor the zoom follows, so the view glides.
+    /// The point a cursor-following zoom looks at: a slow, damped cursor (so the view
+    /// glides), or a point that pans from click to click.
     follow: CursorTrack,
+    ramp: f64,
+    glide: bool,
 }
 
-const RAMP: f64 = 0.5;
+/// Zooms closer than this stay zoomed in and glide from one to the next.
+const GLIDE_GAP: f64 = 1.6;
 
 impl ZoomTrack {
     pub fn new(settings: &Zoom, cursor: &CursorData, duration: f64) -> Self {
         let mut segments = settings.segments.clone();
         if settings.auto {
-            segments.extend(auto_segments(&cursor.clicks, settings.scale, duration));
+            segments.extend(generated_segments(settings, cursor, duration));
         }
         segments.sort_by(|a, b| a.start.total_cmp(&b.start));
-        Self { segments, follow: CursorTrack::new(cursor, duration, Some((30.0, 11.0))) }
+        let spring = Some(settings.speed.spring());
+        let follow = match settings.follow {
+            ZoomFollow::Cursor => CursorTrack::new(cursor, duration, spring),
+            ZoomFollow::Clicks => CursorTrack::new(&click_path(cursor), duration, spring),
+        };
+        Self { segments, follow, ramp: settings.speed.ramp(), glide: settings.glide }
     }
 
     /// Zoom factor (≥ 1) and focus, normalized to the screen (top-left origin).
     pub fn state(&self, t: f64) -> (f64, Point) {
+        if self.glide {
+            return self.glided(t);
+        }
         let mut best: Option<(f64, &ZoomSegment)> = None;
         for segment in self.segments.iter().filter(|s| t >= s.start && t <= s.end) {
-            let ramp = RAMP.min((segment.end - segment.start) / 2.0);
+            let ramp = self.ramp.min((segment.end - segment.start) / 2.0);
             let amount = ((t - segment.start) / ramp).min((segment.end - t) / ramp).min(1.0);
             if amount > best.map_or(0.0, |b| b.0) {
                 best = Some((amount, segment));
@@ -114,9 +126,79 @@ impl ZoomTrack {
         }
         let Some((amount, segment)) = best else { return (1.0, Point::new(0.5, 0.5)) };
         let eased = ease(amount);
-        let focus = segment.focus.or_else(|| self.follow.position(t)).unwrap_or(Point::new(0.5, 0.5));
-        (1.0 + (segment.scale - 1.0) * eased, focus)
+        (1.0 + (segment.scale - 1.0) * eased, self.focus(segment, t))
     }
+
+    fn focus(&self, segment: &ZoomSegment, t: f64) -> Point {
+        segment.focus.or_else(|| self.follow.position(t)).unwrap_or(Point::new(0.5, 0.5))
+    }
+
+    /// Zooms close together form one run: in at its start, out at its end, and in between
+    /// the scale and focus glide from one zoom to the next.
+    fn glided(&self, t: f64) -> (f64, Point) {
+        // The run around t.
+        let mut run: Option<(usize, usize)> = None;
+        let mut i = 0;
+        while i < self.segments.len() {
+            let first = i;
+            let mut end = self.segments[i].end;
+            while i + 1 < self.segments.len() && self.segments[i + 1].start - end < GLIDE_GAP {
+                i += 1;
+                end = end.max(self.segments[i].end);
+            }
+            if t >= self.segments[first].start && t <= end {
+                run = Some((first, i));
+                break;
+            }
+            i += 1;
+        }
+        let Some((first, last)) = run else { return (1.0, Point::new(0.5, 0.5)) };
+        let segs = &self.segments[first..=last];
+        let (start, end) = (segs[0].start, segs.iter().map(|s| s.end).fold(f64::MIN, f64::max));
+        let ramp = self.ramp.min((end - start) / 2.0);
+        let amount = ease(((t - start) / ramp).min((end - t) / ramp).min(1.0));
+
+        // The zoom in charge (latest started), blending from the previous one meanwhile.
+        let k = segs.iter().rposition(|s| s.start <= t).unwrap_or(0);
+        let (mut scale, mut focus) = (segs[k].scale, self.focus(&segs[k], t));
+        if t > segs[k].end && k + 1 < segs.len() {
+            // In a gap: glide toward the next one.
+            let (a, b) = (&segs[k], &segs[k + 1]);
+            let p = ease(((t - a.end) / (b.start - a.end).max(1e-6)).clamp(0.0, 1.0));
+            scale = lerp(a.scale, b.scale, p);
+            focus = lerp_point(self.focus(a, t), self.focus(b, t), p);
+        } else if k > 0 {
+            let (a, b) = (&segs[k - 1], &segs[k]);
+            let from = if b.start > a.end { None } else { Some(b.start) };
+            if let Some(from) = from {
+                // Overlapping: change over one ramp after the newer one starts.
+                let p = ease(((t - from) / self.ramp).clamp(0.0, 1.0));
+                scale = lerp(a.scale, b.scale, p);
+                focus = lerp_point(self.focus(a, t), self.focus(b, t), p);
+            }
+        }
+        (1.0 + (scale - 1.0) * amount, focus)
+    }
+}
+
+fn lerp(a: f64, b: f64, p: f64) -> f64 {
+    a + (b - a) * p
+}
+fn lerp_point(a: Point, b: Point, p: f64) -> Point {
+    Point::new(lerp(a.x, b.x, p), lerp(a.y, b.y, p))
+}
+
+/// A path that holds still and jumps to each click (from the first cursor position); a
+/// spring then turns the jumps into smooth pans.
+fn click_path(cursor: &CursorData) -> CursorData {
+    let mut moves: Vec<CursorMove> = cursor.moves.first().copied().into_iter().collect();
+    for c in cursor.clicks.iter().filter(|c| c.button == MouseButton::Left) {
+        if let Some(prev) = moves.last().copied() {
+            moves.push(CursorMove { t: (c.t - 0.001).max(prev.t), x: prev.x, y: prev.y });
+        }
+        moves.push(CursorMove { t: c.t, x: c.x, y: c.y });
+    }
+    CursorData { moves, clicks: cursor.clicks.clone(), keys: vec![] }
 }
 
 /// Pose of an active 3D move: rotation (radians), scale, shift (canvas px) and how far in
@@ -193,7 +275,7 @@ mod tests {
 
     #[test]
     fn spring_cursor_settles_on_target() {
-        let data = CursorData { moves: vec![CursorMove { t: 0.0, x: 0.0, y: 0.0 }, CursorMove { t: 0.1, x: 1.0, y: 1.0 }], clicks: vec![] };
+        let data = CursorData { moves: vec![CursorMove { t: 0.0, x: 0.0, y: 0.0 }, CursorMove { t: 0.1, x: 1.0, y: 1.0 }], clicks: vec![], keys: vec![] };
         let track = CursorTrack::new(&data, 3.0, Some((170.0, 26.0)));
         let p = track.position(3.0).unwrap();
         assert!((p.x - 1.0).abs() < 0.01 && (p.y - 1.0).abs() < 0.01);
@@ -207,6 +289,8 @@ mod tests {
             auto: false,
             scale: 2.0,
             segments: vec![ZoomSegment { id: uuid::Uuid::nil(), start: 1.0, end: 3.0, scale: 2.0, focus: Some(Point::new(0.2, 0.3)) }],
+            glide: false,
+            ..Zoom::default()
         };
         let track = ZoomTrack::new(&z, &CursorData::default(), 5.0);
         assert_eq!(track.state(0.5).0, 1.0);
@@ -214,5 +298,39 @@ mod tests {
         assert_eq!(track.state(2.0).1, Point::new(0.2, 0.3));
         let mid = track.state(1.25).0;
         assert!(mid > 1.0 && mid < 2.0);
+    }
+
+    #[test]
+    fn glides_between_close_zooms() {
+        let seg = |start: f64, end: f64, scale: f64, x: f64| ZoomSegment { id: uuid::Uuid::new_v4(), start, end, scale, focus: Some(Point::new(x, 0.5)) };
+        let mut z = Zoom { auto: false, segments: vec![seg(1.0, 3.0, 2.0, 0.2), seg(4.0, 6.0, 3.0, 0.8)], glide: false, ..Zoom::default() };
+        // Without glide it zooms out in the gap.
+        assert!(ZoomTrack::new(&z, &CursorData::default(), 8.0).state(3.5).0 < 1.5);
+        z.glide = true;
+        let track = ZoomTrack::new(&z, &CursorData::default(), 8.0);
+        let (scale, focus) = track.state(3.5);
+        assert!((scale - 2.5).abs() < 1e-9 && (focus.x - 0.5).abs() < 1e-9, "{scale} {focus:?}");
+        assert!((track.state(2.0).0 - 2.0).abs() < 1e-9 && (track.state(5.0).0 - 3.0).abs() < 1e-9);
+        assert_eq!(track.state(0.5).0, 1.0);
+        assert_eq!(track.state(7.0).0, 1.0);
+        // Far apart: zooms out between.
+        z.segments[1] = seg(6.0, 8.0, 3.0, 0.8);
+        assert_eq!(ZoomTrack::new(&z, &CursorData::default(), 9.0).state(4.5).0, 1.0);
+    }
+
+    #[test]
+    fn click_follow_pans_to_clicks() {
+        let data = CursorData {
+            moves: vec![CursorMove { t: 0.0, x: 0.1, y: 0.1 }, CursorMove { t: 2.5, x: 0.9, y: 0.9 }],
+            clicks: vec![CursorClick { t: 1.0, x: 0.3, y: 0.3, button: MouseButton::Left }, CursorClick { t: 3.0, x: 0.7, y: 0.6, button: MouseButton::Left }],
+            keys: vec![],
+        };
+        let z = Zoom { auto: false, follow: ZoomFollow::Clicks, segments: vec![ZoomSegment { id: uuid::Uuid::nil(), start: 0.0, end: 6.0, scale: 2.0, focus: None }], ..Zoom::default() };
+        let track = ZoomTrack::new(&z, &data, 6.0);
+        // Holds on the first click while the cursor wanders off, then settles on the next.
+        let p = track.state(2.6).1;
+        assert!((p.x - 0.3).abs() < 0.02, "{p:?}");
+        let q = track.state(5.5).1;
+        assert!((q.x - 0.7).abs() < 0.02 && (q.y - 0.6).abs() < 0.02, "{q:?}");
     }
 }

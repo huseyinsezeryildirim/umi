@@ -144,7 +144,15 @@ export interface EditSettings {
   border: number;
   cursor: { visible: boolean; size: number; smoothing: Smoothing; clickRings: boolean; style: "arrow" | "dot"; motionBlur: boolean; hideWhenIdle: boolean };
   camera: { visible: boolean; shape: CameraShape; size: number; position: Point; mirrored: boolean };
-  zoom: { auto: boolean; scale: number; segments: ZoomSegment[] };
+  zoom: {
+    auto: boolean;
+    scale: number;
+    segments: ZoomSegment[];
+    trigger?: "clicks" | "smart";
+    speed?: "slow" | "normal" | "fast";
+    follow?: "cursor" | "clicks";
+    glide?: boolean;
+  };
   masks: PrivacyMask[];
   scenes: SceneSegment[];
   grade: { preset: GradePreset; exposure: number; contrast: number; saturation: number; vignette: number; grain: number };
