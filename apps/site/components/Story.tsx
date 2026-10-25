@@ -186,10 +186,11 @@ export function Footer() {
     ["Product", [["Download", "#download"], ["Pricing", "#pricing"], ["Questions", "#faq"]]],
     ["Open source", [["GitHub", "https://github.com/umi-cam/umi"], ["Releases", "https://github.com/umi-cam/umi/releases"], ["Report a bug", "https://github.com/umi-cam/umi/issues"]]],
     ["Platforms", [["macOS", "#download"], ["Windows", "#download"], ["Linux", "#download"], ["Browser", "/signup"]]],
+    ["Legal", [["Terms", "/terms"], ["Copyright", "/copyright"]]],
   ];
   return (
     <footer className="px-5 pt-20 pb-12">
-      <div className="mx-auto grid max-w-6xl grid-cols-3 gap-x-4 gap-y-10 border-t border-line pt-12 sm:grid-cols-[1.4fr_repeat(3,1fr)]">
+      <div className="mx-auto grid max-w-6xl grid-cols-3 gap-x-4 gap-y-10 border-t border-line pt-12 sm:grid-cols-[1.4fr_repeat(4,1fr)]">
         <div className="col-span-3 sm:col-span-1">
           <a href="#top" className="flex items-center gap-2 text-lg font-semibold">
             <Mark className="size-6" /> Umi
