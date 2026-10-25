@@ -1,0 +1,99 @@
+name: Deploy site
+
+# umi.cam (apps/site): a static Next.js export with the web editor (VITE_WEB build + the wasm engine)
+# inside it, served by Cloudflare Pages. Pushes to main go to the "staging" branch alias
+# (staging.<project>.pages.dev); a version tag (or a manual run, after the production environment's
+# reviewers approve) goes to the production branch, main.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "crates/**"
+      - "Cargo.lock"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/deploy-site.yml"
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Where to deploy
+        type: choice
+        options: [staging, production]
+        default: staging
+
+concurrency:
+  group: deploy-site-${{ github.event.inputs.environment || (startsWith(github.ref, 'refs/tags/') && 'production' || 'staging') }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment:
+      name: ${{ github.event.inputs.environment || (startsWith(github.ref, 'refs/tags/') && 'production' || 'staging') }}
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      TARGET: ${{ github.event.inputs.environment || (startsWith(github.ref, 'refs/tags/') && 'production' || 'staging') }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PAGES_PROJECT: ${{ vars.PAGES_PROJECT || 'umi-site' }}
+    steps:
+      # Until the setup in docs/DEVOPS.md is done, deploys are skipped with a notice instead of failing.
+      - name: Ready to deploy?
+        id: ready
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::Skipped: add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to the '$TARGET' environment (docs/DEVOPS.md)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The same toolchain as the web job in ci.yml.
+      - if: steps.ready.outputs.ok == 'true'
+        uses: actions/checkout@v4
+      - if: steps.ready.outputs.ok == 'true'
+        uses: pnpm/action-setup@v4
+      - if: steps.ready.outputs.ok == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.ready.outputs.ok == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - if: steps.ready.outputs.ok == 'true'
+        uses: Swatinem/rust-cache@v2
+      - name: wasm-bindgen (the version in Cargo.lock)
+        if: steps.ready.outputs.ok == 'true'
+        run: cargo install wasm-bindgen-cli --locked --version "$(grep -A1 'name = "wasm-bindgen"' Cargo.lock | sed -n 's/version = "\(.*\)"/\1/p')"
+      - if: steps.ready.outputs.ok == 'true'
+        run: pnpm install --frozen-lockfile
+
+      # prebuild compiles crates/umi-web to wasm and builds the web editor into public/editor.
+      - name: Build (wasm engine, web editor, site)
+        if: steps.ready.outputs.ok == 'true'
+        env:
+          NEXT_PUBLIC_UMI_API: ${{ vars.API_URL }}
+        run: pnpm --filter @umi/site build
+
+      - name: Files over the 25 MiB Pages limit → redirects to the same npm file on jsDelivr
+        if: steps.ready.outputs.ok == 'true'
+        run: node apps/site/scripts/pages-large-files.mjs apps/site/out
+
+      - name: Upload to Cloudflare Pages
+        id: deploy
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          # The wrangler pinned by web/ (run from the root so web/wrangler.jsonc, the Worker's config, stays out of it).
+          npm ci --prefix web
+          branch=$([ "$TARGET" = production ] && echo main || echo staging)
+          web/node_modules/.bin/wrangler pages deploy apps/site/out --project-name "$PAGES_PROJECT" --branch "$branch" \
+            --commit-hash "$GITHUB_SHA" --commit-message "${GITHUB_REF_NAME} ${GITHUB_SHA::7}" | tee "$RUNNER_TEMP/deploy.log"
+          url=$(grep -Eo 'https://[^ ]+\.pages\.dev' "$RUNNER_TEMP/deploy.log" | tail -1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
