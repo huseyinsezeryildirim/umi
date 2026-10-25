@@ -4,6 +4,7 @@ import { createEffect, createSignal, For, Match, on, Show, Switch } from "solid-
 import { Button, Dialog, Progress, Segmented, SwitchRow, TextField, toast } from "@umi/ui";
 import { Check, Copy, ExternalLink, Link2, Lock, Trash2 } from "lucide-solid";
 import type { Editor } from "./store";
+import { teamsEnabled } from "../platform";
 
 interface Video {
   id: string;
@@ -64,7 +65,7 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
         setVideo(shared);
         setInsights(null);
         if (shared?.status === "ready") invoke<Insights | null>("share_insights", { id: ed.state().id }).then(setInsights, () => {});
-        if (status.connected) invoke<{ id: string; name: string }[]>("team_list").then(setTeams, () => setTeams([]));
+        if (status.connected && teamsEnabled) invoke<{ id: string; name: string }[]>("team_list").then(setTeams, () => setTeams([]));
       },
     ),
   );
