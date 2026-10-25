@@ -43,8 +43,9 @@ pub fn windows() -> Result<Vec<Window>, CaptureError> {
         .filter(|w| w.pid().is_ok_and(|p| p != own) && !w.is_minimized().unwrap_or(false))
         .filter_map(|w| {
             let (width, height) = (w.width().ok()? as f64, w.height().ok()? as f64);
+            let id = w.id().ok()?;
             (width > 80.0 && height > 60.0).then(|| Window {
-                id: w.id().ok()?,
+                id,
                 title: w.title().unwrap_or_default(),
                 app: w.app_name().unwrap_or_default(),
                 x: w.x().unwrap_or(0) as f64,
@@ -123,13 +124,14 @@ pub fn start(
     recorder.start().map_err(err)?;
     let stop = Arc::new(AtomicBool::new(false));
     let flag = stop.clone();
+    let frame_clock = clock.clone();
     let thread = std::thread::Builder::new()
         .name("umi-screen".into())
         .spawn(move || {
             let mut cropped = Vec::new();
             while !flag.load(Ordering::Relaxed) {
                 let Ok(frame) = frames.recv_timeout(std::time::Duration::from_millis(200)) else { continue };
-                let Some(t) = clock.now() else { continue };
+                let Some(t) = frame_clock.now() else { continue };
                 let (w, h) = (frame.width, frame.height);
                 match crop {
                     Some((x, y, cw, ch)) => {
