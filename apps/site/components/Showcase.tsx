@@ -187,7 +187,7 @@ function BlurScene() {
           </div>
           <i className="h-2 w-2/3 rounded bg-ink/10" />
           <i className="h-2 w-1/2 rounded bg-ink/10" />
-          {/* Spotlight: everything dims except the field. */}
+          {/* Highlight: everything dims except the field. */}
           <motion.span
             className="pointer-events-none absolute inset-0 bg-ink/45"
             style={{ maskImage: "linear-gradient(#000,#000)", WebkitMaskImage: "linear-gradient(#000,#000)" }}
@@ -197,7 +197,7 @@ function BlurScene() {
         </div>
       </Win>
       <div className="mt-2.5 flex justify-center">
-        <Pills items={["Blur", "Pixelate", "Spotlight"]} active={i} />
+        <Pills items={["Blur", "Pixelate", "Highlight"]} active={i} />
       </div>
     </div>
   );
@@ -213,20 +213,21 @@ function LayoutScene() {
         <motion.div className="absolute" animate={{ left: i === 2 ? "4%" : "8%", top: "10%", width: i === 1 ? "0%" : i === 2 ? "56%" : "84%", height: "80%", opacity: i === 1 ? 0 : 1 }} transition={{ duration: 0.7, ease: EASE }}>
           <Win className="h-full" />
         </motion.div>
+        {/* The camera: a bubble, or the whole frame in "Camera only". Heights keep circles round (16:9). */}
         <motion.div
-          className="absolute"
+          className="absolute overflow-hidden bg-[#1a1d29]"
           animate={
             i === 1
-              ? { left: "34%", top: "8%", width: "32%" }
+              ? { left: "0%", top: "0%", width: "100%", height: "100%", borderRadius: "0%", boxShadow: "0 0 0 0px #fff" }
               : i === 2
-                ? { left: "63%", top: "18%", width: "33%" }
+                ? { left: "63%", top: "21%", width: "33%", height: `${33 * (16 / 9)}%`, borderRadius: "50%", boxShadow: "0 0 0 2px #fff" }
                 : i === 3
-                  ? { left: "70%", top: "52%", width: "22%" }
-                  : { left: "5%", top: "62%", width: "17%" }
+                  ? { left: "70%", top: "52%", width: "22%", height: `${22 * (16 / 9)}%`, borderRadius: "50%", boxShadow: "0 0 0 2px #fff" }
+                  : { left: "5%", top: "62%", width: "17%", height: `${17 * (16 / 9)}%`, borderRadius: "50%", boxShadow: "0 0 0 2px #fff" }
           }
           transition={{ duration: 0.7, ease: EASE }}
         >
-          <Face className="w-full" />
+          <video src="/media/camera.mp4" poster="/media/camera.jpg" autoPlay muted loop playsInline className="absolute inset-0 size-full object-cover" />
         </motion.div>
       </div>
       <div className="mt-2.5 flex justify-center">
@@ -507,7 +508,7 @@ function ClipsScene() {
 }
 
 const CARDS: [string, string, () => React.ReactNode][] = [
-  ["Blur what’s private", "Drop a mask over a password or a face. It follows the content.", () => <BlurScene />],
+  ["Blur, pixelate or highlight", "Hide a password or a face, or make one spot stand out. It follows the content.", () => <BlurScene />],
   ["Scenes for screen and camera", "Switch any stretch to camera only, split or floating.", () => <LayoutScene />],
   ["Automatic zoom", "Zooms come from your clicks. Change them on the timeline.", () => <ZoomScene />],
   ["Captions, on your computer", "Words appear as you say them, the current one lit.", () => <CaptionScene />],
