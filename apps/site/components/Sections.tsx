@@ -104,7 +104,7 @@ export function Modes() {
                 exit={{ opacity: 0, y: -16, scale: 0.98, filter: "blur(8px)" }}
                 transition={{ duration: 0.7, ease: EASE }}
               >
-                {MODES[active].media === "share" && <img src="/media/share-top.png" alt="The Share window: link and viewer insights" className="w-[86%] drop-shadow-[0_30px_40px_rgb(0_0_0/0.35)]" />}
+                {MODES[active].media === "share" && <img src="/media/share-top.png" alt="The Share window: link and viewer insights" className="w-[80%] drop-shadow-[0_30px_40px_rgb(0_0_0/0.3)]" />}
                 {MODES[active].media === "studio" && (
                   <video src="/media/after.mp4" autoPlay muted loop playsInline className="w-full rounded-xl shadow-[0_30px_60px_-15px_rgb(0_0_0/0.45)]" />
                 )}

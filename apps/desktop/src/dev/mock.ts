@@ -106,12 +106,30 @@ let recordSettings = {
   systemAudio: true,
   microphone: "",
   camera: null,
-  cameraOn: true,
+  // The website's desktop demo asks the visitor to turn the camera on.
+  cameraOn: new URLSearchParams(location.search).get("view") !== "desktop",
   cameraStyle: { visible: true, shape: "circle", size: 0.24, position: [0.14, 0.8], mirrored: true },
   countdown: true,
   flow: "studio",
   cameraOnly: false,
 };
+/** The camera preview: frames of the stock webcam clip, as JPEG, like the real camera sends. */
+let previewTimer = 0;
+function cameraPreview(camera: string | null, frames: { onmessage: (b: ArrayBuffer) => void }) {
+  clearInterval(previewTimer);
+  if (camera === null) return null;
+  const canvas = new OffscreenCanvas(320, 320);
+  const ctx = canvas.getContext("2d")!;
+  void webcam.play().catch(() => {});
+  previewTimer = window.setInterval(() => {
+    if (webcam.readyState < 2) return;
+    const s = Math.min(webcam.videoWidth, webcam.videoHeight);
+    ctx.drawImage(webcam, (webcam.videoWidth - s) / 2, (webcam.videoHeight - s) / 2, s, s, 0, 0, 320, 320);
+    void canvas.convertToBlob({ type: "image/jpeg", quality: 0.8 }).then((b) => b.arrayBuffer().then((buf) => frames.onmessage(buf)));
+  }, 1000 / 24);
+  return null;
+}
+
 const history: EditSettings[] = [];
 const future: EditSettings[] = [];
 const uuid = () => crypto.randomUUID().toUpperCase();
@@ -471,11 +489,17 @@ mockIPC(
       case "record_status":
         // The desktop demo starts its recording at `__demoRecStart`.
         return { recording: true, paused: false, elapsed: (performance.now() - ((window as unknown as { __demoRecStart?: number }).__demoRecStart ?? 0)) / 1000, level: Math.abs(Math.sin(performance.now() / 300)) * 0.5 };
-      case "record_meter":
       case "record_camera_preview":
+        return cameraPreview(p.camera as string | null, p.frames as { onmessage: (b: ArrayBuffer) => void });
+      // The desktop demo draws the app's floating windows itself; tell it what to show.
       case "window_show":
       case "window_hide":
+        dispatchEvent(new CustomEvent("demo:window", { detail: { view: p.view, shown: cmd === "window_show" } }));
+        return null;
       case "window_resize":
+        dispatchEvent(new CustomEvent("demo:resize", { detail: { width: p.width, height: p.height } }));
+        return null;
+      case "record_meter":
       case "editor_save":
       case "editor_close":
       case "plugin:event|listen":
