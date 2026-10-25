@@ -207,7 +207,7 @@ export function Ai() {
                     <i />
                     <i />
                   </span>
-                  <span className="mx-auto rounded-md bg-black/5 px-10 py-0.5 text-[11px] text-black/50">umi.cam/v/dashboard-walkthrough</span>
+                  <span className="mx-auto min-w-0 truncate rounded-md bg-black/5 px-3 py-0.5 text-[11px] text-black/50 sm:px-10">umi.cam/v/dashboard-walkthrough</span>
                 </div>
                 <div className="grid gap-4 p-4 md:grid-cols-[1.35fr_1fr]">
                   <div className="min-w-0">
