@@ -23,7 +23,7 @@ import type { Moment, Session } from "./engine";
 import { GifEncoder } from "./pkg/umi_web.js";
 import { cameraEffect, loadSegmenter } from "./segment";
 
-export type ExportRequest = { format: "mp4" | "mov" | "gif"; resolution: number; fps: number; destination: string };
+export type ExportRequest = { format: "mp4" | "mov" | "gif"; resolution: number; fps: number; destination: string; /** Video bits per second (default: high quality). */ bitrate?: number };
 
 /** Reads exact frames of one file for a known, ordered list of times. */
 class Frames {
@@ -169,14 +169,14 @@ async function renderTake(session: Session, sink: Sink, onProgress: (p: number) 
 }
 
 /** An MP4/MOV being written: video and sound sources. */
-async function videoFile(format: "mp4" | "mov", width: number, height: number, fps: number, withSound: boolean, file: FileSystemFileHandle | null) {
+async function videoFile(format: "mp4" | "mov", width: number, height: number, fps: number, withSound: boolean, file: FileSystemFileHandle | null, bitrate?: number) {
   const output = new Output({
     format: format === "mov" ? new MovOutputFormat() : new Mp4OutputFormat(file ? {} : { fastStart: "in-memory" }),
     target: file ? new StreamTarget(await file.createWritable(), { chunked: true }) : new BufferTarget(),
   });
   const vcodec = await getFirstEncodableVideoCodec(["avc", "hevc", "vp9", "av1"], { width, height });
   if (!vcodec) throw new Error("This browser can’t encode video.");
-  const video = new VideoSampleSource({ codec: vcodec, bitrate: QUALITY_HIGH });
+  const video = new VideoSampleSource({ codec: vcodec, bitrate: bitrate ?? QUALITY_HIGH });
   output.addVideoTrack(video, { frameRate: fps });
   let audio: AudioSampleSource | null = null;
   if (withSound) {
@@ -215,7 +215,7 @@ async function videoFile(format: "mp4" | "mov", width: number, height: number, f
 export async function exportVideo(session: Session, req: ExportRequest, onProgress: (p: number) => void, signal: AbortSignal, file: FileSystemFileHandle | null): Promise<Blob | null> {
   if (req.format === "gif") return exportGif(session, req, onProgress, signal, file);
   const [W, H] = session.wasm.frameSize(0, req.resolution);
-  const out = await videoFile(req.format, W, H, req.fps, !!session.soundMixer(), file);
+  const out = await videoFile(req.format, W, H, req.fps, !!session.soundMixer(), file, req.bitrate);
   if (!(await renderTake(session, out.sink(0), onProgress, signal))) {
     await out.cancel();
     return null;

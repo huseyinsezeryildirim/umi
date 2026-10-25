@@ -1,6 +1,7 @@
 // The Mac app's Rust side, in the browser: the same editor UI talks to this through the same
 // commands. Editing and drawing are the same Rust code (umi-web, WebAssembly + WebGPU);
 // recordings live in this browser (IndexedDB) and never leave it.
+import { cloudStatus, shareDelete, shareInsights, shareStart, shareState, shareUpdate } from "./cloud";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { ALL_FORMATS, BlobSource, CanvasSink, Input } from "mediabunny";
 import music from "../../src-tauri/resources/music.json";
@@ -144,6 +145,8 @@ async function openEditor(id: string) {
   const preset = library.defaultId ? library.presets.find((p) => p.id === library.defaultId) : undefined;
   const session = await Session.open(id, fallbackName(r), r.project, r.cursor, r.mediaDuration, await fileNames(id), preset ? JSON.stringify(preset) : undefined);
   sessions.set(id, session);
+  // A title it picked up on opening (from the window that was shared) goes into the library now.
+  await save(id);
   return session.state();
 }
 
@@ -579,15 +582,21 @@ async function handle(cmd: string, p: Args): Promise<unknown> {
     case "ai_models":
       return [];
     case "cloud_status":
-      return { connected: false, server: location.origin };
+      return cloudStatus();
     case "share_state":
+      return shareState(String(p.id));
     case "share_insights":
-      return null;
-    case "share_start":
+      return shareInsights(String(p.id));
+    case "share_start": {
+      const s = editor(p.id);
+      return shareStart(s, String(p.id), s.wasm.title(), p.progress as Progress<{ stage: string; value: number }>);
+    }
     case "share_update":
+      return shareUpdate(String(p.id), p.settings as Record<string, unknown>);
     case "share_delete":
+      return shareDelete(String(p.id));
     case "cloud_connect":
-      throw new Error("Share links aren't on the web yet — export the video and share the file.");
+      throw new Error("Sign in on umi.cam to share links.");
     case "team_list":
     case "team_videos":
     case "team_presets":

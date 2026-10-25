@@ -2,11 +2,7 @@
 // HLS stream), asked through Umi's API because Loom doesn't answer other sites directly.
 import { ALL_FORMATS, BlobSource, BufferTarget, EncodedAudioPacketSource, EncodedPacketSink, EncodedVideoPacketSource, Input, Mp4OutputFormat, Output } from "mediabunny";
 
-const q = new URLSearchParams(location.search);
-// The website passes its API address; it's kept for the rest of the visit.
-if (q.get("api")) sessionStorage.setItem("umi.api", q.get("api")!);
-const API = () => sessionStorage.getItem("umi.api") ?? "http://localhost:8799";
-const token = () => localStorage.getItem("umi.session");
+import { apiBase as API, sessionToken as token } from "./cloud";
 
 export const loomId = (link: string) => /loom\.com\/(?:share|embed)\/([0-9a-f]{32})/.exec(link)?.[1] ?? null;
 
