@@ -397,6 +397,17 @@ impl EditorSession {
         Ok(self.apply(Op::SetEdit { edit: Box::new(edit) }))
     }
 
+    /// Title, summary and chapters from the transcript (chapters in output time, plus a
+    /// ready-to-paste "0:00 Intro" list).
+    pub fn insights(&self) -> Option<(umi_project::insights::Insights, String)> {
+        let doc = self.doc.lock();
+        let mut found = umi_project::insights::insights(&doc.edit.captions.words)?;
+        // Chapters inside cut-out parts move to the next kept moment.
+        found.chapters.retain(|c| doc.output_time(c.start).is_some() || c.start == 0.0);
+        let text = umi_project::insights::chapter_text(&found.chapters, |t| doc.output_time(t));
+        Some((found, text))
+    }
+
     /// Captions as SRT or WebVTT on the edited timeline.
     pub fn subtitles(&self, vtt: bool) -> String {
         let doc = self.doc.lock();

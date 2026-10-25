@@ -1288,3 +1288,24 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ed-insights {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ed-insights__box {
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: var(--umi-ice-top);
+  box-shadow: inset 0 0 0 1px var(--umi-hairline);
+  font-size: var(--umi-text-md);
+  line-height: 1.45;
+  cursor: copy;
+}
+.ed-insights__box:hover {
+  box-shadow: inset 0 0 0 1px rgba(17, 111, 245, 0.4);
+}
+.ed-insights__chapters {
+  white-space: pre-line;
+  font-variant-numeric: tabular-nums;
+}

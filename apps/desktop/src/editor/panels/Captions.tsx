@@ -127,6 +127,7 @@ export function CaptionsSection(props: { editor: Editor; gesture: object }) {
           </Button>
           <div class="umi-section__hint">Both are cuts on the timeline: undo brings everything back.</div>
         </Section>
+        <InsightsSection editor={ed} />
         <Transcript editor={ed} />
       </Show>
     </>
@@ -263,6 +264,60 @@ function Transcript(props: { editor: Editor }) {
           )}
         </For>
       </div>
+    </Section>
+  );
+}
+
+interface Insights {
+  title: string;
+  summary: string;
+  chapters: { start: number; title: string }[];
+  chapterText: string;
+}
+
+/** Title, summary and chapters from the transcript, ready to paste into a description. */
+export function InsightsSection(props: { editor: Editor }) {
+  const ed = props.editor;
+  const [found, setFound] = createSignal<Insights | null | undefined>(undefined);
+  const make = async () => {
+    const result = await invoke<Insights | null>("editor_insights", { id: ed.state().id });
+    setFound(result);
+    if (!result) toast("Not enough speech for a summary yet");
+  };
+  const copy = (text: string) => void invoke("copy_text_to_clipboard", { text }).then(() => toast("Copied"));
+  return (
+    <Section title="Title, summary & chapters" icon={<Sparkles size={15} />} hint="From what you said, on this computer.">
+      <Show
+        when={found()}
+        fallback={
+          <Button size="sm" onClick={() => void make()}>
+            <Sparkles size={14} /> Write them
+          </Button>
+        }
+      >
+        {(i) => (
+          <div class="ed-insights">
+            <div class="umi-field-label">Title</div>
+            <div class="ed-insights__box" onClick={() => copy(i().title)} title="Copy">
+              {i().title}
+            </div>
+            <div class="umi-field-label">Summary</div>
+            <div class="ed-insights__box" onClick={() => copy(i().summary)} title="Copy">
+              {i().summary}
+            </div>
+            <div class="umi-field-label">Chapters</div>
+            <div class="ed-insights__box ed-insights__chapters" onClick={() => copy(i().chapterText)} title="Copy">
+              {i().chapterText}
+            </div>
+            <div class="ed-row">
+              <Button size="sm" onClick={() => copy(`${i().title}\n\n${i().summary}\n\n${i().chapterText}`)}>Copy all</Button>
+              <Button size="sm" variant="ghost" onClick={() => void make()}>
+                Again
+              </Button>
+            </div>
+          </div>
+        )}
+      </Show>
     </Section>
   );
 }
