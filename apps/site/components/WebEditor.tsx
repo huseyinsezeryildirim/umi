@@ -9,14 +9,24 @@ import { type Range, fillerCuts, isFiller, keptRanges, pauseCuts, skipCut, total
 import type { Out as TranscribeOut } from "@/lib/transcribe.worker";
 import { Mark } from "./ui";
 
-export type Take = { screen: Blob; camera: Blob | null; duration: number; width: number; height: number; hasSound: boolean };
+export type Take = {
+  screen: Blob;
+  camera: Blob | null;
+  duration: number;
+  width: number;
+  height: number;
+  hasSound: boolean;
+  /** Where the camera bubble was while recording. */
+  corner?: Corner;
+  camSize?: number;
+};
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 type Job = { phase: "idle" } | { phase: "loading" | "working"; progress: number } | { phase: "done" } | { phase: "error"; message: string };
 
 export function Editor({ take, account, onRestart }: { take: Take; account?: React.ReactNode; onRestart: () => void }) {
-  const [look, setLook] = useState<Look>({ ...LOOK, camera: !!take.camera });
+  const [look, setLook] = useState<Look>({ ...LOOK, camera: !!take.camera, corner: take.corner ?? LOOK.corner, camSize: take.camSize ?? LOOK.camSize });
   const [trim, setTrim] = useState<Range>([0, take.duration]);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
