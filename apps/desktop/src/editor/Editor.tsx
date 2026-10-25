@@ -16,6 +16,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-solid";
+import { CommandMenu, type Command } from "./CommandMenu";
 import { ExportDialog } from "./ExportDialog";
 import { Inspector } from "./Inspector";
 import { PresetsMenu } from "./Presets";
@@ -28,6 +29,49 @@ import "./editor.css";
 export function Editor(props: { editor: EditorModel; onBack: () => void }) {
   const ed = props.editor;
   const [exporting, setExporting] = createSignal(false);
+  const [commanding, setCommanding] = createSignal(false);
+
+  const commands = (): Command[] => {
+    const at = () => ed.time();
+    const panel = (tab: string, title: string, keywords?: string): Command => ({ title, group: "Panel", keywords, run: () => ed.requestPanel(tab) });
+    const list: Command[] = [
+      { title: "Play / pause", group: "Playback", shortcut: "Space", run: ed.togglePlay },
+      { title: "Go to start", group: "Playback", run: () => ed.setTime(0) },
+      { title: "Split at playhead", group: "Edit", shortcut: "S", keywords: "cut clip", run: () => void ed.split() },
+      { title: "Cut tool", group: "Edit", shortcut: "B", keywords: "blade scissors", run: () => ed.setBlade(true) },
+      { title: "Undo", group: "Edit", shortcut: "⌘Z", run: () => void ed.undo() },
+      { title: "Redo", group: "Edit", shortcut: "⇧⌘Z", run: () => void ed.redo() },
+      { title: "Add zoom", group: "Add", shortcut: "Z", run: () => void ed.apply({ op: "addZoom", time: at() }) },
+      { title: "Add blur", group: "Add", keywords: "privacy hide mask", run: () => void ed.apply({ op: "addMask", time: at(), style: "blur" }) },
+      { title: "Add spotlight", group: "Add", keywords: "highlight focus dim", run: () => void ed.apply({ op: "addMask", time: at(), style: "highlight" }) },
+      { title: "Add title", group: "Add", keywords: "text", run: () => void ed.apply({ op: "addText", style: "title", time: at() }) },
+      { title: "Add lower third", group: "Add", keywords: "text name", run: () => void ed.apply({ op: "addText", style: "lowerThird", time: at() }) },
+      { title: "Add camera-only scene", group: "Add", keywords: "layout face", run: () => void ed.apply({ op: "addScene", layout: "cameraOnly", time: at() }) },
+      { title: "Add split screen", group: "Add", keywords: "layout scene", run: () => void ed.apply({ op: "addScene", layout: "splitScreen", time: at() }) },
+      { title: "Add 3D glide", group: "Add", keywords: "move perspective", run: () => void ed.apply({ op: "addMove", kind: "glide", time: at() }) },
+      { title: "AI voiceover…", group: "Add", keywords: "voice speech narrate tts kokoro", run: () => ed.requestVoiceover() },
+      { title: "Remove filler words", group: "Clean up", keywords: "um uh transcript", run: () => void ed.apply({ op: "removeFillers" }) },
+      { title: "Shorten long pauses", group: "Clean up", keywords: "silence gaps", run: () => void ed.apply({ op: "removePauses", min: 1.0 }) },
+      { title: "Export…", group: "File", shortcut: "⌘E", keywords: "save mp4 gif mov", run: () => setExporting(true) },
+      panel("background", "Background", "wallpaper gradient color"),
+      panel("screen", "Screen frame", "padding corners shadow crop device"),
+      panel("cursor", "Cursor", "pointer click keystrokes keys"),
+      panel("camera", "Camera", "webcam bubble face"),
+      panel("zoom", "Zoom settings", "smart click magnifier"),
+      panel("color", "Color & effects", "grade look lut"),
+      panel("captions", "Captions & transcript", "subtitles whisper srt text editing"),
+      panel("audio", "Audio", "music noise volume voice"),
+    ];
+    for (const [value, label] of [
+      ["wide", "16:9"],
+      ["vertical", "9:16"],
+      ["square", "1:1"],
+      ["portrait", "4:5"],
+    ] as const) {
+      list.push({ title: `Shape ${label}`, group: "Format", keywords: "aspect ratio", run: () => void ed.update((e) => (e.aspect = value)) });
+    }
+    return list;
+  };
 
   // Keyboard: Space, S, B, Z, ⌫, Esc, ←/→, ⌘Z/⇧⌘Z.
   // ⌘Z / ⇧⌘Z come from the app menu: in a text field they undo typing, otherwise the edit.
@@ -54,6 +98,8 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
       } else if (mod && e.key.toLowerCase() === "a") {
         // Select everything on the timeline.
         ed.setSelected([...document.querySelectorAll<HTMLElement>(".ed-timeline [data-sel]")].map((el) => JSON.parse(el.dataset.sel!)));
+      } else if (mod && e.key.toLowerCase() === "k") {
+        setCommanding(true);
       } else if (mod && e.key.toLowerCase() === "e") {
         setExporting(true);
       } else if (mod && e.key.toLowerCase() === "j" && ed.selection()?.kind === "clip") {
@@ -161,6 +207,7 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
       </main>
       <ExportDialog editor={ed} open={exporting()} onClose={() => setExporting(false)} />
       <VoiceoverDialog editor={ed} />
+      <CommandMenu editor={ed} commands={commands} open={commanding()} onClose={() => setCommanding(false)} />
       <Toaster />
     </div>
   );
