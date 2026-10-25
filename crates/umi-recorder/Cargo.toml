@@ -1,0 +1,19 @@
+[package]
+name = "umi-recorder"
+description = "A recording in progress: capture sources written into a .umi bundle (screen + sound tracks, camera, cursor), with pause, cancel and crash recovery."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+umi-capture = { path = "../umi-capture" }
+umi-media = { path = "../umi-media" }
+umi-project.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+crossbeam-channel = "0.5"
+parking_lot = "0.12"
+
+[lints]
+workspace = true

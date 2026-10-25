@@ -146,6 +146,8 @@ impl StreamWriter {
             // A fragment every second: at most a second is lost if the app dies.
             opts.set("movflags", "+frag_keyframe+empty_moov+default_base_moof");
             opts.set("frag_duration", "1000000");
+            // Hand each fragment to the OS right away instead of keeping it in a buffer.
+            opts.set("flush_packets", "1");
         }
         output.write_header_with(opts)?;
         let video_tb = output.stream(video_stream).map(|st| st.time_base()).unwrap_or(tb);

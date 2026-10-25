@@ -65,6 +65,31 @@ pub fn start(target: &Target, options: &ScreenOptions, clock: Clock, video: Arc<
     }
 }
 
+/// Where a target is on screen (global points, top-left origin) and its pixels per point.
+pub fn geometry(target: &Target) -> Result<((f64, f64, f64, f64), f64), CaptureError> {
+    match target {
+        Target::Display { id } => {
+            let d = displays()?.into_iter().find(|d| d.id == *id).ok_or_else(|| CaptureError::NotFound("That display".into()))?;
+            Ok(((d.x, d.y, d.width, d.height), d.scale))
+        }
+        Target::Area { display, x, y, width, height } => {
+            let d = displays()?.into_iter().find(|d| d.id == *display).ok_or_else(|| CaptureError::NotFound("That display".into()))?;
+            Ok(((d.x + x, d.y + y, *width, *height), d.scale))
+        }
+        Target::Window { id } => {
+            let w = windows()?.into_iter().find(|w| w.id == *id).ok_or_else(|| CaptureError::NotFound("That window".into()))?;
+            let scale = displays()?.into_iter().find(|d| w.x >= d.x && w.x < d.x + d.width && w.y >= d.y && w.y < d.y + d.height).map_or(2.0, |d| d.scale);
+            Ok(((w.x, w.y, w.width, w.height), scale))
+        }
+    }
+}
+
+/// Pixel size frames will have for `target`.
+pub fn output_size(target: &Target, options: &ScreenOptions) -> Result<(u32, u32), CaptureError> {
+    let ((_, _, w, h), scale) = geometry(target)?;
+    Ok(fit(w * scale, h * scale, options.max_size))
+}
+
 /// Output size for a source of `w`×`h` pixels capped at `max` on the long side (even
 /// numbers, as encoders want).
 pub fn fit(w: f64, h: f64, max: u32) -> (u32, u32) {

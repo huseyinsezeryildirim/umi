@@ -27,10 +27,11 @@ impl Clock {
         Self(Arc::new(Mutex::new(State { start: Instant::now(), paused_for: 0.0, paused_at: None })))
     }
 
-    /// Recording time of the instant `at` (`None` while paused: drop what arrives).
+    /// Recording time of the instant `at` (`None` before the start or while paused: drop
+    /// what arrives).
     pub fn at(&self, at: Instant) -> Option<f64> {
         let s = self.0.lock();
-        if s.paused_at.is_some_and(|p| at >= p) {
+        if at < s.start || s.paused_at.is_some_and(|p| at >= p) {
             return None;
         }
         let t = at.saturating_duration_since(s.start).as_secs_f64() - s.paused_for;
@@ -46,6 +47,14 @@ impl Clock {
         let s = self.0.lock();
         let end = s.paused_at.unwrap_or_else(Instant::now);
         (end.saturating_duration_since(s.start).as_secs_f64() - s.paused_for).max(0.0)
+    }
+
+    /// Time starts now (sources warm up first, then the recording begins at 0).
+    pub fn restart(&self) {
+        let mut s = self.0.lock();
+        s.start = Instant::now();
+        s.paused_for = 0.0;
+        s.paused_at = None;
     }
 
     pub fn pause(&self) {
