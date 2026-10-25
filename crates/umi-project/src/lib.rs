@@ -3,6 +3,7 @@
 //! Pure Rust with no platform dependencies: the desktop app, the web editor (via wasm) and
 //! tests all use the same code. JSON stays compatible with projects written by the Swift app.
 
+pub mod captions;
 pub mod edit;
 pub mod geometry;
 pub mod history;

@@ -31,6 +31,7 @@ umi-project.workspace = true
 umi-render = { path = "../../../crates/umi-render" }
 umi-media = { path = "../../../crates/umi-media" }
 umi-engine = { path = "../../../crates/umi-engine" }
+umi-ai = { path = "../../../crates/umi-ai" }
 
 [lints]
 workspace = true

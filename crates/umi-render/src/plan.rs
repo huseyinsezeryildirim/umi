@@ -610,30 +610,7 @@ pub fn overlay_fade(overlay: &MediaOverlay, t: f64) -> f64 {
     ease(((t - overlay.start) / 0.25).min((overlay.end - t) / 0.25).min(1.0))
 }
 
-/// Groups caption words into short lines: up to 7 words or 2.6 s, breaking at sentence ends
-/// and pauses.
-pub fn caption_lines(words: &[CaptionWord]) -> Vec<Vec<CaptionWord>> {
-    let mut sorted = words.to_vec();
-    sorted.sort_by(|a, b| a.start.total_cmp(&b.start));
-    let (mut lines, mut current): (Vec<Vec<CaptionWord>>, Vec<CaptionWord>) = (vec![], vec![]);
-    for word in sorted {
-        if let Some(first) = current.first() {
-            let gap = current.last().is_some_and(|l| word.start - l.end > 0.8);
-            if current.len() >= 7 || word.end - first.start > 2.6 || gap {
-                lines.push(std::mem::take(&mut current));
-            }
-        }
-        let ends = word.text.ends_with(['.', '?', '!']);
-        current.push(word);
-        if ends {
-            lines.push(std::mem::take(&mut current));
-        }
-    }
-    if !current.is_empty() {
-        lines.push(current);
-    }
-    lines
-}
+pub use umi_project::captions::caption_lines;
 
 /// Color grade → shader parameters (matching the Swift Core Image chain).
 pub fn grade_params(grade: &ColorGrade, _t: f64) -> GradeParams {

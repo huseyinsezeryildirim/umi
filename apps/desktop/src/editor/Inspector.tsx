@@ -2,6 +2,7 @@ import { createEffect, createSignal, For, Match, Show, Switch as SolidSwitch } f
 import { Button, Progress, Section, Segmented, SliderField, Swatch, SwitchRow, Tabs, TextField, toast } from "@umi/ui";
 import {
   AudioLines,
+  Captions,
   Camera,
   Clapperboard,
   Crop,
@@ -23,12 +24,13 @@ import {
 } from "lucide-solid";
 import { CropDialog } from "./CropDialog";
 import { BackgroundSection } from "./panels/Background";
+import { CaptionsSection } from "./panels/Captions";
 import { BrandSection } from "./panels/Brand";
 import { MusicSection } from "./panels/Music";
 import type { Editor } from "./store";
 import { maskRectAt, sourceTimeAt, type AspectRatio, type Background, type DeviceFrame, type EditSettings, type GradePreset, type MediaOverlay, type GradientPreset, type Selection } from "./types";
 
-type Tab = "background" | "screen" | "cursor" | "camera" | "zoom" | "color" | "audio";
+type Tab = "background" | "screen" | "cursor" | "camera" | "zoom" | "color" | "captions" | "audio";
 
 const GRADES: GradePreset[] = ["none", "cinematic", "vivid", "golden", "frost", "midnight", "vintage", "noir", "dreamy"];
 
@@ -80,6 +82,7 @@ export function Inspector(props: { editor: Editor }) {
             { id: "camera", label: "Camera", icon: <Camera size={17} /> },
             { id: "zoom", label: "Zoom", icon: <ZoomIn size={17} /> },
             { id: "color", label: "Color & effects", icon: <Sparkles size={17} /> },
+            { id: "captions", label: "Captions & transcript", icon: <Captions size={17} /> },
             { id: "audio", label: "Audio", icon: <AudioLines size={17} /> },
           ]}
         />
@@ -248,6 +251,10 @@ export function Inspector(props: { editor: Editor }) {
               <SliderField label="Vignette" value={edit().grade.vignette} format={pct} onInput={(v) => set((e) => (e.grade.vignette = v))} {...gesture} />
               <SliderField label="Film grain" value={edit().grade.grain} format={pct} onInput={(v) => set((e) => (e.grade.grain = v))} {...gesture} />
             </Section>
+          </Match>
+
+          <Match when={tab() === "captions"}>
+            <CaptionsSection editor={ed} gesture={gesture} />
           </Match>
 
           <Match when={tab() === "audio"}>

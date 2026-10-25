@@ -295,6 +295,52 @@ fn export_default_path(name: String, extension: String) -> PathBuf {
     path
 }
 
+#[derive(Clone, Serialize)]
+struct Stage {
+    stage: String,
+    value: f64,
+}
+
+/// Captions from the voice, on device (Whisper). Progress: model download, then transcription.
+#[tauri::command]
+async fn editor_transcribe(state: State<'_, AppState>, id: String, language: Option<String>, progress: tauri::ipc::Channel<Stage>) -> Result<EditorState, String> {
+    let editor = state.editor(&id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let last = Mutex::new((String::new(), -1i32));
+        editor.transcribe(language, &|stage, value| {
+            let step = (value * 100.0) as i32;
+            let mut seen = last.lock();
+            if seen.0 != stage || seen.1 != step {
+                *seen = (stage.to_string(), step);
+                let _ = progress.send(Stage { stage: stage.into(), value });
+            }
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Writes the captions as an .srt or .vtt file.
+#[tauri::command]
+fn editor_save_subtitles(state: State<'_, AppState>, id: String, destination: PathBuf) -> Result<(), String> {
+    let vtt = destination.extension().is_some_and(|e| e.eq_ignore_ascii_case("vtt"));
+    std::fs::write(destination, state.editor(&id)?.subtitles(vtt)).map_err(|e| e.to_string())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ModelInfo {
+    model: umi_ai::models::Model,
+    purpose: &'static str,
+    ready: bool,
+}
+
+/// On-device AI models and whether they're downloaded.
+#[tauri::command]
+fn ai_models() -> Vec<ModelInfo> {
+    umi_ai::models::Model::ALL.iter().map(|m| ModelInfo { model: *m, purpose: m.purpose(), ready: m.is_ready() }).collect()
+}
+
 #[tauri::command]
 fn editor_close(state: State<'_, AppState>, id: String) -> Result<(), String> {
     if let Some(editor) = state.editors.lock().remove(&id) {
@@ -378,6 +424,9 @@ pub fn run() {
             editor_export,
             editor_export_cancel,
             export_default_path,
+            editor_transcribe,
+            editor_save_subtitles,
+            ai_models,
             assets::bundle_import,
             presets::presets_list,
             presets::preset_save,
