@@ -8,6 +8,7 @@ mod presets;
 mod recording;
 mod screenshot;
 mod share;
+mod pexels;
 mod shortcuts;
 mod tray;
 mod windows;
@@ -744,6 +745,11 @@ pub fn run() {
             share::share_update,
             share::share_delete,
             share::share_insights,
+            pexels::pexels_status,
+            pexels::pexels_connect,
+            pexels::pexels_disconnect,
+            pexels::pexels_search,
+            pexels::pexels_use,
             share::copy_text_to_clipboard,
             shortcuts::shortcuts_get,
             shortcuts::shortcuts_set,
