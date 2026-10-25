@@ -1,9 +1,10 @@
+import { limitStreaming } from "./limits";
 import type { AppEnv } from "./env";
 import { gifKey, thumbnailKey, videoKey } from "./env";
 import { resolveAccess } from "./access";
 
 function denied(state: string): Response {
-  const status = state === "locked" ? 401 : state === "expired" || state === "gone" ? 410 : 404;
+  const status = state === "locked" ? 401 : state === "expired" || state === "gone" ? 410 : state === "review" ? 451 : 404;
   return new Response(state, { status, headers: { "cache-control": "no-store" } });
 }
 
@@ -32,6 +33,7 @@ function cacheControl(expiresAt: number | null, isPrivate: boolean): string {
 
 /** GET|HEAD /v/:id/video.mp4[?download=1] — range-capable streaming from R2. */
 export async function serveVideo(request: Request, env: AppEnv, id: string): Promise<Response> {
+  await limitStreaming(env, request, id);
   const access = await resolveAccess(request, env, id);
   if (access.state !== "ok") return denied(access.state);
   const { video } = access;

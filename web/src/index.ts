@@ -1,3 +1,4 @@
+import { postReport } from "./reports";
 import type { AppEnv } from "./env";
 import { handleApi } from "./api";
 import { handleAuth } from "./auth";
@@ -38,6 +39,7 @@ async function route(request: Request, env: AppEnv): Promise<Response> {
     if (method === "GET") return getReactions(request, env, m[1]!);
     if (method === "POST") return postReaction(request, env, m[1]!);
   }
+  if ((m = /^\/v\/([0-9A-Za-z]+)\/report$/.exec(pathname)) && method === "POST") return postReport(request, env, m[1]!);
   if ((m = /^\/v\/([0-9A-Za-z]+)\/view$/.exec(pathname)) && method === "POST") {
     return postView(request, env, await viewableVideo(request, env, m[1]!));
   }

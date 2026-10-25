@@ -7,6 +7,7 @@ import { deleteSocialData, ownerDeleteComment, ownerListComments } from "./socia
 import { videoInsights } from "./insights";
 import { handleWorkspaces, parseWorkspaceId, visibleVideo } from "./workspaces";
 import { buildUploadPlan } from "./uploads";
+import { throttle } from "./limits";
 import { type VideoRow, getVideo, toJson } from "./videos";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -97,6 +98,8 @@ async function createVideo(request: Request, env: AppEnv, account: Account): Pro
     throw new HttpError(400, "invalid_field", "sizeBytes must be a positive integer.");
   }
   if (size > maxUploadBytes(env)) throw new HttpError(413, "too_large", "Video exceeds the maximum upload size.");
+  // New links per account: a script can't fill storage or farm links faster than a person.
+  await throttle(env, `links:${account.id}`, String(env.DEV_TOOLS ?? "") === "1" ? 1000 : 30, 60 * 60 * 1000);
   // Plan limits: length of one video and total storage.
   const plan = can(account);
   if (plan.maxVideoMinutes !== null && typeof body.durationMs === "number" && body.durationMs > plan.maxVideoMinutes * 60_000) {

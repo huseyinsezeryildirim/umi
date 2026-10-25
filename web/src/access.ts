@@ -8,6 +8,7 @@ export type Access =
   | { state: "expired"; video: VideoRow }
   | { state: "processing"; video: VideoRow }
   | { state: "gone" }
+  | { state: "review" }
   | { state: "not_found" };
 
 const UNLOCK_TTL_MS = 24 * 60 * 60 * 1000;
@@ -21,6 +22,7 @@ export async function resolveAccess(request: Request, env: AppEnv, id: string): 
   const video = await getVideo(env, id);
   if (!video) return { state: "not_found" };
   if (video.status === "deleted") return { state: "gone" };
+  if (video.flagged_at) return { state: "review" };
   if (isExpired(video)) return { state: "expired", video };
   if (video.status !== "ready") return { state: "processing", video };
   if (video.password_hash && !(await hasUnlockCookie(request, env, video))) return { state: "locked", video };

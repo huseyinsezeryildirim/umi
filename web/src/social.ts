@@ -103,6 +103,8 @@ export async function viewableVideo(request: Request, env: AppEnv, id: string): 
       throw new HttpError(410, "expired", "This link has expired.");
     case "gone":
       throw new HttpError(410, "gone", "This video was removed.");
+    case "review":
+      throw new HttpError(451, "under_review", "This video is under review.");
     case "processing":
       throw new HttpError(409, "processing", "This video is still uploading.");
     default:

@@ -395,6 +395,34 @@ async function main() {
   check(accepted === 10 && limited === 429, "per-IP comment rate limit: 10 accepted, then 429");
   await api("DELETE", `/api/videos/${spam.id}`);
 
+  console.log("\nReports (separate video)");
+  const { video: reported } = await upload(small, null, { title: "reported" });
+  check((await viewer("POST", `/v/${reported.id}/report`, { reason: "nonsense" })).status === 400, "unknown reason → 400");
+  check((await viewer("POST", `/v/${reported.id}/report`, { reason: "spam", details: "ads" })).status === 200, "a report → 200");
+  check((await get(`/v/${reported.id}`)).status === 200, "one spam report doesn't hide it");
+  const reportFrom = (ip, reason) =>
+    fetch(`${BASE}/v/${reported.id}/report`, { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": ip }, body: JSON.stringify({ reason }) });
+  check((await reportFrom("203.0.113.1", "illegal")).status === 200, "an illegal-content report → 200");
+  check((await get(`/v/${reported.id}`)).status === 200, "one person can't take a video down");
+  await reportFrom("203.0.113.2", "illegal");
+  check((await get(`/v/${reported.id}`)).status === 451, "a second person reporting illegal content hides the page → 451");
+  check((await get(`/v/${reported.id}/video.mp4`)).status === 451, "…and the video file → 451");
+  check((await api("GET", `/api/videos/${reported.id}`)).data?.video?.underReview === true, "owner sees it's under review");
+  await api("DELETE", `/api/videos/${reported.id}`);
+
+  console.log("\nPlan changes");
+  const freeTok = args["free-token"];
+  const switchPlan = (plan) => api("POST", "/api/auth/dev-plan", { plan }, freeTok);
+  const made = (await api("POST", "/api/videos", { sizeBytes: 1, durationMs: 60_000, title: "plan change" }, freeTok)).data?.video;
+  await switchPlan("pro");
+  const asPro = (await api("GET", `/api/videos/${made.id}`, undefined, freeTok)).data.video;
+  check(asPro.expiresAt === null && !asPro.keptByUpgrade, "upgrading keeps the free link for good");
+  await switchPlan("free");
+  const back = (await api("GET", `/api/videos/${made.id}`, undefined, freeTok)).data.video;
+  const days = (Date.parse(back.expiresAt) - Date.now()) / 86_400_000;
+  check(back.keptByUpgrade && days > 29 && days < 31, "going back to Free gives links 30 days (renewing keeps them)");
+  await api("DELETE", `/api/videos/${made.id}`, undefined, freeTok);
+
   console.log(failures ? `\n${failures} check(s) failed` : "\nAll checks passed");
   console.log(`\nViewer: ${video.url}\n        ${video.url}?t=12`);
   process.exit(failures ? 1 : 0);

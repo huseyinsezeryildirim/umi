@@ -3,6 +3,7 @@ import { hashPassword, randomId, sha256Hex, verifyPassword } from "./crypto";
 import { HttpError, json, readJson } from "./http";
 import { buttonEmail, sendEmail } from "./email";
 import { type Entitlements, type Plan, entitlements, isPlan } from "./plans";
+import { throttle } from "./limits";
 
 export interface Account {
   id: string;
@@ -69,15 +70,27 @@ const publicAccount = (a: Account) => ({
   entitlements: entitlements(planOf(a)),
 });
 
+/** Links a lapsed paid account keeps before they go (time to export or renew). */
+const DOWNGRADE_GRACE_DAYS = 30;
+
 /**
  * Changes an account's plan (billing calls this too). Upgrading keeps the links the free plan
- * would have deleted after a week.
+ * would have deleted after a week. Going back to Free (a subscription ended or was refunded)
+ * gives links without an end date 30 days, so "pay a month, upload a lot, cancel" doesn't leave
+ * storage behind for good; renewing in time keeps them.
  */
 export async function setPlan(env: AppEnv, accountId: string, plan: Plan): Promise<void> {
   await env.DB.prepare("UPDATE accounts SET plan = ?, is_paid = ? WHERE id = ?").bind(plan, plan === "free" ? 0 : 1, accountId).run();
+  const now = Date.now();
   if (entitlements(plan).linkDays === null) {
     await env.DB.prepare("UPDATE videos SET expires_at = NULL, plan_expiry = 0, updated_at = ? WHERE account_id = ? AND plan_expiry = 1 AND status != 'deleted'")
-      .bind(Date.now(), accountId)
+      .bind(now, accountId)
+      .run();
+  } else {
+    await env.DB.prepare(
+      "UPDATE videos SET expires_at = ?, plan_expiry = 1, updated_at = ? WHERE account_id = ? AND status != 'deleted' AND (expires_at IS NULL OR expires_at > ?)",
+    )
+      .bind(now + DOWNGRADE_GRACE_DAYS * 24 * 60 * 60 * 1000, now, accountId, now + DOWNGRADE_GRACE_DAYS * 24 * 60 * 60 * 1000)
       .run();
   }
 }
@@ -168,6 +181,8 @@ export async function handleAuth(request: Request, env: AppEnv, path: string): P
   if (path === "/api/auth/signup" && method === "POST") {
     const { email, password } = credentials(await readJson(request));
     checkPassword(password);
+    // Accounts per address: free links can't be multiplied by signing up again and again.
+    await throttle(env, `signup:${request.headers.get("cf-connecting-ip") ?? "local"}`, String(env.DEV_TOOLS ?? "") === "1" ? 100 : 5, 60 * 60 * 1000);
     const taken = await env.DB.prepare("SELECT 1 FROM accounts WHERE email = ?").bind(email).first();
     if (taken) throw new HttpError(409, "email_taken", "There's already an account with this email. Sign in instead.");
     const id = `acc_${randomId(16)}`;

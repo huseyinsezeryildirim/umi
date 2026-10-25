@@ -19,6 +19,9 @@ export async function handleEmbed(request: Request, env: AppEnv, id: string, wro
     case "not_found":
       return page({ ...base, status: 404, title: "Video not found", description: "This link doesn't exist.",
         body: messageCard(MISSING, "Video not found", "Check the link and try again.") });
+    case "review":
+      return page({ ...base, status: 451, title: "Video under review", description: "This video is being reviewed.",
+        body: messageCard(MISSING, "This video is under review", "People reported it, so it's hidden while we take a look.") });
     case "gone":
       return page({ ...base, status: 410, title: "Video removed", description: "This video is no longer available.",
         body: messageCard(MISSING, "This video was removed", "The owner deleted this video or revoked the link.") });

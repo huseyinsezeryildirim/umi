@@ -253,10 +253,17 @@ select{appearance:none;-webkit-appearance:none;padding-right:12px;font-variant-n
 .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:8px 14px;border-radius:10px;
   font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:calc(100vw - 32px)}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+.report{margin:4px 0 0;font-size:13px;color:var(--muted)}
+.report summary{cursor:pointer;list-style:none;display:inline}
+.report summary::-webkit-details-marker{display:none}
+.report summary:hover{color:var(--text)}
+.report form{display:grid;gap:8px;max-width:420px;margin-top:10px}
+.report select,.report textarea,.report button{font:inherit;font-size:16px;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface-solid);color:var(--text)}
+.report button{cursor:pointer;justify-self:start}
 .foot{text-align:center;color:var(--muted);font-size:13px;padding:28px 16px calc(20px + env(safe-area-inset-bottom))}
 @media (max-width:640px){main{padding:0}.stage{border-radius:0;max-height:none;width:100%;box-shadow:none}
   .timeline{width:auto;padding:0 16px}.info{padding:10px 16px 4px}.react{padding:4px 16px;flex-wrap:nowrap;gap:6px}.react .rx{flex:1 1 0;min-width:0;padding:0 4px;justify-content:center}.comments{margin:14px 16px 8px;padding:16px 14px}
-  .cform input{max-width:none}.actions{width:100%}.actions>*{flex:1 1 auto;justify-content:center}.message{margin:8vh 16px 0}}
+  .report{margin:4px 16px 0}.cform input{max-width:none}.actions{width:100%}.actions>*{flex:1 1 auto;justify-content:center}.message{margin:8vh 16px 0}}
 @media (prefers-reduced-motion:reduce){*{transition:none !important}.fl{animation:none;opacity:0}}
 `;
 

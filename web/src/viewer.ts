@@ -1,3 +1,4 @@
+import { clientIp, throttle } from "./limits";
 import { TRACK_JS } from "./insights";
 import { type AppEnv, baseUrl } from "./env";
 import { resolveAccess, unlockCookie } from "./access";
@@ -107,6 +108,9 @@ export async function handleViewer(request: Request, env: AppEnv, id: string, wr
     case "not_found":
       return page({ ...base, status: 404, title: "Video not found", description: "This link doesn't exist.",
         body: messageCard(MISSING, "Video not found", "Check the link and try again.") });
+    case "review":
+      return page({ ...base, status: 451, title: "Video under review", description: "This video is being reviewed.",
+        body: messageCard(MISSING, "This video is under review", "People reported it, so it's hidden while we take a look.") });
     case "gone":
       return page({ ...base, status: 410, title: "Video removed", description: "This video is no longer available.",
         body: messageCard(MISSING, "This video was removed", "The owner deleted this video or revoked the link.") });
@@ -137,7 +141,7 @@ export async function handleViewer(request: Request, env: AppEnv, id: string, wr
             }
           : undefined,
         oembed: isPublic ? `${origin}/oembed?url=${encodeURIComponent(canonical)}&format=json` : undefined,
-        body: `${playerBody(v, nonce, social)}<script nonce="${nonce}">${SCRIPT}${TRACK_JS}</script>`,
+        body: `${playerBody(v, nonce, social)}${REPORT_HTML}<script nonce="${nonce}">${SCRIPT}${TRACK_JS}${REPORT_JS}</script>`,
       });
     }
   }
@@ -152,6 +156,8 @@ export async function handleUnlock(request: Request, env: AppEnv, id: string): P
   const t = form?.get("t");
   if (typeof t === "string" && t) target.searchParams.set("t", t);
   if (access.state !== "locked") return Response.redirect(target.toString(), 303);
+  // Password guesses per visitor and video.
+  await throttle(env, `unlock:${clientIp(request)}:${id}`, 10, 15 * 60 * 1000);
   const password = form?.get("password");
 
   if (typeof password === "string" && (await verifyPassword(password, access.video.password_hash!))) {
@@ -163,10 +169,36 @@ export async function handleUnlock(request: Request, env: AppEnv, id: string): P
       },
     });
   }
-  // TODO(abuse): rate-limit attempts per video/IP (e.g. Workers Rate Limiting binding).
   const retry = new Request(target, { headers: request.headers });
   return embed ? handleEmbed(retry, env, id, true) : handleViewer(retry, env, id, true);
 }
+
+/** "Report this video": a few reports (or one for illegal content) hide it for review. */
+const REPORT_HTML = `<details class="report" id="report"><summary>Report this video</summary>
+<form id="report-form">
+<select name="reason" required>
+<option value="">What's wrong?</option>
+<option value="spam">Spam or misleading</option>
+<option value="abuse">Harassment or hateful content</option>
+<option value="copyright">Copyright infringement</option>
+<option value="illegal">Illegal content</option>
+<option value="other">Something else</option>
+</select>
+<textarea name="details" rows="3" maxlength="1000" placeholder="Anything we should know (optional)"></textarea>
+<button type="submit">Send report</button>
+</form></details>`;
+
+const REPORT_JS = `(() => {
+  const form = document.getElementById("report-form");
+  if (!form) return;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const res = await fetch(location.pathname.replace(/\\/?$/, "") + "/report", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ reason: fd.get("reason"), details: fd.get("details") || undefined }) }).catch(() => null);
+    form.replaceChildren(Object.assign(document.createElement("p"), { textContent: res && res.ok ? "Thanks — we'll take a look." : "Couldn't send the report. Try again later." }));
+  });
+})();`;
 
 // User content (names, comment bodies) is only ever inserted with textContent / DOM properties.
 const SCRIPT = `(() => {

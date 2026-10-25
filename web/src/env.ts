@@ -6,6 +6,8 @@ export interface AppEnv extends Env {
   BREVO_API_KEY?: string;
   /** "1" in local development only: enables /api/auth/dev-plan. */
   DEV_TOOLS?: string;
+  /** Where viewer reports go (optional). */
+  ABUSE_EMAIL?: string;
 }
 
 export function baseUrl(env: AppEnv, request: Request): string {
