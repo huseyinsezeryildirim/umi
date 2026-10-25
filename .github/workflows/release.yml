@@ -12,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-15
+          - os: macos-26
             target: aarch64-apple-darwin
           - os: macos-15-intel
             target: x86_64-apple-darwin
@@ -23,6 +23,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      # ScreenCaptureKit's Metal bridge needs the macOS 26 SDK (Xcode 26).
+      - if: runner.os == 'macOS'
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
