@@ -18,3 +18,5 @@ apps/desktop/dist/
 
 # Local API keys baked into builds (never committed)
 /keys.env
+# Release-only Tauri settings written by .github/workflows/release.yml
+apps/desktop/src-tauri/release.conf.json
