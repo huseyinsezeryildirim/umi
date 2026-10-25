@@ -14,9 +14,10 @@ fn bake_keys() {
     println!("cargo:rerun-if-changed={}", file.display());
     println!("cargo:rerun-if-env-changed=UMI_PEXELS_KEY");
     let from_file = std::fs::read_to_string(&file).unwrap_or_default();
-    let value = std::env::var("UMI_PEXELS_KEY").ok().filter(|v| !v.is_empty()).or_else(|| {
-        from_file.lines().find_map(|l| l.trim().strip_prefix("UMI_PEXELS_KEY=").map(|v| v.trim().to_string()))
-    });
+    let value = std::env::var("UMI_PEXELS_KEY")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| from_file.lines().find_map(|l| l.trim().strip_prefix("UMI_PEXELS_KEY=").map(|v| v.trim().to_string())));
     if let Some(v) = value {
         println!("cargo:rustc-env=UMI_PEXELS_KEY_BUILTIN={v}");
     }

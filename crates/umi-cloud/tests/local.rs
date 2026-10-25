@@ -91,9 +91,8 @@ fn uploads_a_file_while_it_grows() {
                 &reservation,
                 &path,
                 &|| {
-                    done.load(std::sync::atomic::Ordering::SeqCst).then(|| {
-                        Ok(umi_cloud::Finished { duration_ms: 42_000, width: 1920, height: 1080, poster: None, gif: None })
-                    })
+                    done.load(std::sync::atomic::Ordering::SeqCst)
+                        .then(|| Ok(umi_cloud::Finished { duration_ms: 42_000, width: 1920, height: 1080, poster: None, gif: None }))
                 },
                 &|n| {
                     // Parts go up before the file is finished.
@@ -145,7 +144,12 @@ fn team_workspace_round_trip() {
     let path = std::env::temp_dir().join("umi-team-video.bin");
     std::fs::write(&path, vec![7u8; 2000]).unwrap();
     let video = owner
-        .upload_growing(&reservation, &path, &|| Some(Ok(umi_cloud::Finished { duration_ms: 1000, width: 640, height: 360, poster: None, gif: None })), &|_| {})
+        .upload_growing(
+            &reservation,
+            &path,
+            &|| Some(Ok(umi_cloud::Finished { duration_ms: 1000, width: 640, height: 360, poster: None, gif: None })),
+            &|_| {},
+        )
         .unwrap();
     let moved = owner.update(&video.id, &Settings { workspace_id: Some(Some(ws.id.clone())), ..Default::default() }).unwrap();
     assert_eq!(moved.workspace_id.as_deref(), Some(ws.id.as_str()));

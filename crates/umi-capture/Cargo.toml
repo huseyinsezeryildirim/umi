@@ -14,6 +14,7 @@ cpal = "0.18"
 umi-project.workspace = true
 nokhwa = { version = "0.10", default-features = false, features = ["input-native"] }
 image = { version = "0.25", default-features = false, features = ["jpeg"] }
+xcap = "0.9"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 screencapturekit = { version = "11.1", features = ["macos_13_0"] }
@@ -25,9 +26,6 @@ device_query = "4"
 
 [target.'cfg(windows)'.dependencies]
 windows-capture = "2.0"
-
-[target.'cfg(target_os = "linux")'.dependencies]
-xcap = "0.9"
 
 [lints]
 workspace = true

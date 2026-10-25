@@ -258,6 +258,7 @@ mod tests {
             title: None,
             camera_off: None,
             title_auto: None,
+            windows: None,
         };
         let mut edit = EditSettings::default();
         edit.captions.words = words;

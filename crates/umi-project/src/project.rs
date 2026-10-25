@@ -58,6 +58,10 @@ pub struct RecordingProject {
     /// starts with the camera hidden there.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub camera_off: Option<Vec<(f64, f64)>>,
+    /// Which window was in front while recording (its app and title, from each time in
+    /// seconds): names the recording after what was on screen.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows: Option<Vec<WindowSpan>>,
     /// The recording's title, when it has one (otherwise the folder name is shown).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -93,6 +97,18 @@ impl RecordingProject {
 
 fn version_one() -> i64 {
     1
+}
+
+/// The window in front from `start` (recording time) until the next span.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowSpan {
+    pub start: f64,
+    /// The app's name ("Safari"); empty when only the window's title is known (the web).
+    #[serde(default)]
+    pub app: String,
+    #[serde(default)]
+    pub title: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

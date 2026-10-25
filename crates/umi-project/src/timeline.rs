@@ -554,6 +554,7 @@ mod tests {
             title: None,
             camera_off: None,
             title_auto: None,
+            windows: None,
         };
         Document::new(project, EditSettings::default(), CursorData::default(), duration)
     }

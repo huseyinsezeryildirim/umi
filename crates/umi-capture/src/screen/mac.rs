@@ -226,7 +226,11 @@ impl ScreenSession for Session {
 /// Windows on screen and off: our floating windows exist hidden before they're shown, and
 /// leaving them out while hidden keeps them out of the very first frame they appear in.
 fn all_content() -> Result<SCShareableContent, CaptureError> {
-    SCShareableContent::create().with_on_screen_windows_only(false).with_exclude_desktop_windows(false).get().map_err(|e| CaptureError::Other(e.to_string()))
+    SCShareableContent::create()
+        .with_on_screen_windows_only(false)
+        .with_exclude_desktop_windows(false)
+        .get()
+        .map_err(|e| CaptureError::Other(e.to_string()))
 }
 
 /// Our own windows (except the drawing layer) and, when asked, the desktop's icons.

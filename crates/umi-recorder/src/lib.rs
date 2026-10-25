@@ -19,7 +19,7 @@ use umi_capture::screen::{self, ScreenOptions, ScreenSession};
 use umi_capture::{AudioSink, CaptureError, Clock, Frame, Target, VideoSink};
 use umi_media::{Pixels, StreamWriter, VideoCodec, WriterSettings};
 use umi_project::edit::Camera as CameraStyle;
-use umi_project::project::{AudioInfo, CameraInfo, ScreenInfo};
+use umi_project::project::{AudioInfo, CameraInfo, ScreenInfo, WindowSpan};
 use umi_project::{Bundle, RecordingProject, Rect};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -229,6 +229,39 @@ pub struct Recording {
     audio: AudioInfo,
     /// Spans with the camera turned off (the camera keeps recording; the edit hides it).
     camera_off: parking_lot::Mutex<(Vec<(f64, f64)>, Option<f64>)>,
+    /// The window in front, read once a second (names the recording).
+    windows: parking_lot::Mutex<Option<WindowWatch>>,
+}
+
+struct WindowWatch {
+    stop: Arc<std::sync::atomic::AtomicBool>,
+    thread: JoinHandle<Vec<WindowSpan>>,
+}
+
+impl WindowWatch {
+    fn start(clock: Clock) -> Self {
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = stop.clone();
+        let thread = std::thread::spawn(move || {
+            let mut spans: Vec<WindowSpan> = Vec::new();
+            while !flag.load(std::sync::atomic::Ordering::Relaxed) {
+                // Paused time isn't in the video.
+                if let (Some(t), Some(w)) = (clock.now(), umi_capture::focus::front_window()) {
+                    if spans.last().is_none_or(|l| l.app != w.app || l.title != w.title) {
+                        spans.push(WindowSpan { start: t, app: w.app, title: w.title });
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
+            spans
+        });
+        WindowWatch { stop, thread }
+    }
+
+    fn finish(self) -> Vec<WindowSpan> {
+        self.stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        self.thread.join().unwrap_or_default()
+    }
 }
 
 /// "Umi 2026-10-25 at 10.41.07.umi" in `library` (made unique).
@@ -324,6 +357,7 @@ impl Recording {
             capture_rect: rect,
             audio,
             camera_off: parking_lot::Mutex::new((Vec::new(), None)),
+            windows: parking_lot::Mutex::new(None),
         };
 
         let result = (|| -> Result<(), RecordError> {
@@ -377,6 +411,10 @@ impl Recording {
         if self.device.is_none() {
             let r = self.capture_rect;
             *self.input.lock() = Some(InputRecorder::start(self.clock.clone(), Area { x: r.0, y: r.1, width: r.2, height: r.3 }));
+            // Which window is in front (not for the camera alone).
+            if !self.options.camera_only {
+                self.windows.lock().get_or_insert_with(|| WindowWatch::start(self.clock.clone()));
+            }
         }
     }
 
@@ -453,6 +491,7 @@ impl Recording {
     /// Stops and finishes the bundle; returns its path.
     pub fn stop(mut self) -> Result<PathBuf, RecordError> {
         let duration = self.clock.elapsed();
+        let windows = self.windows.lock().take().map(WindowWatch::finish).filter(|w| !w.is_empty());
         let cursor = self.stop_sources();
         for w in std::mem::take(&mut self.writers) {
             w.join().map_err(|_| RecordError::Write("writer crashed".into()))?.map_err(RecordError::Write)?;
@@ -487,8 +526,13 @@ impl Recording {
                 (has_camera && !off.0.is_empty()).then(|| off.0.clone())
             },
             title_auto: None,
+            windows,
         };
         let mut project = project;
+        // Named after what was on screen right away; what was said may name it better later.
+        if let Some(title) = project.windows.as_deref().and_then(|w| umi_project::insights::screen_title(w, project.duration)) {
+            project.suggest_title(&title);
+        }
         if self.device.is_some() || matches!(self.options.target, Target::Device { .. }) {
             // A phone recording starts in a phone frame, upright.
             let mut edit = project.default_edit(None);
@@ -591,6 +635,7 @@ pub fn recover(library: &Path) -> Vec<PathBuf> {
             title: None,
             camera_off: None,
             title_auto: None,
+            windows: None,
         };
         if bundle.write_project(&project).is_ok() {
             if !bundle.file(umi_project::project::CURSOR_FILE).exists() {

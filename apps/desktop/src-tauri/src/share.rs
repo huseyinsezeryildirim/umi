@@ -334,7 +334,8 @@ pub async fn instant_share(
         let exported = parking_lot::Mutex::new(0.0f64);
         let uploaded = std::sync::atomic::AtomicU64::new(0);
         let send = || {
-            let _ = progress.send(InstantProgress { exported: *exported.lock(), uploaded_bytes: uploaded.load(std::sync::atomic::Ordering::Relaxed) });
+            let _ = progress
+                .send(InstantProgress { exported: *exported.lock(), uploaded_bytes: uploaded.load(std::sync::atomic::Ordering::Relaxed) });
         };
         let finished = parking_lot::Mutex::new(None::<Result<umi_cloud::Finished, String>>);
         let folder = std::env::temp_dir().join(format!("umi-instant-{}", std::process::id()));
@@ -343,7 +344,8 @@ pub async fn instant_share(
         let result = std::thread::scope(|scope| {
             scope.spawn(|| {
                 let cancel = std::sync::atomic::AtomicBool::new(false);
-                let settings = umi_engine::ExportSettings { format: umi_engine::Format::StreamingMp4, resolution: 1080, fps: 60, hardware: true };
+                let settings =
+                    umi_engine::ExportSettings { format: umi_engine::Format::StreamingMp4, resolution: 1080, fps: 60, hardware: true };
                 let outcome = editor
                     .export(
                         gpu,
