@@ -5,6 +5,10 @@ mod assets;
 mod editor;
 mod import;
 mod presets;
+mod recording;
+mod windows;
+mod tray;
+mod shortcuts;
 
 use editor::{EditorSession, EditorState, Op};
 use parking_lot::Mutex;
@@ -24,6 +28,7 @@ pub(crate) struct AppState {
     gpu: OnceLock<Arc<Gpu>>,
     /// Library hover previews by recording path (JPEG data URLs).
     previews: Mutex<HashMap<PathBuf, Arc<Vec<String>>>>,
+    pub(crate) recorder: recording::Recorder,
     /// The AI voice, loaded on first use.
     voice: Mutex<Option<umi_ai::tts::Voice>>,
     /// Running exports by editor id (cancel flags).
@@ -45,7 +50,7 @@ impl AppState {
 }
 
 /// Where recordings live (same folder as the Swift app: ~/Movies/Umi).
-fn library_folder() -> PathBuf {
+pub(crate) fn library_folder() -> PathBuf {
     dirs::video_dir().unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("Movies")).join("Umi")
 }
 
@@ -408,6 +413,38 @@ async fn import_loom(link: String, progress: tauri::ipc::Channel<f64>) -> Result
 }
 
 #[tauri::command]
+fn app_quit(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
+/// Opens the system's privacy settings page for a permission ("screen", "camera",
+/// "microphone", "input").
+#[tauri::command]
+fn open_privacy_settings(kind: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let pane = match kind.as_str() {
+            "camera" => "Privacy_Camera",
+            "microphone" => "Privacy_Microphone",
+            "input" => "Privacy_ListenEvent",
+            _ => "Privacy_ScreenCapture",
+        };
+        std::process::Command::new("open").arg(format!("x-apple.systempreferences:com.apple.preference.security?{pane}")).status().map_err(|e| e.to_string())?;
+    }
+    #[cfg(windows)]
+    {
+        let page = match kind.as_str() {
+            "camera" => "ms-settings:privacy-webcam",
+            "microphone" => "ms-settings:privacy-microphone",
+            _ => "ms-settings:privacy",
+        };
+        std::process::Command::new("cmd").args(["/C", "start", page]).status().map_err(|e| e.to_string())?;
+    }
+    let _ = kind;
+    Ok(())
+}
+
+#[tauri::command]
 fn editor_close(state: State<'_, AppState>, id: String) -> Result<(), String> {
     if let Some(editor) = state.editors.lock().remove(&id) {
         editor.save()?;
@@ -419,6 +456,7 @@ fn editor_close(state: State<'_, AppState>, id: String) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
         .setup(|app| {
@@ -466,6 +504,14 @@ pub fn run() {
                 }
             });
 
+            tray::install(app.handle())?;
+            shortcuts::install(app.handle());
+            // Recordings the app couldn't finish last time (it quit while recording).
+            let recovered = umi_recorder::recover(&library_folder());
+            if !recovered.is_empty() {
+                let _ = app.emit("recovered", recovered.len());
+            }
+
             // Warm the GPU up off the main thread so the first editor opens fast.
             let handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -490,6 +536,23 @@ pub fn run() {
             editor_export,
             editor_export_cancel,
             export_default_path,
+            app_quit,
+            open_privacy_settings,
+            windows::window_show,
+            windows::window_hide,
+            windows::window_resize,
+            recording::record_settings,
+            recording::record_settings_save,
+            recording::record_sources,
+            recording::record_meter,
+            recording::record_status,
+            recording::record_camera_preview,
+            recording::record_prepare,
+            recording::record_begin,
+            recording::record_pause,
+            recording::record_stop,
+            recording::record_cancel,
+            recording::copy_file_to_clipboard,
             import_videos,
             import_loom,
             editor_transcribe,

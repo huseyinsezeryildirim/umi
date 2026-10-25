@@ -118,6 +118,21 @@ impl VideoSink for Feed {
     }
 }
 
+/// One source, two consumers (the file and the on-screen preview).
+struct Tee(Arc<Feed>, Arc<dyn VideoSink>);
+
+impl VideoSink for Tee {
+    fn frame(&self, frame: Frame, t: f64) {
+        let copy = match &frame {
+            Frame::Rgba { width, height, data, stride } => Frame::Rgba { width: *width, height: *height, data, stride: *stride },
+            Frame::Bgra { width, height, data, stride } => Frame::Bgra { width: *width, height: *height, data, stride: *stride },
+            Frame::Nv12 { width, height, y, y_stride, uv, uv_stride } => Frame::Nv12 { width: *width, height: *height, y, y_stride: *y_stride, uv, uv_stride: *uv_stride },
+        };
+        self.1.frame(copy, t);
+        self.0.frame(frame, t);
+    }
+}
+
 /// An audio source's track in a feed.
 struct Track(Arc<Feed>, usize);
 
@@ -211,7 +226,7 @@ fn new_bundle(library: &Path) -> std::io::Result<PathBuf> {
 impl Recording {
     /// Starts recording into a new bundle in `library` right away.
     pub fn start(library: &Path, options: Options) -> Result<Recording, RecordError> {
-        let recording = Self::prepare(library, options)?;
+        let recording = Self::prepare(library, options, None)?;
         recording.begin();
         Ok(recording)
     }
@@ -219,7 +234,9 @@ impl Recording {
     /// Opens every source and lets it warm up (cameras take a moment) without keeping
     /// anything yet; [`begin`](Self::begin) starts the recording at time 0. Call it when a
     /// countdown starts.
-    pub fn prepare(library: &Path, options: Options) -> Result<Recording, RecordError> {
+    /// `camera_preview` also gets every camera frame (the on-screen bubble), so the camera
+    /// is opened once.
+    pub fn prepare(library: &Path, options: Options, camera_preview: Option<Arc<dyn VideoSink>>) -> Result<Recording, RecordError> {
         let screen_options = ScreenOptions { fps: options.fps, max_size: options.max_size, show_cursor: false, system_audio: options.system_audio, exclude_own_windows: true };
         let (rect, scale) = screen::geometry(&options.target)?;
         let size = screen::fit(rect.2 * scale, rect.3 * scale, options.max_size);
@@ -272,7 +289,11 @@ impl Recording {
                 let (tx, rx) = bounded::<Job>(64);
                 let feed = Arc::new(Feed::new(tx));
                 writers.push(writer_thread(bundle.camera(), None, 30, rx));
-                recording.camera = Some(umi_capture::camera::start(Some(id.as_str()).filter(|s| !s.is_empty()), clock.clone(), feed.clone())?);
+                let sink: Arc<dyn VideoSink> = match camera_preview {
+                    Some(preview) => Arc::new(Tee(feed.clone(), preview)),
+                    None => feed.clone(),
+                };
+                recording.camera = Some(umi_capture::camera::start(Some(id.as_str()).filter(|s| !s.is_empty()), clock.clone(), sink)?);
                 recording.camera_feed = Some(feed);
             }
             Ok(())

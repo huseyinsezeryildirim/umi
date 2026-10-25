@@ -35,6 +35,19 @@ let state: EditorState = {
   selection: null,
   ...(fixture as unknown as Omit<EditorState, "id" | "name" | "canUndo" | "canRedo" | "selection">),
 };
+let recordSettings = {
+  target: null,
+  fps: 60,
+  resolution: "native",
+  systemAudio: true,
+  microphone: "",
+  camera: null,
+  cameraOn: true,
+  cameraStyle: { visible: true, shape: "circle", size: 0.24, position: [0.14, 0.8], mirrored: true },
+  countdown: true,
+  flow: "studio",
+  cameraOnly: false,
+};
 const history: EditSettings[] = [];
 const future: EditSettings[] = [];
 const uuid = () => crypto.randomUUID().toUpperCase();
@@ -194,6 +207,32 @@ mockIPC(
         return [];
       case "image_thumbnail":
         return wallpaper("#ddd", "#999");
+      case "record_settings":
+        return recordSettings;
+      case "record_settings_save":
+        recordSettings = p.settings as typeof recordSettings;
+        return null;
+      case "record_sources":
+        return {
+          displays: [{ id: 1, name: "Main display", width: 1728, height: 1117, scale: 2, x: 0, y: 0 }],
+          windows: [
+            { id: 11, title: "Umi — Product demo", app: "Umi", x: 0, y: 0, width: 1440, height: 900 },
+            { id: 12, title: "Inbox", app: "Mail", x: 0, y: 0, width: 1200, height: 800 },
+          ],
+          microphones: [
+            { id: "mbp", name: "MacBook Pro Microphone", isDefault: true },
+            { id: "usb", name: "USB Microphone", isDefault: false },
+          ],
+          cameras: [{ id: "0", name: "FaceTime HD Camera" }],
+          missingPermission: null,
+        };
+      case "record_status":
+        return { recording: true, paused: false, elapsed: (performance.now() / 1000) % 600, level: Math.abs(Math.sin(performance.now() / 300)) * 0.5 };
+      case "record_meter":
+      case "record_camera_preview":
+      case "window_show":
+      case "window_hide":
+      case "window_resize":
       case "editor_save":
       case "editor_close":
       case "plugin:event|listen":

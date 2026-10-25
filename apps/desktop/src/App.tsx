@@ -2,8 +2,9 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Button, Dialog, IconButton, Menu, Progress, Spinner, toast } from "@umi/ui";
-import { Download, Film, FolderOpen, MoreHorizontal, Trash2, Upload } from "lucide-solid";
+import { Circle, Download, Film, FolderOpen, MoreHorizontal, Trash2, Upload } from "lucide-solid";
 import { Editor } from "./editor/Editor";
+import { installRecordingFlow } from "./recorder/flow";
 import { createEditor, formatTime, type Editor as EditorModel } from "./editor/store";
 import type { EditorState, RecordingSummary } from "./editor/types";
 
@@ -23,6 +24,12 @@ export function App() {
       setOpening(null);
     }
   };
+
+  // Recording (launcher, tray, shortcuts) is run from here; a finished recording opens.
+  installRecordingFlow((bundle) => {
+    void refetch();
+    void open(bundle);
+  });
 
   const back = async () => {
     const ed = editor();
@@ -57,6 +64,9 @@ function Library(props: { recordings: RecordingSummary[]; loading: boolean; open
       <header class="lib__header" data-tauri-drag-region>
         <h1>Recordings</h1>
         <div class="lib__actions">
+          <Button size="sm" variant="ink" onClick={() => void invoke("window_show", { view: "launcher" })}>
+            <Circle size={10} fill="#ff4d4d" stroke="none" /> New recording
+          </Button>
           <Button size="sm" onClick={() => void importFiles()}>
             <Upload size={14} /> Import video
           </Button>
