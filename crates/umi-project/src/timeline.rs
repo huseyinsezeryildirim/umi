@@ -119,7 +119,7 @@ impl Document {
     }
 
     pub fn zoom_segments(&self) -> Vec<ZoomSegment> {
-        zoom::all_segments(&self.edit, &self.cursor.clicks, self.project.duration)
+        zoom::all_segments(&self.edit, &self.cursor, self.project.duration)
     }
 
     // MARK: Time mapping

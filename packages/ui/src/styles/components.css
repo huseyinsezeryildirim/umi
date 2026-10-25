@@ -386,6 +386,12 @@
   color: var(--umi-text-3);
   line-height: 1.45;
 }
+.umi-field-label {
+  margin-bottom: -4px;
+  font-size: var(--umi-text-sm);
+  font-weight: var(--umi-weight-medium);
+  color: var(--umi-text-2);
+}
 
 /* ───── Text field ───── */
 

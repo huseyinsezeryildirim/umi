@@ -428,11 +428,77 @@ pub struct Zoom {
     pub scale: f64,
     /// Manual segments; with `auto` on they're added to the generated ones.
     pub segments: Vec<ZoomSegment>,
+    /// What generated zooms come from (missing in older files: clicks).
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub trigger: ZoomTrigger,
+    /// How fast zooms ease in and out and the view pans.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub speed: ZoomSpeed,
+    /// What a cursor-following zoom looks at.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub follow: ZoomFollow,
+    /// Stay zoomed and glide between zooms that are close together instead of zooming
+    /// out and back in (missing in older files: off).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub glide: bool,
+}
+
+fn is_default<T: Default + PartialEq>(v: &T) -> bool {
+    *v == T::default()
+}
+
+/// Where generated zooms come from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ZoomTrigger {
+    /// Every group of clicks, at the chosen scale.
+    #[default]
+    Clicks,
+    /// Clicks and typing, each zoomed just enough to fit the area the cursor works in.
+    Smart,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ZoomSpeed {
+    Slow,
+    #[default]
+    Normal,
+    Fast,
+}
+
+impl ZoomSpeed {
+    /// Seconds to ease in (and out).
+    pub fn ramp(self) -> f64 {
+        match self {
+            Self::Slow => 0.85,
+            Self::Normal => 0.5,
+            Self::Fast => 0.3,
+        }
+    }
+    /// Spring (tension, friction) of the point the view follows.
+    pub fn spring(self) -> (f64, f64) {
+        match self {
+            Self::Slow => (14.0, 7.5),
+            Self::Normal => (30.0, 11.0),
+            Self::Fast => (70.0, 17.0),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ZoomFollow {
+    /// Glide after the cursor.
+    #[default]
+    Cursor,
+    /// Hold still and pan smoothly to each click.
+    Clicks,
 }
 
 impl Default for Zoom {
     fn default() -> Self {
-        Self { auto: true, scale: 1.8, segments: vec![] }
+        Self { auto: true, scale: 1.8, segments: vec![], trigger: ZoomTrigger::Clicks, speed: ZoomSpeed::Normal, follow: ZoomFollow::Cursor, glide: false }
     }
 }
 
