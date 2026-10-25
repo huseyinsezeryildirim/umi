@@ -447,8 +447,11 @@ function apply(op: Record<string, unknown>): EditorState {
     case "delete":
     case "deleteMany": {
       const list = (op.selections as Selection[]) ?? [op.selection as Selection];
+      // Clips go first, last index first, so the others keep their place.
+      const clipIndexes = list.filter((s) => s.kind === "clip").map((s) => (s as { id: number }).id).sort((a, b) => b - a);
+      if (clipIndexes.length) setClips(clips().filter((_, i) => !clipIndexes.includes(i)));
       for (const s of list) {
-        if (!("id" in s)) continue;
+        if (!("id" in s) || s.kind === "clip") continue;
         e.masks = e.masks.filter((x) => x.id !== s.id);
         e.texts = e.texts.filter((x) => x.id !== s.id);
         e.scenes = e.scenes.filter((x) => x.id !== s.id);
