@@ -558,12 +558,14 @@ const PLACES = [
 
 export function Storage() {
   const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { amount: 0.4 });
+  // On a phone the section is taller than the screen, so "in view" means any of it.
+  const inView = useInView(ref, { amount: 0.15 });
   const [active, setActive] = useState(0);
   const [held, setHeld] = useState(false);
   useEffect(() => {
-    if (!inView || held) return;
-    const id = setTimeout(() => setActive((v) => (v + 1) % PLACES.length), 3600);
+    if (!inView) return;
+    // Loops forever; a tap holds the chosen place a little longer, then the loop carries on.
+    const id = setTimeout(() => (setHeld(false), setActive((v) => (v + 1) % PLACES.length)), held ? 9000 : 3600);
     return () => clearTimeout(id);
   }, [active, inView, held]);
   // The recording sits in the middle of a 600×380 box; two places on each side, as logos.
