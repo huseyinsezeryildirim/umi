@@ -321,11 +321,27 @@ html.umi-overlay body {
   background: transparent;
   color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
 }
 .controls__btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.16);
   color: #fff;
+  transform: scale(1.06);
+}
+.controls__btn:active {
+  transform: scale(0.94);
+}
+.controls__btn--danger:hover {
+  background: rgba(255, 77, 77, 0.22);
+  color: #ff8a8a;
+}
+/* Between the groups. */
+.controls__line {
+  flex: none;
+  width: 28px;
+  height: 1px;
+  margin: 4px 0;
+  background: rgba(255, 255, 255, 0.16);
 }
 .controls__btn[data-on="true"] {
   background: rgba(255, 255, 255, 0.18);
