@@ -128,7 +128,7 @@ impl Assets for FrameAssets<'_> {
 
 /// Decodes an image file, downsampled so its long side is at most `max_side`.
 pub fn decode_image(path: &Path, max_side: u32) -> Option<RasterImage> {
-    let img = image::open(path).ok()?;
+    let img = image::open(path).ok().or_else(|| image::open(convert_with_system(path, max_side)?).ok())?;
     let img =
         if img.width().max(img.height()) > max_side { img.resize(max_side, max_side, image::imageops::FilterType::Triangle) } else { img };
     let mut rgba = img.to_rgba8();
@@ -142,6 +142,31 @@ pub fn decode_image(path: &Path, max_side: u32) -> Option<RasterImage> {
         }
     }
     Some(RasterImage { width: rgba.width(), height: rgba.height(), pixels: rgba.into_raw() })
+}
+
+/// Formats the image crate can't read (HEIC wallpapers on macOS) converted to JPEG with the
+/// system's own tool, cached next to other temporary files. `None` elsewhere.
+pub fn convert_with_system(path: &Path, max_side: u32) -> Option<PathBuf> {
+    if !cfg!(target_os = "macos") {
+        return None;
+    }
+    let modified = std::fs::metadata(path).and_then(|m| m.modified()).ok()?;
+    let stamp = modified.duration_since(std::time::UNIX_EPOCH).ok()?.as_secs();
+    let folder = std::env::temp_dir().join("umi-images");
+    std::fs::create_dir_all(&folder).ok()?;
+    let name = path.file_stem()?.to_string_lossy();
+    let out = folder.join(format!("{name}-{stamp}-{max_side}.jpg"));
+    if out.exists() {
+        return Some(out);
+    }
+    let ok = std::process::Command::new("/usr/bin/sips")
+        .args(["-s", "format", "jpeg", "-s", "formatOptions", "92", "-Z", &max_side.to_string()])
+        .arg(path)
+        .arg("--out")
+        .arg(&out)
+        .output()
+        .is_ok_and(|o| o.status.success());
+    ok.then_some(out)
 }
 
 /// tiny-skia pixmap → raster image (already premultiplied RGBA).

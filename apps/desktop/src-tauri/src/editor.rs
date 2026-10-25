@@ -182,7 +182,11 @@ impl EditorSession {
             Op::AddScene { layout, time } => selection = doc.add_scene(layout, time),
             Op::AddText { style, time } => selection = doc.add_text(style, time),
             Op::AddMove { kind, time } => selection = doc.add_move(kind, time),
-            Op::AddOverlay { file, kind, duration, time } => selection = Some(Selection::Overlay(doc.add_overlay(file, kind, duration, time))),
+            Op::AddOverlay { file, kind, duration, time } => {
+                // A video plays for its own length unless told otherwise.
+                let duration = duration.or_else(|| (kind == MediaKind::Video).then(|| umi_media::duration(&self.bundle.join(&file)).ok()).flatten());
+                selection = Some(Selection::Overlay(doc.add_overlay(file, kind, duration, time)));
+            }
             Op::Retime { selection: s, start, end } => doc.retime(s, start, end),
             Op::Delete { selection: s } => {
                 doc.delete(s);
