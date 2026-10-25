@@ -576,6 +576,9 @@ pub struct ZoomSegment {
     /// Fixed focus (normalized screen, top-left origin); `None` = follow the cursor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focus: Option<Point>,
+    /// A round magnifier at the focus instead of zooming the whole view.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub loupe: bool,
 }
 
 impl ZoomSegment {

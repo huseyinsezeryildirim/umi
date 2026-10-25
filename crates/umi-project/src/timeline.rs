@@ -335,6 +335,7 @@ impl Document {
             end: (source + 3.0).min(next - 0.05).min(self.project.duration),
             scale: self.edit.zoom.scale,
             focus: None,
+            loupe: false,
         };
         let id = segment.id;
         self.materialize_auto_zoom();

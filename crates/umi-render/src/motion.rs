@@ -86,6 +86,7 @@ fn interpolate(raw: &[CursorMove], t: f64, index: usize) -> Point {
 #[derive(Debug, Clone)]
 pub struct ZoomTrack {
     pub segments: Vec<ZoomSegment>,
+    loupes: Vec<ZoomSegment>,
     /// The point a cursor-following zoom looks at: a slow, damped cursor (so the view
     /// glides), or a point that pans from click to click.
     follow: CursorTrack,
@@ -103,12 +104,29 @@ impl ZoomTrack {
             segments.extend(generated_segments(settings, cursor, duration));
         }
         segments.sort_by(|a, b| a.start.total_cmp(&b.start));
+        // Magnifiers are drawn on their own; the view zoom ignores them.
+        let (loupes, segments): (Vec<ZoomSegment>, Vec<ZoomSegment>) = segments.into_iter().partition(|s| s.loupe);
         let spring = Some(settings.speed.spring());
         let follow = match settings.follow {
             ZoomFollow::Cursor => CursorTrack::new(cursor, duration, spring),
             ZoomFollow::Clicks => CursorTrack::new(&click_path(cursor), duration, spring),
         };
-        Self { segments, follow, ramp: settings.speed.ramp(), glide: settings.glide }
+        Self { segments, loupes, follow, ramp: settings.speed.ramp(), glide: settings.glide }
+    }
+
+    /// The magnifier at `t`: how far in (0…1, eased), its magnification and focus.
+    pub fn loupe(&self, t: f64) -> Option<(f64, f64, Point)> {
+        let segment = self.loupes.iter().find(|s| t >= s.start && t <= s.end)?;
+        let ramp = self.ramp.min((segment.end - segment.start) / 2.0);
+        let amount = ease(((t - segment.start) / ramp).min((segment.end - t) / ramp).min(1.0));
+        Some((amount, segment.scale, self.focus(segment, t)))
+    }
+
+    /// All segments (view zooms and magnifiers), for the timeline.
+    pub fn all(&self) -> Vec<ZoomSegment> {
+        let mut all: Vec<ZoomSegment> = self.segments.iter().chain(&self.loupes).cloned().collect();
+        all.sort_by(|a, b| a.start.total_cmp(&b.start));
+        all
     }
 
     /// Zoom factor (≥ 1) and focus, normalized to the screen (top-left origin).
@@ -288,7 +306,7 @@ mod tests {
         let z = Zoom {
             auto: false,
             scale: 2.0,
-            segments: vec![ZoomSegment { id: uuid::Uuid::nil(), start: 1.0, end: 3.0, scale: 2.0, focus: Some(Point::new(0.2, 0.3)) }],
+            segments: vec![ZoomSegment { id: uuid::Uuid::nil(), start: 1.0, end: 3.0, scale: 2.0, focus: Some(Point::new(0.2, 0.3)), loupe: false }],
             glide: false,
             ..Zoom::default()
         };
@@ -302,7 +320,7 @@ mod tests {
 
     #[test]
     fn glides_between_close_zooms() {
-        let seg = |start: f64, end: f64, scale: f64, x: f64| ZoomSegment { id: uuid::Uuid::new_v4(), start, end, scale, focus: Some(Point::new(x, 0.5)) };
+        let seg = |start: f64, end: f64, scale: f64, x: f64| ZoomSegment { id: uuid::Uuid::new_v4(), start, end, scale, focus: Some(Point::new(x, 0.5)), loupe: false };
         let mut z = Zoom { auto: false, segments: vec![seg(1.0, 3.0, 2.0, 0.2), seg(4.0, 6.0, 3.0, 0.8)], glide: false, ..Zoom::default() };
         // Without glide it zooms out in the gap.
         assert!(ZoomTrack::new(&z, &CursorData::default(), 8.0).state(3.5).0 < 1.5);
@@ -325,7 +343,7 @@ mod tests {
             clicks: vec![CursorClick { t: 1.0, x: 0.3, y: 0.3, button: MouseButton::Left }, CursorClick { t: 3.0, x: 0.7, y: 0.6, button: MouseButton::Left }],
             keys: vec![],
         };
-        let z = Zoom { auto: false, follow: ZoomFollow::Clicks, segments: vec![ZoomSegment { id: uuid::Uuid::nil(), start: 0.0, end: 6.0, scale: 2.0, focus: None }], ..Zoom::default() };
+        let z = Zoom { auto: false, follow: ZoomFollow::Clicks, segments: vec![ZoomSegment { id: uuid::Uuid::nil(), start: 0.0, end: 6.0, scale: 2.0, focus: None, loupe: false }], ..Zoom::default() };
         let track = ZoomTrack::new(&z, &data, 6.0);
         // Holds on the first click while the cursor wanders off, then settles on the next.
         let p = track.state(2.6).1;
