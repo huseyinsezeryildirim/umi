@@ -43,7 +43,7 @@ jobs:
         run: cargo fmt --all --check
       - name: Build
         run: cargo build --workspace --release
-      - name: Test (no GPU or fixtures in CI: those tests skip themselves)
+      - name: Test (tests needing a GPU or fixtures skip themselves)
         run: cargo test --workspace --release
 
   web:
@@ -55,8 +55,18 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: wasm-bindgen (the version in Cargo.lock)
+        run: cargo install wasm-bindgen-cli --locked --version "$(grep -A1 'name = "wasm-bindgen"' Cargo.lock | sed -n 's/version = "\(.*\)"/\1/p')"
       - run: pnpm install --frozen-lockfile
+      - name: Editor engine for the browser (crates/umi-web)
+        run: pnpm --filter @umi/desktop wasm
       - run: pnpm -r typecheck
+      - name: Web editor and site
+        run: pnpm --filter @umi/site build
       - name: Umi Cloud backend
         working-directory: web
         run: |
