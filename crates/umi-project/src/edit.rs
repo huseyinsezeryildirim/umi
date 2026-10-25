@@ -75,6 +75,10 @@ pub struct EditSettings {
     pub overlays: Vec<MediaOverlay>,
     #[serde(default, deserialize_with = "topt", skip_serializing_if = "Option::is_none")]
     pub watermark: Option<Watermark>,
+    /// Spoken audio on the Voice track (AI voiceover), output time. Other sound dips
+    /// while it plays.
+    #[serde(default, deserialize_with = "t", skip_serializing_if = "Vec::is_empty")]
+    pub voiceovers: Vec<Voiceover>,
 }
 
 // Fields whose default isn't the type's zero value need their own tolerant decoder.
@@ -141,6 +145,7 @@ impl Default for EditSettings {
             music: None,
             overlays: vec![],
             watermark: None,
+            voiceovers: vec![],
         }
     }
 }
@@ -853,6 +858,23 @@ pub enum OverlayMode {
     Fill,
     /// A card on top of the screen.
     PictureInPicture,
+}
+
+/// A spoken audio file on the Voice track, timed on the output timeline.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Voiceover {
+    #[serde(with = "uuid_upper", default = "new_id")]
+    pub id: Uuid,
+    /// Audio file inside the project bundle.
+    pub file: String,
+    pub start: f64,
+    pub end: f64,
+    /// What it says (AI voiceover script).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub text: String,
+    #[serde(default = "d::one")]
+    pub volume: f64,
 }
 
 /// A video or image on the Media track (or Video 2). Timed on the output timeline, so it

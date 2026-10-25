@@ -11,10 +11,14 @@ thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 ureq = "3"
+ort = { version = "=2.0.0-rc.15", features = ["ndarray"] }
+ndarray = "0.17"
+misaki-rs = { version = "0.6", default-features = false }
 dirs = "6"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 whisper-rs = { version = "0.16", features = ["metal"] }
+ort = { version = "=2.0.0-rc.15", features = ["ndarray", "coreml"] }
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 whisper-rs = "0.16"

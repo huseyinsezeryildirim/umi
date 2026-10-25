@@ -164,6 +164,16 @@ export interface EditSettings {
   music?: { file: string; title?: string; volume: number; fadeOut: number };
   overlays: MediaOverlay[];
   watermark?: { file: string; corner: "topLeft" | "topRight" | "bottomLeft" | "bottomRight"; size: number; opacity: number };
+  voiceovers?: Voiceover[];
+}
+
+export interface Voiceover {
+  id: Id;
+  file: string;
+  start: number;
+  end: number;
+  text?: string;
+  volume: number;
 }
 
 export interface Placement {
@@ -173,7 +183,7 @@ export interface Placement {
 
 export type Selection =
   | { kind: "clip"; id: number }
-  | { kind: "zoom" | "mask" | "scene" | "text" | "move" | "overlay"; id: Id }
+  | { kind: "zoom" | "mask" | "scene" | "text" | "move" | "overlay" | "voiceover"; id: Id }
   | { kind: "music" };
 
 export interface EditorState {

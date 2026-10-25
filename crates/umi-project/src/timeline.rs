@@ -22,6 +22,7 @@ pub enum Selection {
     Move(#[serde(with = "crate::serde_util::uuid_upper")] Uuid),
     Music,
     Overlay(#[serde(with = "crate::serde_util::uuid_upper")] Uuid),
+    Voiceover(#[serde(with = "crate::serde_util::uuid_upper")] Uuid),
 }
 
 /// A kept clip laid out on the output timeline.
@@ -433,6 +434,14 @@ impl Document {
             Selection::Text(id) => set(&mut self.edit.texts, id, s, e),
             Selection::Move(id) => set(&mut self.edit.moves, id, s, e),
             Selection::Overlay(id) => self.retime_overlay(id, start, end),
+            // A voiceover keeps its length: it only moves.
+            Selection::Voiceover(id) => {
+                if let Some(v) = self.edit.voiceovers.iter_mut().find(|v| v.id == id) {
+                    let length = v.end - v.start;
+                    v.start = start.max(0.0);
+                    v.end = v.start + length;
+                }
+            }
             Selection::Clip(_) | Selection::Music => {}
         }
     }
@@ -461,6 +470,7 @@ impl Document {
             Selection::Move(id) => self.edit.moves.retain(|m| m.id != id),
             Selection::Music => self.edit.music = None,
             Selection::Overlay(id) => self.edit.overlays.retain(|m| m.id != id),
+            Selection::Voiceover(id) => self.edit.voiceovers.retain(|m| m.id != id),
         }
         true
     }

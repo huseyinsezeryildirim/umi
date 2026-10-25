@@ -23,6 +23,8 @@ pub(crate) struct AppState {
     gpu: OnceLock<Arc<Gpu>>,
     /// Library hover previews by recording path (JPEG data URLs).
     previews: Mutex<HashMap<PathBuf, Arc<Vec<String>>>>,
+    /// The AI voice, loaded on first use.
+    voice: Mutex<Option<umi_ai::tts::Voice>>,
     /// Running exports by editor id (cancel flags).
     exports: Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
@@ -327,6 +329,45 @@ fn editor_save_subtitles(state: State<'_, AppState>, id: String, destination: Pa
     std::fs::write(destination, state.editor(&id)?.subtitles(vtt)).map_err(|e| e.to_string())
 }
 
+/// Speaks `text` with the AI voice and puts it on the Voice track at output time `time`
+/// (or replaces voiceover `replace`). Progress: voice download on first use, then speaking.
+#[tauri::command]
+async fn editor_voiceover(
+    app: tauri::AppHandle,
+    id: String,
+    text: String,
+    speed: Option<f32>,
+    time: f64,
+    replace: Option<uuid::Uuid>,
+    progress: tauri::ipc::Channel<Stage>,
+) -> Result<EditorState, String> {
+    let text = text.trim().to_string();
+    if text.is_empty() {
+        return Err("Write what the voice should say.".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let editor = state.editor(&id)?;
+        let mut slot = state.voice.lock();
+        if slot.is_none() {
+            let send = |p: f64| {
+                let _ = progress.send(Stage { stage: "download".into(), value: p });
+            };
+            *slot = Some(umi_ai::tts::Voice::load(&send).map_err(|e| e.to_string())?);
+        }
+        let _ = progress.send(Stage { stage: "speak".into(), value: 0.0 });
+        let voice = slot.as_mut().ok_or("voice unavailable")?;
+        let samples = voice.speak(&text, speed.unwrap_or(1.0).clamp(0.5, 2.0)).map_err(|e| e.to_string())?;
+        drop(slot);
+        let name = format!("voice-{}.wav", &uuid::Uuid::new_v4().simple().to_string().to_uppercase()[..6]);
+        umi_ai::tts::write_wav(&editor.bundle.join(&name), &samples, umi_ai::tts::VOICE_RATE).map_err(|e| e.to_string())?;
+        let duration = samples.len() as f64 / umi_ai::tts::VOICE_RATE as f64;
+        Ok(editor.apply(Op::AddVoiceover { file: name, text, start: time, duration, replace }))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ModelInfo {
@@ -425,6 +466,7 @@ pub fn run() {
             editor_export_cancel,
             export_default_path,
             editor_transcribe,
+            editor_voiceover,
             editor_save_subtitles,
             ai_models,
             assets::bundle_import,

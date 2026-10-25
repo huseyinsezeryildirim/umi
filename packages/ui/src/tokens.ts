@@ -21,6 +21,7 @@ export const tokens = {
       media: "#0ca678",
       music: "#d6336c",
       video2: "#116ff5",
+      voice: "#0b7285",
     },
   },
   motion: {

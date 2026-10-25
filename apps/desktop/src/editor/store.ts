@@ -56,6 +56,8 @@ export function createEditor(initial: EditorState) {
   const [timelineZoom, setTimelineZoom] = createSignal(1);
   const [blade, setBlade] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
+  /** The AI voiceover sheet (open, and which voiceover it edits). */
+  const [voiceSheet, setVoiceSheet] = createSignal<{ replace?: string } | null>(null);
   /** An inspector tab something asked to show (e.g. "Add → Music…"). */
   const [panelRequest, requestPanel] = createSignal<{ tab: string } | null>(null);
   /** Mask being stuck to content, and how far along (0…1). */
@@ -114,6 +116,9 @@ export function createEditor(initial: EditorState) {
     thumbnails,
     waveform,
     panelRequest,
+    voiceSheet,
+    requestVoiceover: (replace?: string) => setVoiceSheet({ replace }),
+    closeVoiceover: () => setVoiceSheet(null),
     /** Whether a recording time is still in the video (not cut out). */
     isKept: (source: number) => state().placements.some((p) => source >= p.clip.start - 1e-3 && source <= p.clip.end + 1e-3),
     /** Output time showing recording time `source`, or null if it's cut out. */
