@@ -1,10 +1,13 @@
 import { emit, listen } from "@tauri-apps/api/event";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { SlidersHorizontal } from "lucide-solid";
 import { recorder, type CameraStyle, type RecordSettings } from "./api";
 
 const SIZES = { S: 160, M: 220, L: 300 } as const;
+const SHAPES = ["circle", "squircle", "square"] as const;
 
-/** The camera bubble: always on top, draggable; shape and mirror on hover. */
+/** The camera bubble: always on top, draggable; on hover the size (three dots), the shape
+ *  (one button that cycles), mirror, and the camera menu. */
 export function Bubble() {
   const [settings, setSettings] = createSignal<RecordSettings | null>(null);
   const [frame, setFrame] = createSignal<string | null>(null);
@@ -28,8 +31,15 @@ export function Bubble() {
   onMount(() => {
     void start().catch((e) => setError(String(e)));
     const off = listen("bubble:shown", () => void start().catch((e) => setError(String(e))));
+    // Another camera picked in the camera menu: switch to it.
+    const offSettings = listen("record:settings", async () => {
+      const s = await recorder.settings();
+      if (s.camera !== settings()?.camera) void start().catch((e) => setError(String(e)));
+      else setSettings(s);
+    });
     onCleanup(() => {
       void off.then((f) => f());
+      void offSettings.then((f) => f());
       void recorder.cameraPreview(null, () => {});
     });
   });
@@ -37,6 +47,10 @@ export function Bubble() {
 
   const sizeOf = (style: CameraStyle) => (style.size >= 0.3 ? SIZES.L : style.size >= 0.2 ? SIZES.M : SIZES.S);
   const style = () => settings()?.cameraStyle;
+  const setSize = (key: keyof typeof SIZES) => {
+    update((c) => (c.size = key === "S" ? 0.16 : key === "M" ? 0.24 : 0.34));
+    void recorder.resize(SIZES[key], SIZES[key]);
+  };
   const update = (change: (c: CameraStyle) => void) => {
     const next = structuredClone(settings()!);
     change(next.cameraStyle);
@@ -52,17 +66,24 @@ export function Bubble() {
       </Show>
       <Show when={hover()}>
         <div class="bubble__pill">
-          <For each={["circle", "squircle", "square"] as const}>
-            {(shape) => (
-              <button type="button" data-on={style()?.shape === shape ? "true" : "false"} onClick={() => update((c) => (c.shape = shape))} aria-label={shape} title={shape === "squircle" ? "Rounded" : shape[0].toUpperCase() + shape.slice(1)}>
-                <span class={`bubble__shape bubble__shape--${shape}`} />
+          <For each={["S", "M", "L"] as const}>
+            {(k, i) => (
+              <button type="button" data-on={settings() && sizeOf(style()!) === SIZES[k] ? "true" : "false"} onClick={() => setSize(k)} aria-label={["Small", "Medium", "Large"][i()]} title={["Small", "Medium", "Large"][i()]}>
+                <span class="bubble__dot" style={{ width: `${4 + i() * 3}px`, height: `${4 + i() * 3}px` }} />
               </button>
             )}
           </For>
+          <i />
+          <button type="button" onClick={() => update((c) => (c.shape = SHAPES[(SHAPES.indexOf(c.shape) + 1) % SHAPES.length]))} aria-label="Shape" title="Shape">
+            <span class={`bubble__shape bubble__shape--${style()?.shape ?? "circle"}`} />
+          </button>
           <button type="button" data-on={style()?.mirrored ? "true" : "false"} onClick={() => update((c) => (c.mirrored = !c.mirrored))} aria-label="Mirror" title="Mirror">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 3v18M8 7 3 12l5 5zM16 7l5 5-5 5z" />
             </svg>
+          </button>
+          <button type="button" onClick={() => void recorder.show("camera")} aria-label="Camera settings" title="Camera settings">
+            <SlidersHorizontal size={13} />
           </button>
         </div>
       </Show>

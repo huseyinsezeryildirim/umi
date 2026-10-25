@@ -189,6 +189,9 @@ struct Session {
     stream: SCStream,
     size: (u32, u32),
     running: bool,
+    /// The display being recorded and the options, to build the filter again.
+    display: Option<u32>,
+    options: ScreenOptions,
 }
 
 // SAFETY: SCStream is a reference to an Objective-C object whose methods are thread-safe;
@@ -207,6 +210,32 @@ impl ScreenSession for Session {
     fn size(&self) -> (u32, u32) {
         self.size
     }
+
+    fn refresh_exclusions(&self) {
+        let Some(id) = self.display else { return };
+        let Ok(content) = content() else { return };
+        let Some(display) = content.displays().into_iter().find(|d| d.display_id() == id) else { return };
+        let left = left_out_windows(&content, &self.options);
+        let refs: Vec<&SCWindow> = left.iter().collect();
+        if let Ok(filter) = SCContentFilter::create().with_display(&display).with_excluding_windows(&refs).build() {
+            let _ = self.stream.update_content_filter(&filter);
+        }
+    }
+}
+
+/// Our own windows (except the drawing layer) and, when asked, the desktop's icons.
+fn left_out_windows(content: &SCShareableContent, options: &ScreenOptions) -> Vec<SCWindow> {
+    let own = std::process::id() as i32;
+    content
+        .windows()
+        .into_iter()
+        .filter(|w| {
+            let app = w.owning_application();
+            let ours = app.as_ref().is_some_and(|a| a.process_id() == own);
+            let bundle = app.map(|a| a.bundle_identifier()).unwrap_or_default();
+            super::left_out(options, ours, w.title().as_deref(), w.window_layer(), &bundle)
+        })
+        .collect()
 }
 
 impl Drop for Session {
@@ -223,17 +252,7 @@ pub fn start(
     audio: Option<Arc<dyn AudioSink>>,
 ) -> Result<Box<dyn ScreenSession>, CaptureError> {
     let content = content()?;
-    let own = std::process::id() as i32;
-    let own_windows: Vec<SCWindow> = content
-        .windows()
-        .into_iter()
-        .filter(|w| {
-            let app = w.owning_application();
-            let ours = app.as_ref().is_some_and(|a| a.process_id() == own);
-            let bundle = app.map(|a| a.bundle_identifier()).unwrap_or_default();
-            super::left_out(options, ours, w.title().as_deref(), w.window_layer(), &bundle)
-        })
-        .collect();
+    let own_windows = left_out_windows(&content, options);
     let own_refs: Vec<&SCWindow> = own_windows.iter().collect();
     let err = |e: SCError| CaptureError::Other(e.to_string());
 
@@ -286,7 +305,11 @@ pub fn start(
         stream.add_output_handler(output(audio.clone()), SCStreamOutputType::Audio).map_err(err)?;
     }
     stream.start_capture().map_err(err)?;
-    Ok(Box::new(Session { stream, size, running: true }))
+    let display = match target {
+        Target::Display { id } | Target::Area { display: id, .. } => Some(*id),
+        _ => None,
+    };
+    Ok(Box::new(Session { stream, size, running: true, display, options: options.clone() }))
 }
 
 #[cfg(test)]

@@ -48,6 +48,7 @@ void ready.then(async () => {
   const views = {
     launcher: () => import("./recorder/Launcher").then((m) => m.Launcher),
     bubble: () => import("./recorder/Bubble").then((m) => m.Bubble),
+    camera: () => import("./recorder/CameraMenu").then((m) => m.CameraMenu),
     controls: () => import("./recorder/Controls").then((m) => m.Controls),
     countdown: () => import("./recorder/Countdown").then((m) => m.Countdown),
     area: () => import("./recorder/AreaPicker").then((m) => m.AreaPicker),

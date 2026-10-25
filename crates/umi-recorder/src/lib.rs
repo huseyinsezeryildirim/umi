@@ -396,6 +396,14 @@ impl Recording {
         self.clock.resume();
     }
 
+    /// Leaves out our windows that appeared after the recording started (the control bar,
+    /// the camera bubble coming back).
+    pub fn refresh_exclusions(&self) {
+        if let Some(s) = self.screen.as_ref() {
+            s.refresh_exclusions();
+        }
+    }
+
     /// Turns the camera off or on in the video from now (the camera keeps recording).
     pub fn set_camera_visible(&self, visible: bool) {
         let now = self.clock.elapsed();

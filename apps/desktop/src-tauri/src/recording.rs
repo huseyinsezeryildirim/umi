@@ -279,10 +279,26 @@ pub async fn record_prepare(app: AppHandle) -> Result<(), String> {
         let preview = options.camera.is_some().then(|| rec.preview_sink());
         let recording = umi_recorder::Recording::prepare(&crate::library_folder(), options, preview).map_err(|e| e.to_string())?;
         *rec.current.lock() = Some(recording);
+        float_over_full_screen_apps(&app, true);
         Ok(())
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// While recording, the app runs as an accessory (no Dock icon) so its floating windows (the
+/// bar, the camera bubble) show over other apps' full-screen Spaces too; then back to normal.
+fn float_over_full_screen_apps(app: &AppHandle, on: bool) {
+    #[cfg(target_os = "macos")]
+    {
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            let policy = if on { tauri::ActivationPolicy::Accessory } else { tauri::ActivationPolicy::Regular };
+            let _ = handle.set_activation_policy(policy);
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, on);
 }
 
 /// What `record_prepare` answers when macOS hasn't allowed screen recording (the UI shows the
@@ -349,6 +365,7 @@ pub async fn record_stop(app: AppHandle) -> Result<PathBuf, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         let recording = state.recorder.current.lock().take().ok_or("Not recording")?;
+        float_over_full_screen_apps(&app, false);
         let bundle = recording.stop().map_err(|e| e.to_string())?;
         let _ = app.emit("recording", "stopped");
         auto_title(app.clone(), bundle.clone());
@@ -366,6 +383,7 @@ pub async fn record_cancel(app: AppHandle) -> Result<(), String> {
         if let Some(r) = state.recorder.current.lock().take() {
             r.cancel();
         }
+        float_over_full_screen_apps(&app, false);
         let _ = app.emit("recording", "cancelled");
     })
     .await

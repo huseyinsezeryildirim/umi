@@ -202,12 +202,14 @@ html.umi-overlay body {
 }
 
 /* ───── Camera bubble ───── */
+/* A white rim, no shadow (a shadow would be cut off at the window's edge). */
 .bubble {
   position: fixed;
-  inset: 6px;
+  inset: 2px;
   overflow: hidden;
+  box-sizing: border-box;
+  border: 3px solid #fff;
   background: #1a1d29;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 0 0 2px rgba(255, 255, 255, 0.85);
   cursor: grab;
   transition: border-radius var(--umi-normal) var(--umi-ease);
 }
@@ -233,12 +235,12 @@ html.umi-overlay body {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.6);
 }
-/* Shape and mirror, in a small row near the bottom. */
+/* Size dots, shape, mirror and the camera menu, across the middle (the bubble's widest part). */
 .bubble__pill {
   position: absolute;
   left: 50%;
-  bottom: 11%;
-  transform: translateX(-50%);
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   gap: 2px;
@@ -250,8 +252,8 @@ html.umi-overlay body {
 .bubble__pill button {
   display: grid;
   place-items: center;
-  min-width: 22px;
-  height: 22px;
+  min-width: 21px;
+  height: 21px;
   padding: 0 3px;
   border: 0;
   border-radius: 999px;
@@ -265,6 +267,16 @@ html.umi-overlay body {
 .bubble__pill button[data-on="true"] {
   color: #fff;
   background: rgba(255, 255, 255, 0.18);
+}
+.bubble__dot {
+  border-radius: 50%;
+  background: currentColor;
+}
+.bubble__pill i {
+  width: 1px;
+  height: 14px;
+  margin: 0 2px;
+  background: rgba(255, 255, 255, 0.2);
 }
 .bubble__shape {
   width: 10px;
@@ -282,7 +294,7 @@ html.umi-overlay body {
 }
 
 /* ───── Control bar ───── */
-/* A column on the left of the screen (the window is tall and narrow). */
+/* A column on the left of the screen, the same as the web recorder's bar. */
 .controls {
   position: fixed;
   inset: 6px;
@@ -290,89 +302,49 @@ html.umi-overlay body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 0;
-  border-radius: 18px;
-  color: #fff;
-  background: rgba(14, 17, 30, 0.86);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
-  cursor: grab;
-}
-.controls__stop {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 12px;
-  background: #ff4d4d;
-  color: #fff;
-  cursor: pointer;
-}
-.controls__stop:hover {
-  background: #ff3333;
-}
-.controls__time {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   gap: 4px;
-  font-size: 12.5px;
-  font-weight: 600;
-}
-.controls__time i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ff4d4d;
-  animation: rec-blink 1.2s ease-in-out infinite;
-}
-.controls__time i[data-paused="true"] {
-  background: #ffb020;
-  animation: none;
-}
-@keyframes rec-blink {
-  50% {
-    opacity: 0.35;
-  }
-}
-.controls__level {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  height: 18px;
-}
-.controls__level i {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  background: #13d18e;
-  transform-origin: center;
-  transition: transform 90ms;
-}
-/* A small gap between the readouts and the buttons. */
-.controls__spacer {
-  height: 2px;
+  padding: 8px 0;
+  border-radius: 20px;
+  color: #fff;
+  background: rgba(17, 24, 39, 0.9);
+  backdrop-filter: blur(16px);
+  cursor: grab;
 }
 .controls__btn {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  flex: none;
+  width: 44px;
+  height: 44px;
   border: 0;
-  border-radius: 11px;
+  border-radius: 12px;
   background: transparent;
   color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 .controls__btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
 .controls__btn[data-on="true"] {
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
+}
+/* Stop: a red rounded square. */
+.controls__stop span {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: #ff4d4d;
+}
+.controls__time {
+  padding: 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.controls__time[data-paused="true"] {
+  color: rgba(255, 255, 255, 0.5);
 }
 .controls__swatch {
   width: 18px;
@@ -411,18 +383,16 @@ html.umi-overlay body {
 }
 
 /* ───── Countdown ───── */
+/* The whole screen dimmed by half, the number in the middle. */
 .countdown {
   position: fixed;
-  inset: 20px;
+  inset: 0;
   display: grid;
   place-items: center;
-  border-radius: 50%;
-  background: rgba(14, 17, 30, 0.72);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  background: rgba(10, 12, 20, 0.5);
 }
 .countdown__n {
-  font-size: 96px;
+  font-size: 180px;
   font-weight: 700;
   color: #fff;
   font-variant-numeric: tabular-nums;
@@ -672,4 +642,85 @@ html.umi-overlay body {
   background: rgba(255, 255, 255, 0.95);
   font: 700 16px -apple-system, "Segoe UI", sans-serif;
   grid-area: unset !important;
+}
+
+/* ───── Camera menu (next to the bubble) ───── */
+.cam-menu {
+  position: fixed;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  overflow: auto;
+  border-radius: 16px;
+  background: rgba(30, 32, 40, 0.92);
+  backdrop-filter: blur(20px);
+  color: #fff;
+  font-size: 13px;
+}
+.cam-menu__title {
+  margin: 4px 8px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: uppercase;
+}
+.cam-menu__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cam-menu__row span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cam-menu__row:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.cam-menu__line {
+  height: 1px;
+  margin: 4px 8px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.cam-menu__switch {
+  flex: none !important;
+  position: relative;
+  width: 30px;
+  height: 18px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.25);
+  transition: background 0.2s;
+}
+.cam-menu__switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+.cam-menu__switch[data-on="true"] {
+  background: #34c759;
+}
+.cam-menu__switch[data-on="true"]::after {
+  transform: translateX(12px);
 }

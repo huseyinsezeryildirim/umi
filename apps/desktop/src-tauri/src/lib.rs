@@ -593,23 +593,61 @@ async fn import_loom(link: String, progress: tauri::ipc::Channel<f64>) -> Result
     .map_err(|e| e.to_string())?
 }
 
-/// macOS's own camera effects panel (Center Stage, Portrait, Studio Light, backgrounds).
+/// macOS's own panel for the camera's effects (Portrait, Studio Light, backgrounds…) or, with
+/// `microphone`, the microphone modes. Apps can't switch those themselves.
 #[tauri::command]
-fn show_video_effects() -> Result<(), String> {
+fn show_video_effects(microphone: Option<bool>) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     #[allow(unexpected_cfgs, unsafe_code)]
     {
         use objc::runtime::Class;
         use objc::{msg_send, sel, sel_impl};
         let cls = Class::get("AVCaptureDevice").ok_or("AVFoundation isn't available")?;
-        // SAFETY: class method with an enum argument (1 = video effects), macOS 12+.
+        // 1 = video effects, 2 = microphone modes (AVCaptureSystemUserInterface).
+        let which: isize = if microphone == Some(true) { 2 } else { 1 };
+        // SAFETY: class method with an enum argument, macOS 12+.
         unsafe {
-            let _: () = msg_send![cls, showSystemUserInterface: 1isize];
+            let _: () = msg_send![cls, showSystemUserInterface: which];
         }
         Ok(())
     }
     #[cfg(not(target_os = "macos"))]
-    Err("Video effects come from macOS.".into())
+    {
+        let _ = microphone;
+        Err("Video effects come from macOS.".into())
+    }
+}
+
+/// Center Stage (keeps you in frame as you move): `None` when the Mac has none, else whether
+/// it's on. With `on`, turns it on or off first (Umi and the person share control).
+#[tauri::command]
+fn camera_center_stage(on: Option<bool>) -> Option<bool> {
+    #[cfg(target_os = "macos")]
+    #[allow(unexpected_cfgs, unsafe_code)]
+    {
+        use objc::runtime::{BOOL, Class, NO, YES};
+        use objc::{msg_send, sel, sel_impl};
+        let cls = Class::get("AVCaptureDevice")?;
+        // SAFETY: AVCaptureDevice class properties (macOS 12.3+); availability checked first.
+        unsafe {
+            let supported: BOOL = msg_send![cls, respondsToSelector: sel!(setCenterStageControlMode:)];
+            if supported == NO {
+                return None;
+            }
+            if let Some(on) = on {
+                // 2 = cooperative: the app and the person (Control Center) can both change it.
+                let _: () = msg_send![cls, setCenterStageControlMode: 2isize];
+                let _: () = msg_send![cls, setCenterStageEnabled: if on { YES } else { NO }];
+            }
+            let enabled: BOOL = msg_send![cls, isCenterStageEnabled];
+            Some(enabled != NO)
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = on;
+        None
+    }
 }
 
 #[tauri::command]
@@ -785,6 +823,7 @@ pub fn run() {
             shortcuts::shortcuts_set,
             app_quit,
             show_video_effects,
+            camera_center_stage,
             open_privacy_settings,
             windows::window_show,
             windows::ink_set,
