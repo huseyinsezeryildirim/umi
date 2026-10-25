@@ -31,6 +31,12 @@ pub struct RecordSettings {
     /// "studio" (open the editor) or "instant" (export and copy right away).
     pub flow: String,
     pub camera_only: bool,
+    /// Speaker notes shown in the prompter while recording.
+    pub notes: String,
+    pub notes_on: bool,
+    /// Prompter scrolling, lines per minute (0 = still).
+    pub notes_speed: f64,
+    pub notes_size: f64,
 }
 
 impl Default for RecordSettings {
@@ -47,6 +53,10 @@ impl Default for RecordSettings {
             countdown: true,
             flow: "studio".into(),
             camera_only: false,
+            notes: String::new(),
+            notes_on: false,
+            notes_speed: 18.0,
+            notes_size: 22.0,
         }
     }
 }

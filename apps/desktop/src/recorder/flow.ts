@@ -19,6 +19,7 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
     const settings = await recorder.settings();
     try {
       await recorder.hide("launcher");
+      if (settings.notesOn) await recorder.show("prompter");
       await invoke("record_prepare");
       if (settings.countdown) {
         await recorder.show("countdown");
@@ -48,6 +49,7 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
       const settings = await recorder.settings();
       await recorder.hide("controls");
       await recorder.hide("bubble");
+      await recorder.hide("prompter");
       const bundle = await invoke<string>("record_stop");
       if (settings.flow === "instant") {
         await instant(bundle);
@@ -65,6 +67,7 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
   const discard = async () => {
     await recorder.hide("controls");
     await recorder.hide("bubble");
+    await recorder.hide("prompter");
     await invoke("record_cancel");
     toast("Recording discarded");
   };

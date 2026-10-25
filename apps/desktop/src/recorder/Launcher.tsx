@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createResource, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
-import { IconButton, Kbd, Menu, Segmented, type MenuEntry } from "@umi/ui";
-import { AppWindow, Camera, CameraOff, ChevronDown, Crop, Film, Mic, MicOff, Monitor, MoreHorizontal, ShieldAlert, UserSquare2, Volume2, VolumeX } from "lucide-solid";
+import { IconButton, Kbd, Menu, Segmented, Toaster, toast, type MenuEntry } from "@umi/ui";
+import { AppWindow, Camera, CameraOff, ChevronDown, Crop, Film, Maximize2, Mic, MicOff, Monitor, MoreHorizontal, ScrollText, ShieldAlert, UserSquare2, Volume2, VolumeX } from "lucide-solid";
 import { recorder, type RecordSettings, type Sources, type Target } from "./api";
 
 /** The recorder: what to record, camera, microphone, sound, and Start. */
@@ -66,6 +66,25 @@ export function Launcher() {
     for (const d of list?.displays ?? []) entries.push({ label: d.name, icon: <Monitor size={15} />, checked: !settings()?.cameraOnly && (target()?.kind ?? "display") === "display" && (!target() || (target() as { id: number }).id === d.id), onSelect: () => pick({ kind: "display", id: d.id }) });
     entries.push({ label: "Select an area…", icon: <Crop size={15} />, onSelect: () => void recorder.show("area") });
     entries.push({ label: "Camera only", icon: <UserSquare2 size={15} />, checked: settings()?.cameraOnly, onSelect: () => pick(null, true) });
+    const chosen = target()?.kind === "window" ? list?.windows.find((w) => w.id === (target() as { id: number }).id) : undefined;
+    if (chosen) {
+      entries.push({ kind: "separator" }, { kind: "label", label: `Size of ${chosen.app}` });
+      for (const [w, h, label] of [
+        [1280, 720, "1280 × 720 (16:9)"],
+        [1920, 1080, "1920 × 1080 (16:9)"],
+        [1080, 1350, "1080 × 1350 (4:5)"],
+        [720, 1280, "720 × 1280 (9:16)"],
+      ] as const) {
+        entries.push({
+          label,
+          icon: <Maximize2 size={15} />,
+          onSelect: () =>
+            void invoke("resize_app_window", { appName: chosen.app, title: chosen.title, width: w / (list?.displays[0]?.scale ?? 1), height: h / (list?.displays[0]?.scale ?? 1) })
+              .then(() => void refetch())
+              .catch((e) => toast(String(e))),
+        });
+      }
+    }
     if (list?.windows.length) {
       entries.push({ kind: "separator" }, { kind: "label", label: "Window" });
       for (const w of list.windows.slice(0, 14)) entries.push({ label: `${w.app}${w.title ? ` — ${w.title}` : ""}`, icon: <AppWindow size={15} />, checked: target()?.kind === "window" && (target() as { id: number }).id === w.id, onSelect: () => pick({ kind: "window", id: w.id }) });
@@ -150,6 +169,16 @@ export function Launcher() {
             <Row icon={settings()!.cameraOn ? <Camera size={18} /> : <CameraOff size={18} />} title={settings()!.cameraOn ? sources()?.cameras.find((c) => c.id === settings()!.camera)?.name ?? sources()?.cameras[0]?.name ?? "Camera" : "No camera"} on={settings()!.cameraOn} onClick={() => void toggleCamera()} toggle />
             <Menu width={300} entries={micMenu()} trigger={(open) => <Row icon={settings()!.microphone === null ? <MicOff size={18} /> : <Mic size={18} />} title={micName()} on={settings()!.microphone !== null} onClick={open} chevron level={settings()!.microphone === null ? undefined : level()} />} />
             <Row icon={settings()!.systemAudio ? <Volume2 size={18} /> : <VolumeX size={18} />} title="Computer sound" on={settings()!.systemAudio} onClick={() => update((s) => (s.systemAudio = !s.systemAudio))} toggle />
+            <Row
+              icon={<ScrollText size={18} />}
+              title="Speaker notes"
+              on={settings()!.notesOn}
+              onClick={() => {
+                const s = update((x) => (x.notesOn = !x.notesOn));
+                void (s.notesOn ? recorder.show("prompter") : recorder.hide("prompter"));
+              }}
+              toggle
+            />
           </div>
           <Segmented
             value={settings()!.flow}
@@ -162,6 +191,7 @@ export function Launcher() {
           <button type="button" class="rec-start" onClick={() => void recorder.start()}>
             <i /> Start recording
           </button>
+          <Toaster />
           <footer class="rec-footer">
             <span>No time limit · Free forever</span>
             <span>

@@ -581,6 +581,7 @@ pub fn run() {
             windows::window_show,
             windows::window_hide,
             windows::window_resize,
+            windows::resize_app_window,
             recording::record_settings,
             recording::record_settings_save,
             recording::record_sources,
