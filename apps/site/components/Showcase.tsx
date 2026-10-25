@@ -70,7 +70,7 @@ export function NotJust() {
                 transition={{ delay: 0.7, duration: 1.4, ease: EASE }}
               >
                 <img src="/photos/sky.jpg" alt="" className="absolute inset-0 size-full object-cover" />
-                <Mark className="relative mt-24 size-16 text-white" />
+                <Mark className="relative mt-24 size-16 text-white" mono />
                 <span className="relative grid gap-0.5 rounded-xl bg-white/85 px-3 py-2 text-center text-[13px] leading-snug font-medium text-ink backdrop-blur">
                   <span>Unlimited videos</span>
                   <span className="whitespace-nowrap">Any length, 4K</span>

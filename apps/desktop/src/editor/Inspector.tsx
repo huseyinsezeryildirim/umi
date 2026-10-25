@@ -435,7 +435,7 @@ function SelectionPanel(props: { editor: Editor; selection: Selection }) {
                   </>
                 }
               >
-                {header("Spotlight", <Sun size={15} />)}
+                {header("Highlight", <Sun size={15} />)}
                 <div class="umi-section__hint">Keeps this area bright and dims the rest of the screen.</div>
               </Show>
               <SliderField label={m().style === "highlight" ? "Dim the rest" : "Strength"} value={m().amount} format={pct} onInput={(v) => set((e) => (e.masks.find((x) => x.id === m().id)!.amount = v))} {...gesture} />
