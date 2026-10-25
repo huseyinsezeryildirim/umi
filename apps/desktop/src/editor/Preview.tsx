@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from "solid-js";
+import { Bookmark, Heart, MessageCircle, Music2, Send, Smartphone } from "lucide-solid";
 import { createAudioPlayer } from "./audio";
 import { CameraHandle, MaskHandles, OverlayHandle, TextHandle, ZoomFocusHandle } from "./Handles";
 import type { Editor } from "./store";
@@ -121,6 +122,10 @@ export function Preview(props: { editor: Editor }) {
     return { left: (w - width) / 2, top: (h - height) / 2, width, height };
   };
 
+  // Short-video preview: where a phone app's buttons and captions will sit over a 9:16 video.
+  const [reel, setReel] = createSignal(false);
+  const vertical = () => ed.state().edit.aspect === "vertical";
+
   return (
     <div ref={stage} class="ed-stage">
       <canvas ref={canvas} class="ed-canvas" style={{ width: `${fittedBox().width}px`, height: `${fittedBox().height}px` }} />
@@ -132,6 +137,27 @@ export function Preview(props: { editor: Editor }) {
         <Show when={!ed.selection() && ed.state().recording.hasCamera && ed.state().edit.camera.visible}>
           <CameraHandle editor={ed} frame={fittedBox()} />
         </Show>
+      </Show>
+      <Show when={vertical() && reel()}>
+        <div class="ed-reel" style={{ left: `${fittedBox().left}px`, top: `${fittedBox().top}px`, width: `${fittedBox().width}px`, height: `${fittedBox().height}px` }}>
+          <div class="ed-reel__actions">
+            <span><Heart size={22} /><small>12K</small></span>
+            <span><MessageCircle size={22} /><small>340</small></span>
+            <span><Bookmark size={22} /><small>1.2K</small></span>
+            <span><Send size={22} /><small>Share</small></span>
+          </div>
+          <div class="ed-reel__caption">
+            <strong>@yourname</strong>
+            <p>Your caption goes here · #tutorial</p>
+            <span class="ed-reel__music"><Music2 size={12} /> Original audio</span>
+          </div>
+          <span class="ed-reel__note">Phone app buttons cover these areas</span>
+        </div>
+      </Show>
+      <Show when={vertical()}>
+        <button type="button" class="ed-reel-toggle" data-on={reel() ? "true" : "false"} onClick={() => setReel(!reel())} title="Preview with phone app buttons on top">
+          <Smartphone size={14} /> Phone preview
+        </button>
       </Show>
     </div>
   );
