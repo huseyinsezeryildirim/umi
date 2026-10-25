@@ -19,7 +19,7 @@ export function NotJust() {
   const bars = useRef<HTMLDivElement>(null);
   const inView = useInView(bars, { once: true, amount: 0.4 });
   return (
-    <section className="px-3 pt-24 sm:px-4">
+    <section className="px-3 pt-40 sm:px-4">
       <div className="relative mx-auto max-w-[1400px] overflow-hidden rounded-[40px] bg-[linear-gradient(180deg,#eaf3fe,#f7fbff_70%,#ffffff)]">
         <div className="relative mx-auto grid max-w-6xl items-end gap-14 px-6 py-24 sm:px-12 lg:grid-cols-[1fr_1.15fr]">
           <Rise className="self-center">

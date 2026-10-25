@@ -14,7 +14,7 @@ export function Privacy() {
   const [toggles, setToggles] = useState([true, true, true, false]);
   const labels = ["Transcribe on this computer", "Remove background noise on this computer", "Only upload when I share a link", "Send anonymous crash reports"];
   return (
-    <section className="px-3 sm:px-4">
+    <section className="px-3 pt-40 sm:px-4">
       <div className="relative mx-auto max-w-[1400px] overflow-hidden rounded-[40px] px-6 pt-28 pb-0 text-center text-white sm:px-12">
         <img src="/photos/night.jpg" alt="" className="absolute inset-0 size-full object-cover" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgb(5_10_25/0.55),rgb(5_10_25/0.2)_60%,rgb(5_10_25/0.6))]" />

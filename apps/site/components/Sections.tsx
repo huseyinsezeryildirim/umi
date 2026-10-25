@@ -119,26 +119,122 @@ export function Modes() {
 
 // ───── On-device AI ─────
 
+/** What the narrator says in the sample video (same timing as the app demo). */
+const NARRATION = (() => {
+  const text = "Good morning. This is the Northwind dashboard. Revenue is up twelve percent this week. To share it, click Share report and copy the link.";
+  const words = text.split(" ");
+  const step = 9.2 / words.length;
+  return words.map((w, i) => ({ w, start: 0.3 + i * step, end: 0.3 + (i + 0.85) * step }));
+})();
+const CHAPTERS = [
+  { at: 0, title: "The dashboard" },
+  { at: 4.3, title: "This week’s revenue" },
+  { at: 6.6, title: "Sharing the report" },
+];
+const TITLE = "Northwind weekly walkthrough";
+const SUMMARY = "A quick tour of the dashboard: revenue is up 12% this week, and the report is shared with a link.";
+
+/** Types `text` once when `start` turns true. */
+function useTyped(text: string, start: boolean, speed = 22) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!start || n >= text.length) return;
+    const t = setTimeout(() => setN((v) => v + 1), speed);
+    return () => clearTimeout(t);
+  }, [start, n, text, speed]);
+  return text.slice(0, n);
+}
+
 export function Ai() {
+  const box = useRef<HTMLDivElement>(null);
+  const video = useRef<HTMLVideoElement>(null);
+  const inView = useInView(box, { amount: 0.35 });
+  const [t, setT] = useState(0);
+  const title = useTyped(TITLE, inView, 28);
+  const summary = useTyped(SUMMARY, inView && title.length === TITLE.length, 12);
+
+  useEffect(() => {
+    const v = video.current;
+    if (!v) return;
+    if (!inView) return void v.pause();
+    void v.play().catch(() => {});
+    let frame = requestAnimationFrame(function tick() {
+      setT(v.currentTime);
+      frame = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [inView]);
+
+  const current = NARRATION.findIndex((w) => t >= w.start && t <= w.end + 0.2);
+  const line = current >= 0 ? NARRATION.slice(Math.floor(current / 6) * 6, Math.floor(current / 6) * 6 + 6) : [];
+  const chapter = CHAPTERS.reduce((best, c, i) => (t >= c.at ? i : best), 0);
+
   return (
     <section className="px-3 pt-40 sm:px-4">
-      <div className="mx-auto max-w-[1400px] rounded-[40px] bg-panel px-6 py-24 sm:px-12">
-        <div className="mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-[0.8fr_1.2fr]">
-          <div>
-            <Head align="left" eyebrow="AI, on your computer" title="Every recording, understood." lead="Captions, titles, chapters and summaries. Nothing leaves your Mac to make them." />
-            <Rise className="mt-8 grid gap-3 text-[16px] text-text" delay={0.1}>
-              {["Transcribed locally with Whisper", "Titles and chapters written for you", "Fillers and long pauses found for you"].map((t) => (
-                <p key={t} className="flex items-center gap-3">
-                  <span className="size-1.5 rounded-full bg-accent" />
-                  {t}
-                </p>
-              ))}
-            </Rise>
+      <div className="mx-auto max-w-[1400px] rounded-[40px] bg-panel px-4 py-24 sm:px-10">
+        <Head eyebrow="AI, on your computer" title="Every recording, understood." lead="Captions, a title, a summary and chapters. Nothing leaves your Mac to make them." />
+        <Rise className="mx-auto mt-14 grid max-w-6xl gap-4 lg:grid-cols-[1.55fr_1fr]" delay={0.1}>
+          <div ref={box} className="relative aspect-[16/10] overflow-hidden rounded-[24px] bg-[#6d9be0] shadow-[0_40px_80px_-30px_rgb(20_60_130/0.45)] lg:aspect-auto">
+            <video ref={video} src="/media/after.mp4" poster="/media/after-poster.jpg" muted loop playsInline preload="metadata" className="absolute inset-0 size-full object-cover" />
+            <video src="/media/camera.mp4" poster="/media/camera.jpg" autoPlay muted loop playsInline className="absolute right-[4%] bottom-[17%] aspect-square w-[15%] rounded-full border-[3px] border-white object-cover shadow-[0_10px_30px_rgb(0_0_0/0.3)]" />
+            <div className="absolute inset-x-0 bottom-[6%] flex justify-center px-[22%]">
+              <AnimatePresence>
+                {line.length > 0 && (
+                  <motion.p
+                    key={line[0].start}
+                    className="rounded-lg bg-black/75 px-3 py-1.5 text-center text-[clamp(12px,1.5vw,19px)] font-semibold text-white backdrop-blur"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    {line.map((w, k) => (
+                      <span key={k} className={NARRATION.indexOf(w) === current ? "text-[#ffd60a]" : ""}>
+                        {w.w}{" "}
+                      </span>
+                    ))}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
-          <Rise delay={0.15}>
-            <img src="/media/captions.jpg" alt="The editor with the Captions panel" className="w-full rounded-2xl shadow-[0_0_0_0.5px_rgb(0_0_0/0.12),0_40px_80px_-30px_rgb(20_60_130/0.45)]" />
-          </Rise>
-        </div>
+          <div className="flex flex-col gap-3">
+            <div className="rounded-[20px] bg-white p-5 shadow-[0_0_0_1px_rgb(17_24_39/0.05)]">
+              <p className="flex items-center gap-1.5 text-[12px] font-semibold text-accent">
+                <svg viewBox="0 0 24 24" className="size-3.5" fill="currentColor" aria-hidden>
+                  <path d="M12 2l2 6.5L20.5 10 14 12l-2 6.5-2-6.5L3.5 10 10 8.5z" />
+                </svg>
+                Written by Umi
+              </p>
+              <p className="mt-2 min-h-[1.4em] text-[18px] font-semibold tracking-tight">
+                {title}
+                {title.length < TITLE.length && <span className="animate-pulse text-accent">|</span>}
+              </p>
+              <p className="mt-1 min-h-[3em] text-[14px] text-muted">{summary}</p>
+            </div>
+            <div className="rounded-[20px] bg-white p-5 shadow-[0_0_0_1px_rgb(17_24_39/0.05)]">
+              <p className="text-[12px] font-semibold text-muted">Chapters</p>
+              <div className="mt-2 grid gap-1">
+                {CHAPTERS.map((c, k) => (
+                  <div key={c.title} className={`flex items-center gap-3 rounded-lg px-2 py-1.5 text-[14px] transition-colors duration-300 ${k === chapter ? "bg-tint text-ink" : "text-muted"}`}>
+                    <span className="w-8 font-mono text-[12px] tabular-nums">0:{String(Math.floor(c.at)).padStart(2, "0")}</span>
+                    {c.title}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1 rounded-[20px] bg-white p-5 shadow-[0_0_0_1px_rgb(17_24_39/0.05)]">
+              <p className="text-[12px] font-semibold text-muted">Transcript</p>
+              <p className="mt-2 text-[14px] leading-relaxed">
+                {NARRATION.map((w, k) => (
+                  <span key={k} className={`rounded-[3px] transition-colors duration-150 ${k === current ? "bg-[#ffd60a]/60 text-ink" : k < current ? "text-ink" : "text-faint"}`}>
+                    {w.w}{" "}
+                  </span>
+                ))}
+              </p>
+            </div>
+          </div>
+        </Rise>
       </div>
     </section>
   );
