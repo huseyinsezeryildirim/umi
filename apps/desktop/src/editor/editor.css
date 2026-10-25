@@ -1266,6 +1266,19 @@
   outline: none;
   box-shadow: none;
 }
+.ed-share__free {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--umi-accent-soft, rgba(17, 111, 245, 0.08));
+  font-size: var(--umi-text-sm);
+  color: var(--umi-text-2);
+}
+.ed-share__free span {
+  flex: 1;
+}
 .ed-share__row {
   display: flex;
   align-items: center;

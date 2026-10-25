@@ -9,6 +9,8 @@ import { handleWorkspaces, parseWorkspaceId, visibleVideo } from "./workspaces";
 import { buildUploadPlan } from "./uploads";
 import { type VideoRow, getVideo, toJson } from "./videos";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 interface CreateVideoBody {
   title?: string;
   sizeBytes: number;
@@ -100,6 +102,16 @@ async function createVideo(request: Request, env: AppEnv, account: Account): Pro
   if (plan.maxVideoMinutes !== null && typeof body.durationMs === "number" && body.durationMs > plan.maxVideoMinutes * 60_000) {
     throw new HttpError(402, "plan_limit", `Share links on your plan hold videos up to ${plan.maxVideoMinutes} minutes. Export the file, or upgrade for longer links.`);
   }
+  if (plan.maxLinks !== null) {
+    const kept = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM videos WHERE account_id = ? AND status != 'deleted' AND (expires_at IS NULL OR expires_at > ?)",
+    )
+      .bind(account.id, Date.now())
+      .first<{ n: number }>();
+    if ((kept?.n ?? 0) >= plan.maxLinks) {
+      throw new HttpError(402, "plan_limit", `Free keeps ${plan.maxLinks} share links at a time. Delete one, or upgrade to Pro to keep as many as you like.`);
+    }
+  }
   if (plan.storageGB !== null) {
     const used = await env.DB.prepare("SELECT COALESCE(SUM(size_bytes), 0) AS n FROM videos WHERE account_id = ? AND status != 'deleted'").bind(account.id).first<{ n: number }>();
     if ((used?.n ?? 0) + size > plan.storageGB * 1e9) throw new HttpError(402, "plan_limit", `Your plan includes ${plan.storageGB} GB of cloud storage. Delete old links or upgrade.`);
@@ -113,14 +125,19 @@ async function createVideo(request: Request, env: AppEnv, account: Account): Pro
     httpMetadata: { contentType },
   });
   const now = Date.now();
-  const expiresAt = parseExpiresAt(body.expiresAt) ?? null;
+  // Free links last `linkDays` (an earlier expiry someone picked still wins).
+  const planEnd = plan.linkDays !== null ? now + plan.linkDays * DAY_MS : null;
+  const chosen = parseExpiresAt(body.expiresAt) ?? null;
+  const expiresAt = planEnd !== null && (chosen === null || chosen > planEnd) ? planEnd : chosen;
+  const planExpiry = planEnd !== null && expiresAt === planEnd ? 1 : 0;
   const passwordHash = (await parsePassword(body.password)) ?? null;
+  if (passwordHash !== null && !plan.linkControls) throw new HttpError(402, "payment_required", "Passwords on links are part of Umi Pro.");
   const workspaceId = (await parseWorkspaceId(env, account, body.workspaceId)) ?? null;
 
   await env.DB.prepare(
     `INSERT INTO videos (id, account_id, title, status, upload_id, content_type, size_bytes, duration_ms, width, height,
-       password_hash, expires_at, allow_download, allow_comments, created_at, updated_at, workspace_id)
-     VALUES (?, ?, ?, 'uploading', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       password_hash, expires_at, allow_download, allow_comments, created_at, updated_at, workspace_id, plan_expiry)
+     VALUES (?, ?, ?, 'uploading', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -139,6 +156,7 @@ async function createVideo(request: Request, env: AppEnv, account: Account): Pro
       now,
       now,
       workspaceId,
+      planExpiry,
     )
     .run();
 
@@ -218,7 +236,7 @@ async function hasValidGif(env: AppEnv, id: string): Promise<boolean> {
 
 /** PATCH /api/videos/:id */
 async function updateVideo(request: Request, env: AppEnv, account: Account, id: string): Promise<Response> {
-  await ownedVideo(env, account, id);
+  const video = await ownedVideo(env, account, id);
   const body = await readJson<UpdateVideoBody>(request);
   const sets: string[] = [];
   const values: unknown[] = [];
@@ -231,9 +249,17 @@ async function updateVideo(request: Request, env: AppEnv, account: Account, id: 
     if (typeof body.allowComments !== "boolean") throw new HttpError(400, "invalid_field", "allowComments must be boolean.");
     sets.push("allow_comments = ?"), values.push(body.allowComments ? 1 : 0);
   }
-  const expiresAt = parseExpiresAt(body.expiresAt);
+  let expiresAt = parseExpiresAt(body.expiresAt);
+  const linkDays = can(account).linkDays;
+  if (expiresAt !== undefined && linkDays !== null) {
+    // A free link can't be kept past its week.
+    const planEnd = video.created_at + linkDays * DAY_MS;
+    if (expiresAt === null || expiresAt > planEnd) expiresAt = planEnd;
+    sets.push("plan_expiry = ?"), values.push(expiresAt === planEnd ? 1 : 0);
+  } else if (expiresAt !== undefined) sets.push("plan_expiry = 0");
   if (expiresAt !== undefined) sets.push("expires_at = ?"), values.push(expiresAt);
   const passwordHash = await parsePassword(body.password);
+  if (passwordHash && !can(account).linkControls) throw new HttpError(402, "payment_required", "Passwords on links are part of Umi Pro.");
   if (passwordHash !== undefined) sets.push("password_hash = ?"), values.push(passwordHash);
   const workspaceId = await parseWorkspaceId(env, account, body.workspaceId);
   if (workspaceId !== undefined) sets.push("workspace_id = ?"), values.push(workspaceId);
@@ -299,7 +325,11 @@ export async function handleApi(request: Request, env: AppEnv, path: string): Pr
     if (method === "DELETE" && c[2]) return ownerDeleteComment(env, video, c[2]);
   }
   const ins = /^\/api\/videos\/([0-9A-Za-z]+)\/insights$/.exec(path);
-  if (ins && method === "GET") return videoInsights(env, await visibleVideo(env, account, ins[1]!));
+  if (ins && method === "GET") {
+    const video = await visibleVideo(env, account, ins[1]!);
+    if (!can(account).insights) throw new HttpError(402, "payment_required", "Viewer insights are part of Umi Pro.");
+    return videoInsights(env, video);
+  }
   const m = /^\/api\/videos\/([0-9A-Za-z]+)(\/complete|\/upload-urls)?$/.exec(path);
   if (m) {
     const id = m[1]!;

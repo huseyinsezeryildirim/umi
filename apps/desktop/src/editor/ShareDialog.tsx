@@ -16,6 +16,8 @@ interface Video {
   expiresAt?: string | null;
   workspaceId?: string | null;
   durationMs?: number | null;
+  /** A free link: it's deleted at `expiresAt` unless you upgrade. */
+  keptByUpgrade?: boolean;
 }
 interface Insights {
   views: number;
@@ -210,6 +212,17 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
                 </Show>
                 <SwitchRow label="Viewers can download" checked={v().allowDownload} onChange={(on) => void update({ allowDownload: on })} />
                 <SwitchRow label="Comments" checked={v().allowComments ?? true} onChange={(on) => void update({ allowComments: on })} />
+                <Show when={v().keptByUpgrade && v().expiresAt}>
+                  <div class="ed-share__free">
+                    <span>
+                      Free links stay up for 7 days: this one is deleted {new Date(v().expiresAt!).toLocaleDateString(undefined, { day: "numeric", month: "long" })}.
+                    </span>
+                    <Button onClick={() => void openUrl("https://umi.cam/#pricing")}>
+                      Keep it with Pro
+                    </Button>
+                  </div>
+                </Show>
+                <Show when={!v().keptByUpgrade}>
                 <div class="umi-field-label">Expires</div>
                 <div class="ed-chips">
                   <For each={EXPIRY}>
@@ -227,6 +240,7 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
                 </div>
                 <Show when={v().expiresAt}>
                   <div class="umi-section__hint">Expires {new Date(v().expiresAt!).toLocaleString()}</div>
+                </Show>
                 </Show>
                 <div class="umi-field-label">Password</div>
                 <div class="ed-share__row">

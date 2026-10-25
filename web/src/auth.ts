@@ -69,6 +69,19 @@ const publicAccount = (a: Account) => ({
   entitlements: entitlements(planOf(a)),
 });
 
+/**
+ * Changes an account's plan (billing calls this too). Upgrading keeps the links the free plan
+ * would have deleted after a week.
+ */
+export async function setPlan(env: AppEnv, accountId: string, plan: Plan): Promise<void> {
+  await env.DB.prepare("UPDATE accounts SET plan = ?, is_paid = ? WHERE id = ?").bind(plan, plan === "free" ? 0 : 1, accountId).run();
+  if (entitlements(plan).linkDays === null) {
+    await env.DB.prepare("UPDATE videos SET expires_at = NULL, plan_expiry = 0, updated_at = ? WHERE account_id = ? AND plan_expiry = 1 AND status != 'deleted'")
+      .bind(Date.now(), accountId)
+      .run();
+  }
+}
+
 /** The account's plan (older rows only have the paid flag). */
 export const planOf = (a: Account): Plan => (isPlan(a.plan) ? a.plan : a.is_paid === 1 ? "pro" : "free");
 export const can = (a: Account): Entitlements => entitlements(planOf(a));
@@ -242,7 +255,7 @@ export async function handleAuth(request: Request, env: AppEnv, path: string): P
     const a = await authenticate(request, env);
     const plan = (await readJson<{ plan?: unknown }>(request)).plan;
     if (!isPlan(plan)) throw new HttpError(400, "invalid_field", "plan must be free, pro or team.");
-    await env.DB.prepare("UPDATE accounts SET plan = ?, is_paid = ? WHERE id = ?").bind(plan, plan === "free" ? 0 : 1, a.id).run();
+    await setPlan(env, a.id, plan);
     return json({ account: publicAccount({ ...a, plan, is_paid: plan === "free" ? 0 : 1 }) });
   }
   return null;

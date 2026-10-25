@@ -62,6 +62,9 @@ pub struct Video {
     /// The team workspace it's shared with.
     #[serde(default)]
     pub workspace_id: Option<String>,
+    /// A free link: deleted at `expires_at` unless the account upgrades.
+    #[serde(default)]
+    pub kept_by_upgrade: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]

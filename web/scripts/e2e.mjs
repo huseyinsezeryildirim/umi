@@ -113,8 +113,29 @@ async function main() {
 
   console.log("\nAuth & billing hook");
   check((await api("POST", "/api/videos", { sizeBytes: 1 }, "nope")).status === 401, "bad token → 401");
-  // Plans (src/plans.ts): share links are a paid feature; Free exports or self-hosts.
-  check((await api("POST", "/api/videos", { sizeBytes: 1 }, args["free-token"])).status === 402, "free plan has no cloud links → 402");
+  // Plans (src/plans.ts): Free keeps 3 links of up to 5 minutes for a week.
+  const free = args["free-token"];
+  // Start from an empty free account (earlier runs or manual tries may have left links).
+  for (const v of (await api("GET", "/api/videos", undefined, free)).data?.videos ?? []) await api("DELETE", `/api/videos/${v.id}`, undefined, free);
+  check((await api("POST", "/api/videos", { sizeBytes: 1, durationMs: 6 * 60_000 }, free)).status === 402, "free: a video over 5 minutes → 402");
+  const later = new Date(Date.now() + 30 * 86_400_000).toISOString();
+  const freeLinks = [];
+  for (let i = 0; i < 3; i++) {
+    const r = await api("POST", "/api/videos", { sizeBytes: 1, durationMs: 60_000, title: `Free ${i}`, expiresAt: i === 0 ? later : undefined }, free);
+    if (r.status === 201) freeLinks.push(r.data.video);
+  }
+  check(freeLinks.length === 3, "free: 3 links can be made");
+  const week = (v) => Math.abs(Date.parse(v.expiresAt) - (Date.parse(v.createdAt) + 7 * 86_400_000)) < 5_000;
+  check(freeLinks.every((v) => v.expiresAt && week(v) && v.keptByUpgrade), "free: each link ends after a week (even when a later date was asked)");
+  check((await api("POST", "/api/videos", { sizeBytes: 1, durationMs: 60_000 }, free)).status === 402, "free: a 4th link → 402");
+  check((await api("PATCH", `/api/videos/${freeLinks[1].id}`, { password: "secret123" }, free)).status === 402, "free: passwords are Pro → 402");
+  check((await api("GET", `/api/videos/${freeLinks[1].id}/insights`, undefined, free)).status === 402, "free: insights are Pro → 402");
+  const kept = await api("PATCH", `/api/videos/${freeLinks[0].id}`, { expiresAt: null }, free);
+  check(kept.status === 200 && week(kept.data.video), "free: the week can't be lifted");
+  for (const v of freeLinks) await api("DELETE", `/api/videos/${v.id}`, undefined, free);
+  const again = await api("POST", "/api/videos", { sizeBytes: 1, durationMs: 60_000 }, free);
+  check(again.status === 201, "free: deleting frees a slot");
+  if (again.data?.video) await api("DELETE", `/api/videos/${again.data.video.id}`, undefined, free);
 
   console.log("\nUpload");
   const { video, plan } = await upload(bytes, thumbBytes, {

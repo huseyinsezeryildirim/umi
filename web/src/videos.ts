@@ -23,6 +23,8 @@ export interface VideoRow {
   updated_at: number;
   deleted_at: number | null;
   workspace_id: string | null;
+  /** 1 when the free plan set the expiry (upgrading keeps the link). */
+  plan_expiry?: number;
 }
 
 /** Shape returned to the owner (macOS app). */
@@ -47,6 +49,8 @@ export interface VideoJson {
   createdAt: string;
   updatedAt: string;
   workspaceId: string | null;
+  /** The free plan's week ends at `expiresAt`: Pro keeps the link. */
+  keptByUpgrade: boolean;
 }
 
 export async function getVideo(env: AppEnv, id: string): Promise<VideoRow | null> {
@@ -78,6 +82,7 @@ export function toJson(video: VideoRow, env: AppEnv, request: Request): VideoJso
     hasPassword: video.password_hash !== null,
     expiresAt: video.expires_at === null ? null : new Date(video.expires_at).toISOString(),
     expired: isExpired(video),
+    keptByUpgrade: video.plan_expiry === 1,
     createdAt: new Date(video.created_at).toISOString(),
     updatedAt: new Date(video.updated_at).toISOString(),
     workspaceId: video.workspace_id ?? null,
