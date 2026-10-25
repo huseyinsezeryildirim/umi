@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useInView } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { AppleIcon, ChromeIcon, LinuxIcon, LoomIcon, WindowsIcon } from "./icons";
+import { AppleIcon, LinuxIcon, LoomIcon, WindowsIcon } from "./icons";
 import { PLATFORMS } from "./Download";
 import { Mark } from "./ui";
 
@@ -367,7 +367,7 @@ export function Platforms() {
   const os = useOs();
   return (
     <section className="px-4 pt-40">
-      <Head eyebrow="Every platform" title="Native on Mac, Windows and Linux." lead="One app, the same editor everywhere, plus an extension for the browser." />
+      <Head eyebrow="Every platform" title="Native on Mac, Windows and Linux." lead="One app, the same editor everywhere. Or record right in your browser, nothing to install." />
       <div className="mx-auto mt-14 grid max-w-6xl gap-3 md:grid-cols-3">
         {OS.map((o, i) => (
           <Rise key={o.key} delay={i * 0.07}>
@@ -385,11 +385,14 @@ export function Platforms() {
           </Rise>
         ))}
         <Rise className="md:col-span-1" delay={0.05}>
-          <div className="relative flex h-full flex-col justify-end overflow-hidden rounded-[28px] bg-[#f3f5f8] p-7">
-            <ChromeScene />
-            <h3 className="mt-6 text-[22px] font-semibold tracking-tight">Chrome extension</h3>
-            <p className="mt-1 text-[15px] text-muted">Record a tab or your whole screen without leaving the browser.</p>
-          </div>
+          <a href="/signup" className="group relative flex h-full flex-col justify-end overflow-hidden rounded-[28px] bg-[#f3f5f8] p-7">
+            <BrowserScene />
+            <h3 className="mt-6 flex items-center gap-2 text-[22px] font-semibold tracking-tight">
+              In your browser
+              <span className="text-muted transition-transform duration-300 group-hover:translate-x-0.5">→</span>
+            </h3>
+            <p className="mt-1 text-[15px] text-muted">Record and edit from Chrome, Edge, Firefox or Safari. Nothing to install.</p>
+          </a>
         </Rise>
         <Rise className="md:col-span-2" delay={0.1}>
           <div className="flex h-full flex-col rounded-[28px] bg-[#f3f5f8] p-7">
@@ -414,14 +417,14 @@ export function Platforms() {
   );
 }
 
-/** A browser with the extension's popup recording a tab. */
-function ChromeScene() {
+/** A browser tab on umi.cam: press Start, pick the screen, it records. Nothing installed. */
+function BrowserScene() {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { amount: 0.5 });
   const [rec, setRec] = useState(false);
   useEffect(() => {
     if (!inView) return;
-    const id = setTimeout(() => setRec((v) => !v), rec ? 2600 : 1600);
+    const id = setTimeout(() => setRec((v) => !v), rec ? 2800 : 1800);
     return () => clearTimeout(id);
   }, [rec, inView]);
   return (
@@ -432,30 +435,31 @@ function ChromeScene() {
           <i />
           <i />
         </span>
-        <span className="h-4 flex-1 rounded-md bg-white" />
-        <span className={`grid size-5 place-items-center rounded-md transition-colors ${rec ? "bg-record/15" : "bg-tint"}`}>
-          {rec ? <i className="size-2 animate-pulse rounded-full bg-record" /> : <Mark className="size-3.5 text-accent" />}
+        <span className="flex h-4 flex-1 items-center gap-1 rounded-md bg-white px-2 text-[9px] text-muted">
+          {rec && <i className="size-1.5 animate-pulse rounded-full bg-record" />}
+          umi.cam/app
         </span>
       </div>
-      <div className="relative grid gap-1.5 p-3">
-        <i className="h-2 w-1/2 rounded bg-ink/12" />
-        <i className="h-2 w-2/3 rounded bg-ink/8" />
-        <i className="h-10 rounded bg-ink/[0.05]" />
-        <AnimatePresence>
-          {!rec && (
-            <motion.div
-              className="absolute top-1.5 right-2 w-[52%] rounded-lg bg-white p-2 text-[10.5px] shadow-[0_0_0_1px_rgb(17_24_39/0.08),0_10px_24px_-10px_rgb(20_40_90/0.4)]"
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.3 }}
-            >
-              <p className="rounded-md bg-ink px-2 py-1.5 text-center font-semibold text-white">Record this tab</p>
-              <p className="mt-1 px-2 py-1 text-center text-muted">Whole screen</p>
+      <div className="relative grid h-[104px] place-items-center bg-[radial-gradient(120%_90%_at_50%_0%,#dcebfc,#fff_70%)]">
+        <AnimatePresence mode="wait">
+          {rec ? (
+            <motion.div key="rec" className="text-center" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+              <p className="flex items-center justify-center gap-1.5 text-[10px] text-muted">
+                <i className="size-1.5 animate-pulse rounded-full bg-record" />
+                Recording
+              </p>
+              <p className="text-[22px] font-semibold tabular-nums">0:04</p>
+            </motion.div>
+          ) : (
+            <motion.div key="idle" className="grid justify-items-center gap-2" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+              <span className="size-9 rounded-full bg-[url(/media/camera.jpg)] bg-cover shadow-[0_0_0_2px_#fff,0_6px_14px_-6px_rgb(20_40_90/0.5)]" />
+              <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[10.5px] font-medium shadow-[0_0_0_1px_rgb(17_24_39/0.08),0_6px_14px_-8px_rgb(20_40_90/0.4)]">
+                <i className="size-1.5 rounded-full bg-record" />
+                Start recording
+              </span>
             </motion.div>
           )}
         </AnimatePresence>
-        {rec && <span className="pointer-events-none absolute inset-1 rounded-md ring-2 ring-record/70" />}
       </div>
     </div>
   );

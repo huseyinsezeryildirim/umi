@@ -15,7 +15,7 @@ src/
   social.ts    viewer comments + emoji reactions (validation, rate limits, owner moderation)
   media.ts     range-capable video, thumbnail and GIF preview streaming
   access.ts    expiry / password / revoked checks shared by page and media
-  auth.ts      bearer-token stub + paid-plan hook
+  auth.ts      email + password sign-up/sign-in (per-device sessions), bearer auth, paid-plan hook
   cleanup.ts   hourly purge of stale uploads and long-expired links
 migrations/    D1 schema
 seed/dev.sql   local dev accounts

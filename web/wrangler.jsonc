@@ -14,7 +14,9 @@
     // Optional: R2 S3 endpoint for direct-to-R2 presigned URLs, e.g. https://<account_id>.r2.cloudflarestorage.com
     // When empty (local dev), upload URLs point at this Worker, which streams parts into R2 via the binding.
     "R2_S3_ENDPOINT": "",
-    "R2_BUCKET_NAME": "umi-videos"
+    "R2_BUCKET_NAME": "umi-videos",
+    // Website origins allowed to call /api (sign-in, the web recorder). Comma-separated.
+    "SITE_ORIGINS": "http://localhost:3210,https://umi.cam"
   },
   // Secrets (set with `wrangler secret put`, or in .dev.vars locally):
   //   SIGNING_SECRET        HMAC key for upload URLs and password-unlock cookies (required)

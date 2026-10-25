@@ -3,7 +3,7 @@
 import { AnimatePresence, motion, useScroll, useSpring, useTransform } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { DownloadButton } from "./Download";
-import { ChromeIcon, LinuxIcon, LoomIcon, WindowsIcon } from "./icons";
+import { BrowserIcon, LinuxIcon, LoomIcon, WindowsIcon } from "./icons";
 
 const EASE = [0.25, 1, 0.5, 1] as const;
 
@@ -42,7 +42,9 @@ export function Hero() {
           <span className="flex items-center gap-3.5 text-[#5f6673]">
             <WindowsIcon className="size-[18px]" />
             <LinuxIcon className="size-5" />
-            <ChromeIcon className="size-5" />
+            <a href="/signup" title="Record in your browser" className="transition-colors hover:text-ink">
+              <BrowserIcon className="size-5" />
+            </a>
           </span>
         </div>
       </motion.div>

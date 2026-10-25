@@ -1,5 +1,6 @@
 import type { AppEnv } from "./env";
 import { handleApi } from "./api";
+import { handleAuth } from "./auth";
 import { cleanup } from "./cleanup";
 import { HttpError, errorResponse, json } from "./http";
 import { handleEmbed, handleOembed } from "./embed";
@@ -49,20 +50,47 @@ async function route(request: Request, env: AppEnv): Promise<Response> {
   if ((m = /^\/api\/uploads\/([0-9A-Za-z]+)\/(thumbnail|gif)$/.exec(pathname)) && method === "PUT") {
     return handleAssetUpload(request, env, m[1]!, m[2] as "thumbnail" | "gif");
   }
+  if (pathname.startsWith("/api/auth/")) {
+    const response = await handleAuth(request, env, pathname);
+    if (response) return response;
+  }
   if (pathname.startsWith("/api/")) return handleApi(request, env, pathname);
 
   return new Response("Not found", { status: 404 });
 }
 
+/** Lets the configured site origins (SITE_ORIGINS, comma-separated) call the API. */
+function withCors(request: Request, env: AppEnv, response: Response): Response {
+  const origin = request.headers.get("origin");
+  const allowed = String(env.SITE_ORIGINS ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  if (!origin || !allowed.includes(origin)) return response;
+  const headers = new Headers(response.headers);
+  headers.set("access-control-allow-origin", origin);
+  headers.set("access-control-allow-headers", "authorization, content-type");
+  headers.set("access-control-allow-methods", "GET, POST, PATCH, DELETE, OPTIONS");
+  headers.set("access-control-max-age", "86400");
+  headers.append("vary", "origin");
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 export default {
   async fetch(request, env): Promise<Response> {
+    // The website (another origin) calls the API with a bearer token, never cookies.
+    if (request.method === "OPTIONS" && new URL(request.url).pathname.startsWith("/api/")) return withCors(request, env, new Response(null, { status: 204 }));
+    let response: Response;
     try {
-      return await route(request, env);
+      response = await route(request, env);
     } catch (err) {
-      if (err instanceof HttpError) return errorResponse(err);
-      console.error(err);
-      return errorResponse(new HttpError(500, "internal", "Something went wrong."));
+      if (err instanceof HttpError) response = errorResponse(err);
+      else {
+        console.error(err);
+        response = errorResponse(new HttpError(500, "internal", "Something went wrong."));
+      }
     }
+    return new URL(request.url).pathname.startsWith("/api/") ? withCors(request, env, response) : response;
   },
   async scheduled(_controller, env, ctx): Promise<void> {
     ctx.waitUntil(cleanup(env).then((r) => console.log("cleanup", r)));

@@ -45,6 +45,18 @@ export function ChromeIcon({ className }: P) {
   );
 }
 
+/** A browser window. */
+export function BrowserIcon({ className }: P) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-label="Browser">
+      <rect x="2.5" y="4" width="19" height="16" rx="3" />
+      <path d="M2.5 9h19" />
+      <circle cx="5.8" cy="6.5" r=".5" fill="currentColor" />
+      <circle cx="8" cy="6.5" r=".5" fill="currentColor" />
+    </svg>
+  );
+}
+
 /** Loom's mark: a burst of rounded rays around an open centre. */
 export function LoomIcon({ className }: P) {
   return (

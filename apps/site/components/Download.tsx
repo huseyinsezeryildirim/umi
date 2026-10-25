@@ -9,7 +9,7 @@ export const PLATFORMS = [
   { key: "mac-intel", name: "macOS", detail: "Intel", label: "Download for Mac (Intel)", href: `${RELEASES}/Umi_x64.dmg` },
   { key: "windows", name: "Windows", detail: "10 and 11", label: "Download for Windows", href: `${RELEASES}/Umi_x64-setup.exe` },
   { key: "linux", name: "Linux", detail: "AppImage · .deb", label: "Download for Linux", href: `${RELEASES}/Umi_amd64.AppImage` },
-  { key: "chrome", name: "Chrome", detail: "Extension", label: "Add to Chrome", href: "https://chromewebstore.google.com/" },
+  { key: "chrome", name: "Browser", detail: "No install", label: "Record in your browser", href: "/signup" },
 ] as const;
 type Key = (typeof PLATFORMS)[number]["key"];
 
