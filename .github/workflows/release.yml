@@ -1,0 +1,75 @@
+name: Release
+
+# Builds the desktop app for every platform and attaches the installers to a GitHub release.
+# Artifact names match the download site (site/index.html).
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: macos-13
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: System libraries (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg pkgconf
+      - name: System libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config clang libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libavfilter-dev \
+            libswscale-dev libswresample-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev \
+            libpipewire-0.3-dev libwayland-dev libxcb1-dev libxcb-randr0-dev libdbus-1-dev libgbm-dev libv4l-dev
+      - name: System libraries (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-win64-gpl-shared-7.1.zip"
+          Invoke-WebRequest $url -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath C:\ffmpeg
+          $dir = (Get-ChildItem C:\ffmpeg)[0].FullName
+          "FFMPEG_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$dir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+      - run: pnpm install --frozen-lockfile
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          args: --target ${{ matrix.target }}
+          tagName: ${{ github.ref_name }}
+          releaseName: Umi ${{ github.ref_name }}
+          releaseDraft: true
+
+  extension:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack the Chrome extension
+        run: cd extension && zip -r ../umi-chrome.zip . -x "README.md"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: umi-chrome.zip
+          draft: true
