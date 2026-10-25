@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Main window permissions.",
   "windows": ["main", "editor-*", "launcher", "bubble", "controls", "countdown", "area", "prompter", "shot", "ink"],
-  "permissions": ["core:default", "core:window:allow-start-dragging", "dialog:default", "opener:default"]
+  "permissions": ["core:default", "core:window:allow-start-dragging", "core:window:allow-toggle-maximize", "dialog:default", "opener:default"]
 }

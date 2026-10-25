@@ -1,4 +1,4 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { FlipHorizontal2, Sparkles, X } from "lucide-solid";
@@ -11,20 +11,31 @@ export function Bubble() {
   const [settings, setSettings] = createSignal<RecordSettings | null>(null);
   const [frame, setFrame] = createSignal<string | null>(null);
   const [hover, setHover] = createSignal(false);
+  const [error, setError] = createSignal<string | null>(null);
   let lastUrl: string | null = null;
 
-  onMount(async () => {
+  /** Reads the settings, fits the window and starts the camera (again after being hidden). */
+  const start = async () => {
     const s = await recorder.settings();
     setSettings(s);
-    await getCurrentWindow().setSize(new (await import("@tauri-apps/api/dpi")).LogicalSize(sizeOf(s.cameraStyle), sizeOf(s.cameraStyle)));
-    void recorder.cameraPreview(s.camera ?? "", (jpeg) => {
+    setFrame(null);
+    void recorder.resize(sizeOf(s.cameraStyle), sizeOf(s.cameraStyle));
+    await recorder.cameraPreview(s.camera ?? "", (jpeg) => {
       const url = URL.createObjectURL(new Blob([jpeg], { type: "image/jpeg" }));
       setFrame(url);
       if (lastUrl) URL.revokeObjectURL(lastUrl);
       lastUrl = url;
     });
-    onCleanup(() => void recorder.cameraPreview(null, () => {}));
+  };
+  onMount(() => {
+    void start().catch((e) => setError(String(e)));
+    const off = listen("bubble:shown", () => void start().catch((e) => setError(String(e))));
+    onCleanup(() => {
+      void off.then((f) => f());
+      void recorder.cameraPreview(null, () => {});
+    });
   });
+
 
   const sizeOf = (style: CameraStyle) => (style.size >= 0.3 ? SIZES.L : style.size >= 0.2 ? SIZES.M : SIZES.S);
   const style = () => settings()?.cameraStyle;
@@ -47,7 +58,7 @@ export function Bubble() {
 
   return (
     <div class="bubble" data-shape={style()?.shape ?? "circle"} onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)} data-tauri-drag-region>
-      <Show when={frame()} fallback={<div class="bubble__wait" data-tauri-drag-region>Starting camera…</div>}>
+      <Show when={frame()} fallback={<div class="bubble__wait" data-tauri-drag-region>{error() ?? "Starting camera…"}</div>}>
         <img src={frame()!} alt="" draggable={false} data-tauri-drag-region style={{ transform: style()?.mirrored ? "scaleX(-1)" : "none" }} />
       </Show>
       <Show when={hover()}>
