@@ -44,3 +44,16 @@ export function ChromeIcon({ className }: P) {
     </svg>
   );
 }
+
+/** Loom's mark: a burst of rounded rays around an open centre. */
+export function LoomIcon({ className }: P) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-label="Loom">
+      <g fill="#625df5">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <rect key={i} x="10.6" y="1.2" width="2.8" height="7.4" rx="1.4" transform={`rotate(${i * 45} 12 12)`} />
+        ))}
+      </g>
+    </svg>
+  );
+}

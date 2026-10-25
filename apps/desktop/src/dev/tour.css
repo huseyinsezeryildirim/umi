@@ -1,0 +1,212 @@
+/* The guided demo over the editor (website only). */
+.demo-tour {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+.demo-tour__dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 14, 25, 0.42);
+  animation: tour-in 0.4s ease;
+}
+.demo-tour__hole,
+.demo-tour__ring {
+  position: absolute;
+  border-radius: 12px;
+  transition:
+    left 0.45s cubic-bezier(0.25, 1, 0.5, 1),
+    top 0.45s cubic-bezier(0.25, 1, 0.5, 1),
+    width 0.45s cubic-bezier(0.25, 1, 0.5, 1),
+    height 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.demo-tour__hole {
+  box-shadow: 0 0 0 9999px rgba(10, 14, 25, 0.42);
+}
+.demo-tour__ring {
+  border: 2px solid #116ff5;
+  animation: tour-pulse 1.6s ease-in-out infinite;
+}
+@keyframes tour-pulse {
+  50% {
+    box-shadow: 0 0 0 8px rgba(17, 111, 245, 0.18);
+  }
+}
+@keyframes tour-in {
+  from {
+    opacity: 0;
+  }
+}
+.demo-tour__hint {
+  position: absolute;
+  width: 300px;
+  padding: 12px 14px 14px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgba(17, 24, 39, 0.06),
+    0 18px 40px rgba(10, 14, 25, 0.25);
+  pointer-events: auto;
+  transition:
+    left 0.45s cubic-bezier(0.25, 1, 0.5, 1),
+    top 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+  animation: tour-hint 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.demo-tour__hint[data-shake="a"] {
+  animation: tour-shake-a 0.4s;
+}
+.demo-tour__hint[data-shake="b"] {
+  animation: tour-shake-b 0.4s;
+}
+@keyframes tour-hint {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes tour-shake-a {
+  25% { translate: -6px 0; }
+  55% { translate: 5px 0; }
+  80% { translate: -2px 0; }
+}
+@keyframes tour-shake-b {
+  25% { translate: -6px 0; }
+  55% { translate: 5px 0; }
+  80% { translate: -2px 0; }
+}
+.demo-tour__chip {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.demo-tour__hint p {
+  display: flex;
+  gap: 10px;
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #111827;
+}
+.demo-tour__hint b {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+}
+.demo-tour__bar {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px 5px 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 0 0 1px rgba(17, 24, 39, 0.06),
+    0 10px 30px rgba(10, 14, 25, 0.18);
+  backdrop-filter: blur(16px);
+  transform: translateX(-50%);
+  pointer-events: auto;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.demo-tour__chapter {
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: #6b7280;
+  font-weight: 500;
+  transition: background 0.3s, color 0.3s;
+}
+.demo-tour__progress {
+  width: 120px;
+  height: 4px;
+  margin: 0 6px 0 10px;
+  border-radius: 2px;
+  background: rgba(17, 24, 39, 0.1);
+  overflow: hidden;
+}
+.demo-tour__progress i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: #111827;
+  transition: width 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.demo-tour__count {
+  color: #9ca3af;
+  font-variant-numeric: tabular-nums;
+}
+.demo-tour__bar button,
+.demo-tour__end button {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: #6b7280;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.demo-tour__bar button:hover {
+  background: rgba(17, 24, 39, 0.05);
+  color: #111827;
+}
+.demo-tour__end {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 380px;
+  padding: 26px;
+  border-radius: 22px;
+  background: #fff;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 30px 80px rgba(10, 14, 25, 0.35);
+  pointer-events: auto;
+  animation: tour-hint 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.demo-tour__end h2 {
+  margin: 12px 0 6px;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #111827;
+}
+.demo-tour__end p {
+  margin: 0 0 18px;
+  color: #6b7280;
+  font-size: 14px;
+}
+.demo-tour__end div {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.demo-tour__primary {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: #111827;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.demo-tour__end button {
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: rgba(17, 111, 245, 0.1);
+  color: #116ff5;
+  font-weight: 500;
+}

@@ -3,7 +3,7 @@
 import { AnimatePresence, motion, useScroll, useSpring, useTransform } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { DownloadButton } from "./Download";
-import { ChromeIcon, LinuxIcon, WindowsIcon } from "./icons";
+import { ChromeIcon, LinuxIcon, LoomIcon, WindowsIcon } from "./icons";
 
 const EASE = [0.25, 1, 0.5, 1] as const;
 
@@ -32,9 +32,7 @@ export function Hero() {
       <motion.div className="mt-9 flex flex-col items-center gap-6" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: EASE, delay: 0.35 }}>
         <DownloadButton />
         <a href="#loom" className="group flex items-center gap-2 text-[15px] text-muted">
-          <motion.svg viewBox="0 0 24 24" className="size-4 text-[#625df5]" animate={{ rotate: 360 }} transition={{ duration: 12, repeat: Infinity, ease: "linear" }} aria-hidden>
-            <path fill="currentColor" d="M12 2l1.6 6.4L20 10l-6.4 1.6L12 18l-1.6-6.4L4 10l6.4-1.6z" />
-          </motion.svg>
+          <LoomIcon className="size-[18px]" />
           Switching from Loom?
           <span className="border-b border-ink/30 text-ink transition-colors group-hover:border-ink">Import your library</span>
           <span className="transition-transform duration-300 group-hover:translate-x-0.5">→</span>
@@ -80,8 +78,8 @@ function LiveDemo() {
         <img src="/media/editor.jpg" alt="The Umi editor" className="absolute inset-0 size-full object-cover" />
         {live && (
           <iframe
-            src="/demo/index.html?demo&open"
-            title="Umi editor, interactive demo"
+            src="/demo/index.html?demo&open&tour"
+            title="Umi editor, guided demo"
             onLoad={() => setTimeout(() => setReady(true), 600)}
             style={{ width: 1440, height: 900, transform: `scale(${scale})`, transformOrigin: "0 0" }}
             className={`absolute top-0 left-0 border-0 transition-opacity duration-700 ${ready ? "opacity-100" : "opacity-0"}`}
@@ -107,24 +105,12 @@ function LiveDemo() {
                   <span className="absolute inset-0 animate-ping rounded-full bg-accent/30" />
                   <span className="relative size-2.5 rounded-full bg-accent" />
                 </span>
-                Try the editor
+                Start interactive demo
               </motion.button>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-      <AnimatePresence>
-        {live && (
-          <motion.p
-            className="relative mt-3 text-[13px] text-white/90"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
-          >
-            This is the real app, running on a sample recording. Change the background, press play.
-          </motion.p>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

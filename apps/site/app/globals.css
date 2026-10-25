@@ -135,6 +135,15 @@ html.lenis body {
   }
 }
 
+@keyframes ribbon {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
+
 @property --angle {
   syntax: "<angle>";
   inherits: false;

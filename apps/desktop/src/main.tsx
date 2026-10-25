@@ -13,7 +13,17 @@ const ready = (import.meta.env.DEV || import.meta.env.VITE_DEMO) && !("__TAURI_I
 
 void ready.then(async () => {
   const root = document.getElementById("root")!;
-  if (view === "main") return render(() => <App />, root);
+  if (view === "main") {
+    render(() => <App />, root);
+    // The website's guided demo.
+    if ((import.meta.env.DEV || import.meta.env.VITE_DEMO) && new URLSearchParams(location.search).has("tour")) {
+      const { Tour } = await import("./dev/tour");
+      const layer = document.createElement("div");
+      document.body.append(layer);
+      render(() => <Tour />, layer);
+    }
+    return;
+  }
   // The screenshot editor is a normal window; the rest float with their own shapes.
   if (view !== "shot") document.documentElement.classList.add("umi-overlay");
   const views = {
