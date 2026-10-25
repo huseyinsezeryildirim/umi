@@ -374,6 +374,46 @@ async fn editor_voiceover(
     .map_err(|e| e.to_string())?
 }
 
+/// Makes a camera effect for the editor's recording: "blur" or "remove" (background), or
+/// "face" (the face's path, for keeping it framed). Progress 0…1 per stage.
+#[tauri::command]
+async fn editor_camera_effect(state: State<'_, AppState>, id: String, effect: String, progress: tauri::ipc::Channel<Stage>) -> Result<(), String> {
+    let editor = state.editor(&id)?;
+    let bundle = editor.bundle.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let send = |stage: &str, value: f64| {
+            let _ = progress.send(Stage { stage: stage.into(), value });
+        };
+        let model = if effect == "face" { umi_ai::models::Model::FaceDetection } else { umi_ai::models::Model::Segmentation };
+        model.ensure(&|p| send("download", p)).map_err(|e| e.to_string())?;
+        let last = std::sync::atomic::AtomicU32::new(0);
+        let report = |p: f64| {
+            let step = (p * 100.0) as u32;
+            if step != last.swap(step, Ordering::Relaxed) {
+                send("process", p);
+            }
+        };
+        match effect.as_str() {
+            "face" => umi_ai::camera::track_face(&bundle, &report).map(|_| ()),
+            "remove" => umi_ai::camera::process_background(&bundle, umi_ai::camera::Background::Remove, &report),
+            _ => umi_ai::camera::process_background(&bundle, umi_ai::camera::Background::Blur, &report),
+        }
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    // The renderer picks the new files up with the next edit change.
+    editor.refresh_sources();
+    Ok(())
+}
+
+/// Which camera effects are already made for a recording.
+#[tauri::command]
+fn editor_camera_effects(state: State<'_, AppState>, id: String) -> Result<Vec<String>, String> {
+    let bundle = state.editor(&id)?.bundle.clone();
+    Ok([("blur", "camera-blur.mov"), ("remove", "camera-matte.mov"), ("face", "camera-face.json")].iter().filter(|(_, f)| bundle.join(f).exists()).map(|(k, _)| k.to_string()).collect())
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ModelInfo {
@@ -556,6 +596,8 @@ pub fn run() {
             import_videos,
             import_loom,
             editor_transcribe,
+            editor_camera_effect,
+            editor_camera_effects,
             editor_voiceover,
             editor_save_subtitles,
             ai_models,

@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 umi-media = { path = "../umi-media" }
+umi-project.workspace = true
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -22,6 +23,9 @@ ort = { version = "=2.0.0-rc.15", features = ["ndarray", "coreml"] }
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 whisper-rs = "0.16"
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [lints]
 workspace = true

@@ -6402,6 +6402,7 @@ name = "umi-ai"
 version = "0.2.0"
 dependencies = [
  "dirs 6.0.0",
+ "image",
  "misaki-rs",
  "ndarray",
  "ort",
@@ -6409,6 +6410,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "umi-media",
+ "umi-project",
  "ureq",
  "whisper-rs",
 ]

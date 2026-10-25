@@ -10,7 +10,7 @@ use crate::ops::*;
 use crate::raster::Assets;
 use crate::scene::{DeviceFrameGeometry, SceneLayoutEngine};
 use umi_project::edit::*;
-use umi_project::project::KeyPress;
+use umi_project::project::{FaceKey, KeyPress};
 use umi_project::{CursorData, RecordingProject};
 use uuid::Uuid;
 
@@ -24,6 +24,10 @@ pub struct FramePlanner {
     zoom: ZoomTrack,
     scenes: SceneLayoutEngine,
     keys: Vec<KeyPress>,
+    /// The face's path in the camera (for keeping it framed).
+    pub faces: Vec<FaceKey>,
+    /// When the bubble sits on the other side to stay clear of the cursor.
+    camera_away: Vec<(f64, f64)>,
 }
 
 /// Per-frame inputs: times and which video textures are available this frame.
@@ -56,14 +60,85 @@ impl FramePlanner {
     pub fn new(project: RecordingProject, settings: EditSettings, cursor_data: &CursorData, apply_zoom_and_moves: bool) -> Self {
         let crop = settings.crop.unwrap_or(Rect::UNIT);
         let aspect = (project.screen.pixel_width as f64 * crop.width()) / (project.screen.pixel_height.max(1) as f64 * crop.height());
-        Self {
+        let mut planner = Self {
             cursor: CursorTrack::new(cursor_data, project.duration, settings.cursor.smoothing.spring()),
             zoom: ZoomTrack::new(&settings.zoom, cursor_data, project.duration),
             scenes: SceneLayoutEngine::new(settings.clone(), aspect, project.camera.is_some()),
             keys: cursor_data.keys.clone(),
+            faces: vec![],
+            camera_away: vec![],
             settings,
             project,
             apply_zoom_and_moves,
+        };
+        if planner.settings.camera.avoid_cursor && planner.project.camera.is_some() {
+            planner.camera_away = planner.cursor_near_camera();
+        }
+        planner
+    }
+
+    /// Times when the cursor works close to the camera bubble (so it moves aside): near for
+    /// 0.3 s to move away, clear for 1.5 s to come back.
+    fn cursor_near_camera(&self) -> Vec<(f64, f64)> {
+        let (w, h) = umi_project::timeline::render_size(&self.project, &self.settings, 1080);
+        let canvas = Rect::new(0.0, 0.0, w as f64, h as f64);
+        let mut spans: Vec<(f64, f64)> = Vec::new();
+        let (mut away, mut since) = (false, 0.0);
+        let mut t = 0.0;
+        while t <= self.project.duration {
+            let scene = self.scenes.state(t, canvas);
+            let near = match self.cursor.position(t) {
+                Some(p) if scene.camera_alpha > 0.0 => {
+                    let content = DeviceFrameGeometry::content_rect(self.settings.frame, scene.screen_rect);
+                    let p = self.to_content(p);
+                    let (x, y) = (content.min_x() + p.x * content.width(), content.max_y() - p.y * content.height());
+                    let r = scene.camera_rect.inset(-canvas.short_side() * 0.06, -canvas.short_side() * 0.06);
+                    x >= r.min_x() && x <= r.max_x() && y >= r.min_y() && y <= r.max_y()
+                }
+                _ => false,
+            };
+            if near != away {
+                if since == 0.0 {
+                    since = t;
+                }
+                if t - since >= if near { 0.3 } else { 1.5 } {
+                    away = near;
+                    if away {
+                        spans.push((since, f64::MAX));
+                    } else if let Some(last) = spans.last_mut() {
+                        last.1 = since;
+                    }
+                    since = 0.0;
+                }
+            } else {
+                since = 0.0;
+            }
+            t += 0.1;
+        }
+        spans
+    }
+
+    /// 0 = the bubble where it was put, 1 = mirrored to the other side.
+    fn camera_shift(&self, t: f64) -> f64 {
+        const GLIDE: f64 = 0.45;
+        self.camera_away
+            .iter()
+            .map(|&(a, b)| ease(((t - a) / GLIDE).min((b - t) / GLIDE).clamp(0.0, 1.0)))
+            .fold(0.0, f64::max)
+    }
+
+    /// The face at `t`, interpolated (`None` without a face path).
+    fn face_at(&self, t: f64) -> Option<FaceKey> {
+        let faces = &self.faces;
+        let i = faces.partition_point(|f| f.t <= t);
+        match (i.checked_sub(1).and_then(|j| faces.get(j)), faces.get(i)) {
+            (Some(a), Some(b)) => {
+                let k = ((t - a.t) / (b.t - a.t).max(1e-6)).clamp(0.0, 1.0);
+                Some(FaceKey { t, x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, size: a.size + (b.size - a.size) * k })
+            }
+            (Some(a), None) => Some(*a),
+            (None, Some(b)) => Some(*b),
+            (None, None) => None,
         }
     }
 
@@ -188,7 +263,7 @@ impl FramePlanner {
         }
 
         if inputs.has_camera && scene.camera_alpha > 0.001 {
-            self.plan_camera(assets, scene.camera_rect, scene.camera_radius, scene.camera_alpha, short, composite, ops);
+            self.plan_camera(t, canvas, assets, scene.camera_rect, scene.camera_radius, scene.camera_alpha, short, composite, ops);
         }
 
         // Grade into the destination (or copy when there's nothing to grade).
@@ -574,11 +649,41 @@ impl FramePlanner {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn plan_camera(&self, assets: &mut dyn Assets, rect: Rect, radius: f64, alpha: f64, _short: f64, target: Target, ops: &mut Vec<Op>) {
+    #[allow(clippy::too_many_arguments)]
+    fn plan_camera(&self, t: f64, canvas: Rect, assets: &mut dyn Assets, rect: Rect, radius: f64, alpha: f64, _short: f64, target: Target, ops: &mut Vec<Op>) {
         let Some(size) = assets.size(&TexRef::Camera) else { return };
+        let cam = &self.settings.camera;
+        // Out of the cursor's way: glide to the mirrored spot.
+        let shift = self.camera_shift(t);
+        let rect = if shift > 0.0 {
+            let mirrored_x = canvas.width() - rect.max_x();
+            rect.offset((mirrored_x - rect.min_x()) * shift, 0.0)
+        } else {
+            rect
+        };
+        let mut draw = aspect_fill(rect, radius, TexRef::Camera, size, cam.mirrored, alpha);
+        if cam.follow_face
+            && let Some(face) = self.face_at(t)
+        {
+            draw.uv = face_crop(rect, size, face);
+        }
+        if cam.background == CameraBackground::Remove {
+            // The person alone, standing on the bottom edge below where the bubble was (no
+            // bubble, no shadow), a bit bigger to make up for the missing frame.
+            let uv = draw.uv;
+            let aspect = (uv.width() * size.0 as f64) / (uv.height() * size.1 as f64).max(1.0);
+            let height = rect.height() * 1.35;
+            let width = height * aspect;
+            let x = (rect.mid_x() - width / 2.0).clamp(canvas.min_x() - width * 0.15, canvas.max_x() - width * 0.85);
+            let mut d = aspect_fill(Rect::new(x, canvas.min_y(), width, height), 0.0, TexRef::Camera, size, cam.mirrored, alpha);
+            d.uv = uv;
+            d.mask = Mask::NONE;
+            ops.push(Op::Draw { target, draw: d });
+            return;
+        }
         let side = rect.short_side();
         ops.push(Op::Draw { target, draw: shadow(rect.offset(0.0, -side * 0.02), radius, side * 0.04, black(0.4 * alpha), 1.0) });
-        ops.push(Op::Draw { target, draw: aspect_fill(rect, radius, TexRef::Camera, size, self.settings.camera.mirrored, alpha) });
+        ops.push(Op::Draw { target, draw });
     }
 
     fn plan_text(&self, text: &TextOverlay, t: f64, canvas: Rect, assets: &mut dyn Assets, target: Target, ops: &mut Vec<Op>) {
@@ -756,6 +861,24 @@ fn full_canvas(canvas: Rect, texture: TexRef, uv: Rect, alpha: f64) -> Draw {
 }
 
 /// A texture cropped to fill `rect` (aspect fill), with rounded corners.
+/// The part of the camera frame that keeps the face centered at a comfortable size (the
+/// face about 40 % of the bubble's height), staying inside the frame.
+fn face_crop(rect: Rect, (w, h): (u32, u32), face: FaceKey) -> Rect {
+    let (w, h) = (w as f64, h as f64);
+    let target_aspect = rect.width() / rect.height().max(1.0);
+    // Crop height in frame-height units, and width to match the bubble's shape.
+    let mut ch = (face.size / 0.4).clamp(0.3, 1.0);
+    let mut cw = ch * h * target_aspect / w;
+    if cw > 1.0 {
+        ch /= cw;
+        cw = 1.0;
+    }
+    // Slightly above the face center: eyes sit a bit high in a good frame.
+    let cx = (face.x - cw / 2.0).clamp(0.0, 1.0 - cw);
+    let cy = (face.y + face.size * 0.08 - ch / 2.0).clamp(0.0, 1.0 - ch);
+    Rect::new(cx, cy, cw, ch)
+}
+
 fn aspect_fill(rect: Rect, radius: f64, texture: TexRef, (w, h): (u32, u32), mirror: bool, alpha: f64) -> Draw {
     let (w, h) = (w as f64, h as f64);
     let target_aspect = rect.width() / rect.height().max(1.0);

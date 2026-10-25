@@ -28,6 +28,7 @@ type Op =
   | { op: "removeFillers" }
   | { op: "removePauses"; min: number }
   | { op: "speedUpTyping"; speed: number }
+  | { op: "hideCameraInSilence"; min: number }
   | { op: "beginGesture" }
   | { op: "endGesture" }
   | { op: "undo" }

@@ -50,8 +50,10 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn new(gpu: Arc<Gpu>, project: RecordingProject, edit: EditSettings, cursor: CursorData, bundle: Option<PathBuf>) -> Self {
+        let mut planner = FramePlanner::new(project, edit, &cursor, true);
+        planner.faces = bundle.as_ref().map(|b| umi_project::Bundle::new(b).read_face_track()).unwrap_or_default();
         Self {
-            planner: FramePlanner::new(project, edit, &cursor, true),
+            planner,
             exec: gpu::Executor::new(gpu.clone()),
             gpu,
             rasters: Arc::new(RasterCache::default()),
@@ -70,6 +72,8 @@ impl Renderer {
         let project = self.planner.project.clone();
         let flag = self.planner.apply_zoom_and_moves;
         self.planner = FramePlanner::new(project, edit, &self.cursor, flag);
+        // Re-read: the face path may have just been made.
+        self.planner.faces = self.bundle.as_ref().map(|b| umi_project::Bundle::new(b).read_face_track()).unwrap_or_default();
     }
 
     /// Zoom and 3D moves on/off (the editor turns them off while placing masks or a focus).

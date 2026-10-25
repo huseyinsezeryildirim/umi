@@ -7,6 +7,7 @@ use crate::sources::{CAMERA, SCREEN, Sources, as_video_frame};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use umi_media::{DecodedFrame, MediaError};
+use umi_project::edit::CameraBackground;
 use umi_project::{Bundle, CursorData, Document, EditSettings, RecordingProject};
 use umi_render::{FrameRequest, Gpu, Renderer};
 use uuid::Uuid;
@@ -24,6 +25,50 @@ pub struct FrameSource {
     pub sources: Sources,
     pub schedule: Schedule,
     has_camera: bool,
+    camera: CameraFeed,
+}
+
+/// Which camera picture the edit asks for (falling back to the original while an effect
+/// hasn't been made yet).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CameraFeed {
+    Original,
+    Blurred,
+    /// Original plus the person's outline (`camera-matte.mov`) as transparency.
+    Cutout,
+}
+
+const CAMERA_BLUR: &str = "camera-blur.mov";
+const CAMERA_MATTE: &str = "camera-matte.mov";
+
+fn camera_feed(sources: &mut Sources, edit: &EditSettings) -> CameraFeed {
+    match edit.camera.background {
+        CameraBackground::Blur if sources.has(CAMERA_BLUR) => CameraFeed::Blurred,
+        CameraBackground::Remove if sources.has(CAMERA_MATTE) => CameraFeed::Cutout,
+        _ => CameraFeed::Original,
+    }
+}
+
+/// The camera frame with the matte's brightness as (premultiplied) transparency.
+fn cut_out(camera: &DecodedFrame, matte: &DecodedFrame) -> Option<DecodedFrame> {
+    let (w, h, mut rgba) = umi_media::to_rgba(camera, camera.width.max(camera.height)).ok()?;
+    let (mw, mh) = (matte.width as usize, matte.height as usize);
+    let (luma, stride) = (&matte.planes[0], matte.strides[0] as usize);
+    let full = matte.color.full_range;
+    for y in 0..h as usize {
+        let my = (y * mh / h as usize).min(mh - 1);
+        for x in 0..w as usize {
+            let mx = (x * mw / w as usize).min(mw - 1);
+            let v = luma[my * stride + mx] as u32;
+            let a = if full { v } else { (v.saturating_sub(16) * 255 / 219).min(255) };
+            let i = (y * w as usize + x) * 4;
+            for c in 0..3 {
+                rgba[i + c] = (rgba[i + c] as u32 * a / 255) as u8;
+            }
+            rgba[i + 3] = a as u8;
+        }
+    }
+    Some(DecodedFrame { pts: camera.pts, width: w, height: h, format: umi_media::FrameFormat::Rgba, color: camera.color, planes: vec![rgba], strides: vec![w * 4] })
 }
 
 impl FrameSource {
@@ -52,15 +97,23 @@ impl FrameSource {
     /// Frames for one clip set: consecutive clips alternate between two decoder sets, so a
     /// dissolve reads two times of the same files without seeking back and forth.
     fn layer(&mut self, set: usize, t: f64) -> Result<(Option<Arc<DecodedFrame>>, Option<Arc<DecodedFrame>>), MediaError> {
-        if set == 0 {
-            let screen = self.sources.frame(SCREEN, t)?;
-            let camera = if self.has_camera { self.sources.frame(CAMERA, t)? } else { None };
-            Ok((screen, camera))
-        } else {
-            let screen = self.sources.frame_aliased(SCREEN, "screen#1", t)?;
-            let camera = if self.has_camera { self.sources.frame_aliased(CAMERA, "camera#1", t)? } else { None };
-            Ok((screen, camera))
+        let screen = if set == 0 { self.sources.frame(SCREEN, t)? } else { self.sources.frame_aliased(SCREEN, "screen#1", t)? };
+        if !self.has_camera {
+            return Ok((screen, None));
         }
+        let mut read = |file: &str| if set == 0 { self.sources.frame(file, t) } else { self.sources.frame_aliased(file, &format!("{file}#1"), t) };
+        let camera = match self.camera {
+            CameraFeed::Original => read(CAMERA)?,
+            CameraFeed::Blurred => read(CAMERA_BLUR)?,
+            CameraFeed::Cutout => {
+                let (camera, matte) = (read(CAMERA)?, read(CAMERA_MATTE)?);
+                match (camera, matte) {
+                    (Some(c), Some(m)) => cut_out(&c, &m).map(Arc::new).or(Some(c)),
+                    (c, _) => c,
+                }
+            }
+        };
+        Ok((screen, camera))
     }
 }
 
@@ -113,6 +166,7 @@ impl Composer {
         let media_duration = self.source.sources.video_duration(SCREEN).unwrap_or(self.project.duration);
         let document = Document::new(self.project.clone(), edit.clone(), self.cursor.clone(), media_duration);
         self.source.schedule = Schedule::new(&edit, document.total());
+        self.source.camera = camera_feed(&mut self.source.sources, &edit);
         self.renderer.set_edit(edit);
     }
 
@@ -141,5 +195,6 @@ pub fn open_source(
     let has_camera = project.camera.is_some() && sources.has(CAMERA);
     let document = Document::new(project.clone(), edit.clone(), cursor.clone(), media_duration);
     let schedule = Schedule::new(edit, document.total());
-    Ok((FrameSource { sources, schedule, has_camera }, project, cursor))
+    let camera = camera_feed(&mut sources, edit);
+    Ok((FrameSource { sources, schedule, has_camera, camera }, project, cursor))
 }

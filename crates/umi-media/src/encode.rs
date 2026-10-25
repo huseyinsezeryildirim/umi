@@ -10,6 +10,8 @@ use std::path::Path;
 pub enum VideoCodec {
     H264,
     Hevc,
+    /// ProRes 4444 with an alpha channel (cut-out camera).
+    ProRes4444,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,11 +52,13 @@ fn candidates(codec: VideoCodec, hardware: bool) -> Vec<&'static str> {
             VideoCodec::Hevc => {
                 list.extend(["hevc_videotoolbox", "hevc_nvenc", "hevc_qsv", "hevc_amf", "hevc_mf"]);
             }
+            VideoCodec::ProRes4444 => {}
         }
     }
     match codec {
         VideoCodec::H264 => list.extend(["libx264", "libopenh264", "h264"]),
         VideoCodec::Hevc => list.extend(["libx265", "hevc"]),
+        VideoCodec::ProRes4444 => list.push("prores_ks"),
     }
     list
 }
@@ -100,7 +104,13 @@ impl Encoder {
         let mut chosen = None;
         for name in candidates(settings.codec, settings.hardware) {
             let Some(codec) = ff::encoder::find_by_name(name) else { continue };
-            let pix_fmt = if name.starts_with("lib") || name == "h264" || name == "hevc" { Pixel::YUV420P } else { Pixel::NV12 };
+            let pix_fmt = if name == "prores_ks" {
+                Pixel::YUVA444P10LE
+            } else if name.starts_with("lib") || name == "h264" || name == "hevc" {
+                Pixel::YUV420P
+            } else {
+                Pixel::NV12
+            };
             let mut enc = ff::codec::context::Context::new_with_codec(codec).encoder().video()?;
             enc.set_width(settings.width);
             enc.set_height(settings.height);

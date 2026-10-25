@@ -16,7 +16,7 @@ pub enum Model {
     KokoroVoices,
     /// MediaPipe selfie segmentation (Apache-2.0): camera background blur/removal.
     Segmentation,
-    /// YuNet face detector (MIT): face tracking for the camera.
+    /// UltraFace RFB-320 face detector (MIT): face tracking for the camera.
     FaceDetection,
 }
 
@@ -29,7 +29,7 @@ impl Model {
             Model::Kokoro => "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model_quantized.onnx",
             Model::KokoroVoices => "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/voices/af_heart.bin",
             Model::Segmentation => "https://huggingface.co/onnx-community/mediapipe_selfie_segmentation/resolve/main/onnx/model.onnx",
-            Model::FaceDetection => "https://huggingface.co/opencv/face_detection_yunet/resolve/main/face_detection_yunet_2023mar.onnx",
+            Model::FaceDetection => "https://github.com/onnx/models/raw/main/validated/vision/body_analysis/ultraface/models/version-RFB-320.onnx",
         }
     }
 
@@ -39,7 +39,7 @@ impl Model {
             Model::Kokoro => "kokoro-82m-q8.onnx",
             Model::KokoroVoices => "kokoro-af_heart.bin",
             Model::Segmentation => "selfie-segmentation.onnx",
-            Model::FaceDetection => "yunet-2023mar.onnx",
+            Model::FaceDetection => "ultraface-rfb-320.onnx",
         }
     }
 

@@ -76,12 +76,19 @@ impl StreamWriter {
             (VideoCodec::Hevc, true) => vec!["hevc_videotoolbox", "hevc_nvenc", "hevc_qsv", "hevc_amf", "hevc_mf", "libx265"],
             (VideoCodec::H264, false) => vec!["libx264", "libopenh264", "h264_videotoolbox"],
             (VideoCodec::Hevc, false) => vec!["libx265", "hevc_videotoolbox"],
+            (VideoCodec::ProRes4444, _) => vec!["prores_ks"],
         };
         let mut chosen = None;
         let mut last_error = None;
         for name in names {
             let Some(codec) = ff::encoder::find_by_name(name) else { continue };
-            let pix_fmt = if name.starts_with("lib") { Pixel::YUV420P } else { Pixel::NV12 };
+            let pix_fmt = if name == "prores_ks" {
+                Pixel::YUVA444P10LE
+            } else if name.starts_with("lib") {
+                Pixel::YUV420P
+            } else {
+                Pixel::NV12
+            };
             let mut enc = ff::codec::context::Context::new_with_codec(codec).encoder().video()?;
             enc.set_width(s.width);
             enc.set_height(s.height);
@@ -100,6 +107,10 @@ impl StreamWriter {
             if name == "libx264" {
                 opts.set("preset", "veryfast");
                 opts.set("tune", "zerolatency");
+            }
+            if name == "prores_ks" {
+                opts.set("profile", "4");
+                opts.set("alpha_bits", "16");
             }
             if name.ends_with("_videotoolbox") {
                 opts.set("realtime", "1");

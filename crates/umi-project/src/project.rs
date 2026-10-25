@@ -23,6 +23,17 @@ pub const SCREEN_FILE: &str = "screen.mov";
 pub const CAMERA_FILE: &str = "camera.mov";
 pub const CURSOR_FILE: &str = "cursor.json";
 pub const SHARE_FILE: &str = "share.json";
+/// Where the face is in the camera over time (made on request, for keeping it framed).
+pub const FACE_FILE: &str = "camera-face.json";
+
+/// The face's center (normalized to the camera frame, top-left origin) and height.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct FaceKey {
+    pub t: f64,
+    pub x: f64,
+    pub y: f64,
+    pub size: f64,
+}
 pub const BUNDLE_EXTENSION: &str = "umi";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -209,6 +220,11 @@ impl Bundle {
 
     pub fn write_cursor(&self, data: &CursorData) -> Result<(), ProjectError> {
         write_json(&self.file(CURSOR_FILE), data)
+    }
+
+    /// The camera's face path, if it was analyzed.
+    pub fn read_face_track(&self) -> Vec<FaceKey> {
+        read_json(&self.file(FACE_FILE)).unwrap_or_default()
     }
 }
 

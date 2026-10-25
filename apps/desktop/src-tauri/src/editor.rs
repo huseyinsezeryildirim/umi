@@ -52,6 +52,8 @@ pub enum Op {
     RemovePauses { min: f64 },
     /// Plays long typing faster.
     SpeedUpTyping { speed: f64 },
+    /// Hides the camera while nobody speaks for `min` seconds or more.
+    HideCameraInSilence { min: f64 },
     BeginGesture,
     EndGesture,
     Undo,
@@ -92,6 +94,8 @@ enum Job {
     Frame { time: f64, width: u32, height: u32, flat: bool, edit: Option<Box<EditSettings>>, reply: Sender<Result<Vec<u8>, String>> },
     /// Where the screen content sits on the canvas at an output time (normalized, top-left).
     Layout { time: f64, edit: Option<Box<EditSettings>>, reply: Sender<[f64; 4]> },
+    /// Reopen the composer (new files in the bundle).
+    Refresh,
 }
 
 pub struct EditorSession {
@@ -245,6 +249,15 @@ impl EditorSession {
                 let ranges = umi_project::captions::long_pauses(&doc.edit.captions.words, min.max(0.3), 0.3);
                 doc.cut_source_ranges(&ranges);
             }
+            Op::HideCameraInSilence { min } => {
+                let screen = Bundle::new(&self.bundle).screen();
+                let tracks = umi_media::audio_streams(&screen).map(|t| t.len()).unwrap_or(0);
+                let track = doc.project.audio.microphone_track.map(|t| t as usize).filter(|t| *t < tracks).unwrap_or(0);
+                if let Ok(levels) = umi_media::waveform(&screen, track, 50) {
+                    let quiet = umi_project::captions::silences(&levels, 50.0, min.max(1.5));
+                    doc.hide_camera_in_silences(&quiet);
+                }
+            }
             Op::SpeedUpTyping { speed } => {
                 doc.speed_up_typing(speed.clamp(1.5, 8.0));
             }
@@ -390,6 +403,12 @@ impl EditorSession {
         umi_project::captions::subtitles(&doc, if vtt { umi_project::captions::SubtitleFormat::Vtt } else { umi_project::captions::SubtitleFormat::Srt })
     }
 
+    /// New files appeared in the bundle (camera effects): reopen sources on the next frame.
+    pub fn refresh_sources(&self) {
+        let _ = self.jobs.send(Job::Refresh);
+        *self.rendered_edit.lock() = None;
+    }
+
     fn edit_change(&self) -> Option<Box<EditSettings>> {
         let edit = self.doc.lock().edit.clone();
         let mut seen = self.rendered_edit.lock();
@@ -511,6 +530,12 @@ fn merge(old: Job, new: Job) -> Job {
 }
 
 fn handle_layout(composer: &mut Composer, job: Job) {
+    if let Job::Refresh = job {
+        if let Ok(fresh) = Composer::open(composer.renderer.gpu().clone(), &composer.bundle.clone(), composer.renderer.edit().clone(), true) {
+            *composer = fresh;
+        }
+        return;
+    }
     if let Job::Layout { time, edit, reply } = job {
         if let Some(edit) = edit {
             composer.set_edit(*edit);

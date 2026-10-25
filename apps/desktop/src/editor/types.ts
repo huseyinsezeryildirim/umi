@@ -145,7 +145,16 @@ export interface EditSettings {
   shadow: number;
   border: number;
   cursor: { visible: boolean; size: number; smoothing: Smoothing; clickRings: boolean; style: "arrow" | "dot"; motionBlur: boolean; hideWhenIdle: boolean };
-  camera: { visible: boolean; shape: CameraShape; size: number; position: Point; mirrored: boolean };
+  camera: {
+    visible: boolean;
+    shape: CameraShape;
+    size: number;
+    position: Point;
+    mirrored: boolean;
+    background?: "original" | "blur" | "remove";
+    followFace?: boolean;
+    avoidCursor?: boolean;
+  };
   zoom: {
     auto: boolean;
     scale: number;

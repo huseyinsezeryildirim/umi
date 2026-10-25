@@ -196,6 +196,28 @@ impl VideoDecoder {
                 strides: vec![y_stride as u32, uv_stride as u32],
             });
         }
+        // With transparency (cut-out camera): premultiplied RGBA.
+        if has_alpha(frame.format()) {
+            let needs_new = self.scaler.as_ref().is_none_or(|(_, f, sw, sh)| *f != frame.format() || *sw != w || *sh != h);
+            if needs_new {
+                let ctx = ff::software::scaling::Context::get(frame.format(), w, h, Pixel::RGBA, w, h, ff::software::scaling::Flags::BILINEAR)?;
+                self.scaler = Some((ctx, frame.format(), w, h));
+            }
+            let mut out = ff::frame::Video::empty();
+            if let Some((scaler, ..)) = &mut self.scaler {
+                scaler.run(frame, &mut out)?;
+            }
+            let stride = out.stride(0);
+            let mut rgba = Vec::with_capacity(w as usize * h as usize * 4);
+            for row in 0..h as usize {
+                let line = &out.data(0)[row * stride..row * stride + w as usize * 4];
+                for px in line.chunks_exact(4) {
+                    let a = px[3] as u32;
+                    rgba.extend([(px[0] as u32 * a / 255) as u8, (px[1] as u32 * a / 255) as u8, (px[2] as u32 * a / 255) as u8, px[3]]);
+                }
+            }
+            return Ok(DecodedFrame { pts, width: w, height: h, format: FrameFormat::Rgba, color, planes: vec![rgba], strides: vec![w * 4] });
+        }
         // Anything else (P010, YUV420P, 4:4:4…): convert on the CPU to NV12.
         let needs_new = self.scaler.as_ref().is_none_or(|(_, f, sw, sh)| *f != frame.format() || *sw != w || *sh != h);
         if needs_new {
@@ -217,6 +239,13 @@ impl VideoDecoder {
             strides: vec![y_stride as u32, uv_stride as u32],
         })
     }
+}
+
+fn has_alpha(format: Pixel) -> bool {
+    matches!(
+        format,
+        Pixel::YUVA420P | Pixel::YUVA422P | Pixel::YUVA444P | Pixel::YUVA444P10LE | Pixel::YUVA444P12LE | Pixel::YUVA422P10LE | Pixel::RGBA | Pixel::BGRA | Pixel::ARGB | Pixel::ABGR
+    )
 }
 
 /// Filmstrip pictures: for each time, the keyframe at or before it (one frame decode each,
