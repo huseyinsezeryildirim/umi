@@ -74,7 +74,7 @@ export function page(o: PageOptions): Response {
     ? `<main class="embed">${o.body}</main>`
     : `<header class="top"><a class="brand" href="https://umi.cam" rel="noopener">${LOGO}<span>Umi</span></a></header>
 <main>${o.body}</main>
-<footer class="foot">Recorded with <a href="https://umi.cam" rel="noopener">Umi</a> — the free screen recorder for Mac</footer>`;
+<footer class="foot">Recorded with <a href="https://umi.cam" rel="noopener">Umi</a> — the free screen recorder · <a href="https://umi.cam/terms" rel="noopener">Terms</a> · <a href="https://umi.cam/copyright" rel="noopener">Copyright</a></footer>`;
 
   const html = `<!doctype html>
 <html lang="en">
