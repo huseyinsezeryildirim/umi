@@ -1,6 +1,8 @@
 # Umi architecture (v2: cross-platform)
 
 Umi moves from a macOS-only Swift app to one codebase for **macOS, Windows, Linux and Chrome**.
+> The Swift app was retired on 2026-10-25 once the new app reached parity; its code stays in git history.
+
 The Swift app (`Umi/`) is the feature spec and the visual reference until the new app matches it
 feature for feature; then it is removed. Nothing ships with fewer features than today.
 

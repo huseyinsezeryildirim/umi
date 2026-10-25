@@ -48,6 +48,10 @@ pub fn show(app: &AppHandle, spec: &Spec, at: Option<(f64, f64)>) -> tauri::Resu
     if let Some(w) = app.get_webview_window(spec.view) {
         w.set_position(LogicalPosition::new(place.0, place.1))?;
         w.show()?;
+        // The bubble turned its camera off when hidden; it starts it again.
+        if spec.view == "bubble" {
+            let _ = w.emit("bubble:shown", ());
+        }
         if spec.focus {
             w.set_focus()?;
         }
@@ -82,6 +86,10 @@ pub fn show_launcher(app: &AppHandle, at: Option<(f64, f64)>) -> tauri::Result<W
 pub fn hide(app: &AppHandle, view: &str) {
     if let Some(w) = app.get_webview_window(view) {
         let _ = w.hide();
+    }
+    // No camera light for a bubble nobody sees.
+    if view == "bubble" {
+        crate::recording::stop_preview(app);
     }
 }
 

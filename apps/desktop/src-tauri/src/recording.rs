@@ -222,6 +222,11 @@ pub async fn record_camera_preview(app: AppHandle, camera: Option<String>, frame
     .map_err(|e| e.to_string())?
 }
 
+/// Turns the bubble's camera off (the bubble was hidden); a recording's camera keeps going.
+pub fn stop_preview(app: &AppHandle) {
+    *app.state::<AppState>().recorder.preview.lock() = None;
+}
+
 fn options(settings: &RecordSettings) -> Result<umi_recorder::Options, String> {
     let target = match &settings.target {
         Some(t) => t.clone(),
