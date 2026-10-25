@@ -41,6 +41,10 @@ umi-cloud = { path = "../../../crates/umi-cloud" }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 arboard = { version = "3", default-features = false, features = ["image-data"] }
 
+[target.'cfg(windows)'.dependencies]
+# Keeping Umi's own floating windows out of screen recordings (SetWindowDisplayAffinity).
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
 
