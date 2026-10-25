@@ -17,3 +17,7 @@ VALUES ('acc_demo', 'demo@umi.local', '1fb7d733310422623836ea927edf529e46ff2fa2f
 
 -- Plans (migration 0007): the paid seeds get Team so the workspace tests can run.
 UPDATE accounts SET plan = 'team' WHERE id IN ('acc_dev', 'acc_team');
+
+-- Local-only quick sign-in for the owner: name "sezer", password "admin" (works only with DEV_TOOLS=1).
+INSERT OR REPLACE INTO accounts (id, email, token_hash, password_hash, is_paid, email_verified, plan, created_at)
+VALUES ('acc_sezer', 'sezer', '8513aee0484947c45e4b5865fbd20cff8a4ea1e812f0339307e5353e5a81d35e', 'pbkdf2-sha256$100000$CgRNKRUGCrmEu7nB_ObOlQ$nHP4uNBzg5c0AxWW_DqfWcUa_Sa7YsRzOO3tU_3s3oo', 1, 1, 'team', 0);

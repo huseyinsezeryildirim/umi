@@ -51,9 +51,11 @@ async function newSession(env: AppEnv, accountId: string): Promise<string> {
   return token;
 }
 
-function credentials(body: { email?: unknown; password?: unknown }): { email: string; password: string } {
+function credentials(body: { email?: unknown; password?: unknown }, devName = false): { email: string; password: string } {
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body.password === "string" ? body.password : "";
+  // Local development (DEV_TOOLS=1) also signs in seeded accounts by a short name, like "sezer".
+  if (devName && /^[a-z0-9_.-]{2,32}$/.test(email)) return { email, password };
   if (!EMAIL.test(email) || email.length > 254) throw new HttpError(400, "invalid_email", "Enter a valid email address.");
   return { email, password };
 }
@@ -164,7 +166,7 @@ export async function handleAuth(request: Request, env: AppEnv, path: string): P
     return json({ token: await newSession(env, id), account: publicAccount({ id, email, is_paid: 0, email_verified: 0, plan: "free" }) }, 201);
   }
   if (path === "/api/auth/login" && method === "POST") {
-    const { email, password } = credentials(await readJson(request));
+    const { email, password } = credentials(await readJson(request), String(env.DEV_TOOLS ?? "") === "1");
     const ip = request.headers.get("cf-connecting-ip") ?? "local";
     await checkLimit(env, [
       [`email:${email}`, MAX_PER_EMAIL],
