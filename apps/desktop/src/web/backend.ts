@@ -133,9 +133,9 @@ export async function addRecording(r: StoredRecording, files: Record<string, Blo
 }
 
 async function openEditor(id: string) {
-  // The editor draws with the GPU (the same renderer as the Mac app).
-  if (!("gpu" in navigator) || !(await (navigator as Navigator & { gpu: { requestAdapter(): Promise<unknown> } }).gpu.requestAdapter().catch(() => null)))
-    throw new Error("The editor needs WebGPU: open Umi in Chrome, Edge or Safari 26 or later.");
+  // The editor draws with the GPU (the same renderer as the Mac app): WebGPU, or WebGL2.
+  if (!("gpu" in navigator) && !new OffscreenCanvas(1, 1).getContext("webgl2"))
+    throw new Error("This browser can't draw the editor (no WebGPU or WebGL2). Try an up-to-date Chrome, Edge, Firefox or Safari.");
   const open = sessions.get(id);
   if (open) return open.state();
   const r = await getRecording(id);
