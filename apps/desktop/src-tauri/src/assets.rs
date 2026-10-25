@@ -39,7 +39,8 @@ fn wallpaper_files() -> Vec<PathBuf> {
     while let Some(dir) = stack.pop() {
         for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
             let path = entry.path();
-            let hidden = path.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.'));
+            // Plain colors are already offered as Color backgrounds.
+            let hidden = path.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.') || n == "Solid Colors");
             if path.is_dir() && !hidden && out.len() < 200 {
                 stack.push(path);
             } else if path
@@ -200,6 +201,7 @@ mod tests {
     fn lists_and_decodes_mac_wallpapers() {
         let files = wallpaper_files();
         assert!(files.len() > 5, "{files:?}");
+        assert!(!files.iter().any(|p| p.to_string_lossy().contains("Solid Colors")));
         let heic = files.iter().find(|p| p.extension().is_some_and(|e| e == "heic")).unwrap();
         assert!(thumbnail(heic).unwrap().starts_with("data:image/jpeg"));
         // The full-size wallpaper decodes for rendering.

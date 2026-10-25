@@ -15,3 +15,6 @@ dist/
 *.tsbuildinfo
 apps/desktop/src-tauri/gen/
 apps/desktop/dist/
+
+# Local API keys baked into builds (never committed)
+/keys.env

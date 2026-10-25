@@ -572,6 +572,126 @@
     var(--umi-shadow-md);
 }
 
+/* ───── Color picker ───── */
+
+.umi-color {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.umi-color__chip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 36px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: var(--umi-radius-md);
+  background: var(--umi-ice-top);
+  box-shadow: inset 0 0 0 1px var(--umi-hairline);
+  color: var(--umi-ink);
+  font: inherit;
+  font-size: var(--umi-text-md);
+  cursor: pointer;
+  transition: box-shadow var(--umi-normal) var(--umi-ease);
+}
+.umi-color__chip i {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  box-shadow: inset 0 0 0 1px rgba(14, 17, 30, 0.12);
+}
+.umi-color__chip span {
+  flex: 1;
+  text-align: left;
+}
+.umi-color__chip code {
+  font-family: var(--umi-font-mono, ui-monospace, monospace);
+  font-size: var(--umi-text-sm);
+  color: var(--umi-text);
+}
+.umi-color__chip[data-selected="true"] {
+  box-shadow:
+    inset 0 0 0 1px var(--umi-hairline),
+    0 0 0 2px var(--umi-accent);
+}
+.umi-color__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--umi-radius-md);
+  background: var(--umi-surface, #fff);
+  box-shadow:
+    inset 0 0 0 1px var(--umi-hairline),
+    var(--umi-shadow-md);
+  animation: umi-color-in var(--umi-normal) var(--umi-ease);
+}
+@keyframes umi-color-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.umi-color__area {
+  position: relative;
+  height: 130px;
+  border-radius: 8px;
+  background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent);
+  cursor: crosshair;
+  touch-action: none;
+}
+.umi-color__hue {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+  cursor: pointer;
+  touch-action: none;
+}
+.umi-color__knob {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2.5px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.umi-color__area .umi-color__knob {
+  top: 0;
+}
+.umi-color__hex {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--umi-text-sm);
+  color: var(--umi-text);
+}
+.umi-color__hex input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--umi-ice-top);
+  box-shadow: inset 0 0 0 1px var(--umi-hairline);
+  color: var(--umi-ink);
+  font-family: var(--umi-font-mono, ui-monospace, monospace);
+  font-size: var(--umi-text-md);
+  text-transform: uppercase;
+  outline: 0;
+}
+.umi-color__hex input:focus {
+  box-shadow: 0 0 0 2px var(--umi-accent);
+}
+.umi-color__hex input[aria-invalid="true"] {
+  box-shadow: 0 0 0 2px #f0443a;
+}
+
 /* ───── Spinner, progress ───── */
 
 .umi-spinner {

@@ -3,6 +3,7 @@ export { Button, IconButton } from "./components/Button";
 export type { ButtonProps, ButtonSize, ButtonVariant, IconButtonProps } from "./components/Button";
 export { Badge, Kbd, Progress, Section, Segmented, Slider, SliderField, Spinner, Swatch, Switch, SwitchRow, Tabs, TextField } from "./components/Controls";
 export type { SegmentOption, SliderProps } from "./components/Controls";
+export { ColorPicker, hexToHsv, hsvToHex, parseHex } from "./components/ColorPicker";
 export { Menu } from "./components/Menu";
 export type { MenuEntry } from "./components/Menu";
 export { Dialog, Toaster, toast } from "./components/Overlays";
