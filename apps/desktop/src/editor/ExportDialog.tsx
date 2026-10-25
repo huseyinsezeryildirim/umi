@@ -103,7 +103,7 @@ export function ExportDialog(props: { editor: Editor; open: boolean; onClose: ()
               <div class="ed-export__error">Couldn't export: {(phase() as { message: string }).message}</div>
             </Show>
             <div class="ed-export__actions">
-              <Button onClick={close}>Cancel</Button>
+              <Button variant="ghost" onClick={close}>Cancel</Button>
               <Button variant="ink" onClick={() => void run()} disabled={!destination()}>
                 Export
               </Button>
@@ -114,7 +114,7 @@ export function ExportDialog(props: { editor: Editor; open: boolean; onClose: ()
             <Progress value={(phase() as { progress: number }).progress} />
             <div class="ed-export__actions">
               <span class="umi-tabular ed-export__pct">{Math.round((phase() as { progress: number }).progress * 100)}%</span>
-              <Button onClick={() => void invoke("editor_export_cancel", { id: ed.state().id })}>Cancel</Button>
+              <Button variant="ghost" onClick={() => void invoke("editor_export_cancel", { id: ed.state().id })}>Cancel</Button>
             </div>
           </Match>
           <Match when={phase().kind === "done"}>

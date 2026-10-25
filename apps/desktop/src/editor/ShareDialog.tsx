@@ -144,7 +144,7 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
             <div class="umi-field-label">Access token</div>
             <TextField value={token()} placeholder="From your Umi Cloud account page" onInput={(e) => setToken(e.currentTarget.value)} type="password" />
             <div class="ed-export__actions">
-              <Button onClick={props.onClose}>Cancel</Button>
+              <Button variant="ghost" onClick={props.onClose}>Cancel</Button>
               <Button variant="ink" disabled={!token().trim()} onClick={() => void connect()}>
                 Connect
               </Button>
@@ -169,7 +169,7 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
               Uploads this video and copies a link anyone can watch in their browser, no account needed.
             </div>
             <div class="ed-export__actions">
-              <Button onClick={props.onClose}>Cancel</Button>
+              <Button variant="ghost" onClick={props.onClose}>Cancel</Button>
               <Button variant="ink" onClick={() => void start()}>
                 <Link2 size={15} /> Create link
               </Button>
@@ -234,7 +234,7 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
                     <Lock size={14} /> Set
                   </Button>
                   <Show when={v().hasPassword}>
-                    <Button onClick={() => void update({ password: "" })}>Remove</Button>
+                    <Button variant="ghost" onClick={() => void update({ password: "" })}>Remove</Button>
                   </Show>
                 </div>
                 <div class="umi-field-label">Embed</div>
@@ -259,7 +259,7 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
                   <Button onClick={() => void openUrl(v().url)}>
                     <ExternalLink size={14} /> Open
                   </Button>
-                  <Button variant="ink" onClick={props.onClose}>
+                  <Button variant="ghost" onClick={props.onClose}>
                     Done
                   </Button>
                 </div>

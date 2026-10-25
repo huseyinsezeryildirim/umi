@@ -70,7 +70,7 @@ export function PresetsMenu(props: { editor: Editor }) {
         >
           <TextField value={name()} placeholder="Name, e.g. Product demos" autofocus onInput={(e) => setName(e.currentTarget.value)} />
           <div class="ed-export__actions">
-            <Button type="button" onClick={() => setSaving(false)}>
+            <Button type="button" variant="ghost" onClick={() => setSaving(false)}>
               Cancel
             </Button>
             <Button variant="ink" type="submit" disabled={!name().trim()}>

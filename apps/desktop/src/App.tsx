@@ -2,7 +2,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Button, Dialog, IconButton, Menu, Progress, Segmented, Spinner, toast } from "@umi/ui";
-import { Circle, CircleHelp, Combine, Download, Film, FolderOpen, MoreHorizontal, Trash2, Upload } from "lucide-solid";
+import { ChevronDown, Circle, CircleHelp, Combine, Download, Film, FolderOpen, MoreHorizontal, Trash2, Upload } from "lucide-solid";
 import { Editor } from "./editor/Editor";
 import { installRecordingFlow } from "./recorder/flow";
 import { ShortcutsDialog } from "./ShortcutsDialog";
@@ -113,18 +113,24 @@ function Library(props: { recordings: RecordingSummary[]; loading: boolean; open
           />
         </div>
         <div class="lib__actions">
-          <Button size="sm" variant="ink" onClick={() => void invoke("window_show", { view: "launcher" })}>
-            <Circle size={10} fill="#ff4d4d" stroke="none" /> New recording
-          </Button>
-          <Button size="sm" onClick={() => void importFiles()}>
-            <Upload size={14} /> Import video
-          </Button>
-          <Button size="sm" onClick={() => setLoom(true)}>
-            <Download size={14} /> Import from Loom
-          </Button>
           <IconButton label="Show the tour" size="sm" onClick={props.onTour}>
             <CircleHelp size={16} />
           </IconButton>
+          <Menu
+            align="end"
+            trigger={(open) => (
+              <Button size="sm" onClick={open}>
+                <Upload size={14} /> Import <ChevronDown size={13} />
+              </Button>
+            )}
+            entries={[
+              { label: "Video files…", icon: <Film size={15} />, onSelect: () => void importFiles() },
+              { label: "From Loom…", icon: <Download size={15} />, onSelect: () => setLoom(true) },
+            ]}
+          />
+          <Button size="sm" variant="ink" onClick={() => void invoke("window_show", { view: "launcher" })}>
+            <Circle size={9} fill="#ff4d4d" stroke="none" /> New recording
+          </Button>
         </div>
       </header>
       <LoomImport open={loom()} onClose={() => setLoom(false)} onDone={props.onChanged} />
@@ -138,7 +144,7 @@ function Library(props: { recordings: RecordingSummary[]; loading: boolean; open
               <Button size="sm" variant="ink" disabled={picked().length < 2} onClick={() => void combine()}>
                 <Combine size={14} /> Combine into one video
               </Button>
-              <Button size="sm" onClick={() => setPicked([])}>
+              <Button size="sm" variant="ghost" onClick={() => setPicked([])}>
                 Clear
               </Button>
             </>
@@ -247,7 +253,7 @@ function RecordingCard(props: { recording: RecordingSummary; index: number; open
           “{props.recording.name}” goes to the Trash with its edits. You can put it back from there.
         </p>
         <div style={{ display: "flex", gap: "8px", "justify-content": "flex-end", "margin-top": "16px" }}>
-          <Button onClick={() => setConfirm(false)}>Cancel</Button>
+          <Button variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button>
           <Button
             variant="ink"
             onClick={() => {
@@ -314,7 +320,7 @@ function LoomImport(props: { open: boolean; onClose: () => void; onDone: () => v
         )}
       </Show>
       <div style={{ display: "flex", gap: "8px", "justify-content": "flex-end", "margin-top": "14px" }}>
-        <Button onClick={props.onClose} disabled={!!progress()}>
+        <Button variant="ghost" onClick={props.onClose} disabled={!!progress()}>
           Cancel
         </Button>
         <Button variant="ink" onClick={() => void run()} disabled={!!progress() || !links().trim()}>

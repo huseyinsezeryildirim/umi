@@ -81,7 +81,7 @@ export function VoiceoverDialog(props: { editor: Editor }) {
         </Show>
         <div class="ed-export__actions">
           <span class="ed-export__pct umi-section__hint">{text().trim() ? `${text().trim().split(/\s+/).length} words · about ${Math.max(1, Math.round(text().trim().split(/\s+/).length / 2.6 / speed()))} s` : ""}</span>
-          <Button onClick={() => ed.closeVoiceover()} disabled={!!job()}>
+          <Button variant="ghost" onClick={() => ed.closeVoiceover()} disabled={!!job()}>
             Cancel
           </Button>
           <Button variant="ink" onClick={() => void generate()} disabled={!text().trim() || !!job()}>

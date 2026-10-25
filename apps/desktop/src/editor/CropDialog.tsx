@@ -137,8 +137,8 @@ export function CropDialog(props: { editor: Editor; open: boolean; onClose: () =
         <span class="umi-tabular ed-export__pct">
           {px().w} × {px().h}
         </span>
-        <Button onClick={() => setRect([[0, 0], [1, 1]])}>Reset</Button>
-        <Button onClick={props.onClose}>Cancel</Button>
+        <Button variant="ghost" onClick={() => setRect([[0, 0], [1, 1]])}>Reset</Button>
+        <Button variant="ghost" onClick={props.onClose}>Cancel</Button>
         <Button variant="ink" onClick={apply}>
           Crop
         </Button>
