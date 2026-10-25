@@ -205,6 +205,12 @@ html.lenis body {
   }
 }
 
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+
 @property --angle {
   syntax: "<angle>";
   inherits: false;

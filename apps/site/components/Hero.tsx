@@ -7,6 +7,52 @@ import { BrowserIcon, LinuxIcon, LoomIcon, WindowsIcon } from "./icons";
 
 const EASE = [0.25, 1, 0.5, 1] as const;
 
+const LINES = ["that look edited.", "with captions built in.", "that zoom on their own.", "that sound like a studio.", "that cost nothing."];
+
+/** The second line of the headline rewrites itself: erase back to the caret, type the next one. */
+function Typed() {
+  const [text, setText] = useState(LINES[0]);
+  useEffect(() => {
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let line = 0;
+    let timer = 0;
+    const wait = (ms: number) => new Promise<void>((r) => (timer = window.setTimeout(r, ms)));
+    let alive = true;
+    (async () => {
+      while (alive) {
+        await wait(2800);
+        const next = LINES[(line + 1) % LINES.length];
+        if (still) {
+          line = (line + 1) % LINES.length;
+          setText(next);
+          continue;
+        }
+        for (let n = LINES[line].length; n >= 0 && alive; n--) {
+          setText(LINES[line].slice(0, n));
+          await wait(28);
+        }
+        await wait(250);
+        line = (line + 1) % LINES.length;
+        for (let n = 1; n <= next.length && alive; n++) {
+          setText(next.slice(0, n));
+          await wait(55);
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, []);
+  return (
+    <span className="whitespace-nowrap" aria-live="off">
+      {text}
+      <span aria-hidden className="ml-[0.04em] inline-block h-[0.86em] w-[0.06em] translate-y-[0.1em] animate-[caret_1s_steps(1)_infinite] rounded-full bg-accent" />
+      {!text && "\u200b"}
+    </span>
+  );
+}
+
 export function Hero() {
   const stage = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: stage, offset: ["start end", "center center"] });
@@ -17,14 +63,14 @@ export function Hero() {
   return (
     <section id="top" className="px-4 pt-36 text-center sm:pt-44">
       <motion.h1
-        className="h-display mx-auto max-w-4xl text-[clamp(44px,7.6vw,84px)]"
+        className="h-display mx-auto max-w-4xl text-[clamp(30px,min(11vw,calc((100vw-32px)/10)),84px)]"
         initial={{ opacity: 0, y: 24, filter: "blur(10px)" }}
         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
         transition={{ duration: 1.2, ease: EASE }}
       >
         Screen recordings
         <br />
-        that look edited.
+        <Typed />
       </motion.h1>
       <motion.p className="lead mx-auto mt-6 max-w-md" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: EASE, delay: 0.2 }}>
         Record. Umi does the zooms, captions and sound. Free forever.
