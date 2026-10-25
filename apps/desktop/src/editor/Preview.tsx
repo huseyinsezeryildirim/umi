@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from "solid-js";
 import { createAudioPlayer } from "./audio";
-import { MaskHandles } from "./Handles";
+import { CameraHandle, MaskHandles, OverlayHandle, TextHandle, ZoomFocusHandle } from "./Handles";
 import type { Editor } from "./store";
 
 /**
@@ -22,7 +22,11 @@ export function Preview(props: { editor: Editor }) {
     const s = ed.selection();
     return s?.kind === "mask" ? ed.state().edit.masks.find((m) => m.id === s.id) : undefined;
   };
-  const flat = () => !ed.playing() && !!selectedMask();
+  const selectedOf = (kind: string) => {
+    const s = ed.selection();
+    return s && s.kind === kind && "id" in s ? String(s.id) : null;
+  };
+  const flat = () => !ed.playing() && (!!selectedMask() || !!selectedOf("zoom"));
 
   const request = (t: number) => {
     wanted = t;
@@ -121,6 +125,14 @@ export function Preview(props: { editor: Editor }) {
     <div ref={stage} class="ed-stage">
       <canvas ref={canvas} class="ed-canvas" style={{ width: `${fittedBox().width}px`, height: `${fittedBox().height}px` }} />
       <Show when={flat() && selectedMask()}>{(m) => <MaskHandles editor={ed} mask={m()} frame={fittedBox()} />}</Show>
+      <Show when={!ed.playing()}>
+        <Show when={selectedOf("zoom")}>{(id) => <ZoomFocusHandle editor={ed} id={id()} frame={fittedBox()} />}</Show>
+        <Show when={selectedOf("text")}>{(id) => <TextHandle editor={ed} id={id()} frame={fittedBox()} />}</Show>
+        <Show when={selectedOf("overlay")}>{(id) => <OverlayHandle editor={ed} id={id()} frame={fittedBox()} />}</Show>
+        <Show when={!ed.selection() && ed.state().recording.hasCamera && ed.state().edit.camera.visible}>
+          <CameraHandle editor={ed} frame={fittedBox()} />
+        </Show>
+      </Show>
     </div>
   );
 }
