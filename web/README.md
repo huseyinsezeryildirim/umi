@@ -47,7 +47,10 @@ The e2e script prints a viewer URL; open it in a browser to watch the uploaded v
 Seeded tokens (local only): `umi_dev_token` (paid account), `umi_free_token` (unpaid → `402`).
 Local R2/D1 state lives in `.wrangler/state`; delete it to start over.
 
-## Deploy (not done yet)
+## Deploy
+
+CI deploys staging and production (`.github/workflows/deploy-cloud.yml`); the one-time setup is in
+[docs/DEVOPS.md](../docs/DEVOPS.md). By hand:
 
 ```bash
 npx wrangler login
