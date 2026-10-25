@@ -109,3 +109,240 @@ export function MaskHandles(props: { editor: Editor; mask: PrivacyMask; frame: {
     </Show>
   );
 }
+
+type Box = { left: number; top: number; width: number; height: number };
+
+/**
+ * A box over the preview in canvas units (0…1, top-left origin) that drags to move and,
+ * when `onResize` is given, resizes from its corners (keeping its aspect).
+ */
+function CanvasBox(props: {
+  editor: Editor;
+  frame: Box;
+  /** Box in canvas units. */
+  box: Box;
+  round?: boolean;
+  /** No dimming around it; the outline shows on hover (always-available handles). */
+  soft?: boolean;
+  label?: string;
+  onMove: (dx: number, dy: number) => void;
+  onResize?: (scale: number) => void;
+}) {
+  const ed = props.editor;
+  const px = () => ({
+    left: props.frame.left + props.box.left * props.frame.width,
+    top: props.frame.top + props.box.top * props.frame.height,
+    width: props.box.width * props.frame.width,
+    height: props.box.height * props.frame.height,
+  });
+  const drag = (corner: Corner, e: PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const ox = e.clientX;
+    const oy = e.clientY;
+    const start = px();
+    let last = { x: 0, y: 0, k: 1 };
+    void ed.gestureStart();
+    const move = (m: PointerEvent) => {
+      const dx = (m.clientX - ox) / props.frame.width;
+      const dy = (m.clientY - oy) / props.frame.height;
+      if (corner === "move") {
+        props.onMove(dx - last.x, dy - last.y);
+        last = { ...last, x: dx, y: dy };
+      } else if (props.onResize) {
+        // Grow from the center by how far the corner moved outward.
+        const sx = corner.includes("e") ? 1 : -1;
+        const sy = corner.includes("s") ? 1 : -1;
+        const grow = ((m.clientX - ox) * sx + (m.clientY - oy) * sy) / 2;
+        const k = Math.max(0.2, (start.width + 2 * grow) / start.width);
+        props.onResize(k / last.k);
+        last = { ...last, k };
+      }
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      void ed.gestureEnd();
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  return (
+    <div
+      class="ed-handle-box"
+      data-round={props.round ? "true" : "false"}
+      data-soft={props.soft ? "true" : "false"}
+      style={{ left: `${px().left}px`, top: `${px().top}px`, width: `${px().width}px`, height: `${px().height}px` }}
+      onPointerDown={(e) => drag("move", e)}
+    >
+      <Show when={props.onResize}>
+        <For each={["nw", "ne", "sw", "se"] as Corner[]}>{(corner) => <div class={`ed-handle ed-handle--${corner}`} onPointerDown={(e) => drag(corner, e)} />}</For>
+      </Show>
+      <Show when={props.label}>
+        <span class="ed-handle-badge">{props.label}</span>
+      </Show>
+    </div>
+  );
+}
+
+const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
+
+/** Drag the selected text to place it. */
+export function TextHandle(props: { editor: Editor; id: string; frame: Box }) {
+  const ed = props.editor;
+  const text = () => ed.state().edit.texts.find((t) => t.id === props.id);
+  const box = () => {
+    const t = text()!;
+    const w = t.style === "lowerThird" ? 0.34 : t.style === "kicker" ? 0.22 : 0.42;
+    const h = t.style === "bigStat" || t.style === "quote" ? 0.2 : 0.1;
+    return { left: t.position[0] - w / 2, top: t.position[1] - h / 2, width: w, height: h };
+  };
+  return (
+    <Show when={text()}>
+      <CanvasBox
+        editor={ed}
+        frame={props.frame}
+        box={box()}
+        label="Drag to move"
+        onMove={(dx, dy) =>
+          void ed.update((e) => {
+            const t = e.texts.find((x) => x.id === props.id);
+            if (t) t.position = [clamp01(t.position[0] + dx), clamp01(t.position[1] + dy)];
+          })
+        }
+      />
+    </Show>
+  );
+}
+
+/** Drag the camera bubble; corners resize it. */
+export function CameraHandle(props: { editor: Editor; frame: Box }) {
+  const ed = props.editor;
+  const cam = () => ed.state().edit.camera;
+  const box = () => {
+    const short = Math.min(props.frame.width, props.frame.height);
+    const w = (cam().size * short) / props.frame.width;
+    const h = (cam().size * short) / props.frame.height;
+    return { left: cam().position[0] - w / 2, top: cam().position[1] - h / 2, width: w, height: h };
+  };
+  return (
+    <CanvasBox
+      editor={ed}
+      frame={props.frame}
+      box={box()}
+      soft
+      round={cam().shape === "circle"}
+      onMove={(dx, dy) => void ed.update((e) => (e.camera.position = [clamp01(e.camera.position[0] + dx), clamp01(e.camera.position[1] + dy)]))}
+      onResize={(k) => void ed.update((e) => (e.camera.size = Math.min(Math.max(e.camera.size * k, 0.1), 0.6)))}
+    />
+  );
+}
+
+/** Drag a picture-in-picture image or video; corners resize it. */
+export function OverlayHandle(props: { editor: Editor; id: string; frame: Box }) {
+  const ed = props.editor;
+  const overlay = () => ed.state().edit.overlays.find((o) => o.id === props.id);
+  const box = () => {
+    const o = overlay()!;
+    const aspect = o.lane === 2 ? ed.state().recording.width / Math.max(ed.state().recording.height, 1) : 16 / 9;
+    const w = o.width;
+    const h = (w * props.frame.width) / aspect / props.frame.height;
+    return { left: o.center[0] - w / 2, top: o.center[1] - h / 2, width: w, height: h };
+  };
+  return (
+    <Show when={overlay()?.mode === "pictureInPicture"}>
+      <CanvasBox
+        editor={ed}
+        frame={props.frame}
+        box={box()}
+        onMove={(dx, dy) =>
+          void ed.update((e) => {
+            const o = e.overlays.find((x) => x.id === props.id);
+            if (o) o.center = [clamp01(o.center[0] + dx), clamp01(o.center[1] + dy)];
+          })
+        }
+        onResize={(k) =>
+          void ed.update((e) => {
+            const o = e.overlays.find((x) => x.id === props.id);
+            if (o) o.width = Math.min(Math.max(o.width * k, 0.1), 0.95);
+          })
+        }
+      />
+    </Show>
+  );
+}
+
+/**
+ * The selected zoom's focus: click anywhere on the screen to pin the zoom there, drag the
+ * marker to move it. Without a focus the zoom follows the cursor.
+ */
+export function ZoomFocusHandle(props: { editor: Editor; id: string; frame: Box }) {
+  const ed = props.editor;
+  const [content, setContent] = createSignal<[number, number, number, number] | null>(null);
+  createEffect(
+    on([ed.time, () => ed.state().edit], () => {
+      void invoke<[number, number, number, number]>("editor_layout", { id: ed.state().id, time: ed.time() }).then(setContent, () => {});
+    }),
+  );
+  const zoom = () => ed.state().zoomSegments.find((z) => z.id === props.id);
+  const crop = (): Rect => ed.state().edit.crop ?? [[0, 0], [1, 1]];
+
+  /** Stage px → screen-normalized point (clamped). */
+  const toScreen = (clientX: number, clientY: number, stage: DOMRect): [number, number] | null => {
+    const c = content();
+    if (!c) return null;
+    const [[cx, cy], [cw, ch]] = crop();
+    const fx = (clientX - stage.left - props.frame.left) / props.frame.width;
+    const fy = (clientY - stage.top - props.frame.top) / props.frame.height;
+    return [clamp01(cx + ((fx - c[0]) / c[2]) * cw), clamp01(cy + ((fy - c[1]) / c[3]) * ch)];
+  };
+  const marker = () => {
+    const c = content();
+    const f = zoom()?.focus;
+    if (!c || !f) return null;
+    const [[cx, cy], [cw, ch]] = crop();
+    return {
+      left: props.frame.left + (c[0] + ((f[0] - cx) / cw) * c[2]) * props.frame.width,
+      top: props.frame.top + (c[1] + ((f[1] - cy) / ch) * c[3]) * props.frame.height,
+    };
+  };
+
+  const setFocus = (focus: [number, number]) =>
+    void ed.update((e) => {
+      // Editing a generated zoom turns the generated ones into manual zooms.
+      if (e.zoom.auto) {
+        e.zoom.segments = structuredClone(ed.state().zoomSegments);
+        e.zoom.auto = false;
+      }
+      const z = e.zoom.segments.find((x) => x.id === props.id);
+      if (z) z.focus = focus;
+    });
+
+  const press = (e: PointerEvent) => {
+    const stage = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const p = toScreen(e.clientX, e.clientY, stage);
+    if (!p) return;
+    e.preventDefault();
+    void ed.gestureStart();
+    setFocus(p);
+    const move = (m: PointerEvent) => {
+      const q = toScreen(m.clientX, m.clientY, stage);
+      if (q) setFocus(q);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      void ed.gestureEnd();
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  return (
+    <div class="ed-focus-layer" onPointerDown={press}>
+      <Show when={marker()} fallback={<span class="ed-focus-hint">Click where the zoom should look · it follows the cursor until then</span>}>
+        {(m) => <div class="ed-focus" style={{ left: `${m().left}px`, top: `${m().top}px` }} />}
+      </Show>
+    </div>
+  );
+}
