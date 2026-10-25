@@ -5,7 +5,9 @@ use crate::share::client;
 use umi_cloud::{Member, TeamPreset, TeamVideo, Workspace};
 
 /// Runs a cloud call off the main thread.
-async fn cloud<T: Send + 'static>(f: impl FnOnce(umi_cloud::Client) -> Result<T, umi_cloud::CloudError> + Send + 'static) -> Result<T, String> {
+async fn cloud<T: Send + 'static>(
+    f: impl FnOnce(umi_cloud::Client) -> Result<T, umi_cloud::CloudError> + Send + 'static,
+) -> Result<T, String> {
     let client = client()?;
     tauri::async_runtime::spawn_blocking(move || {
         f(client).map_err(|e| if e.needs_plan() { "Team workspaces need an Umi Cloud plan.".to_string() } else { e.to_string() })

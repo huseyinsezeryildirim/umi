@@ -4,13 +4,13 @@
 mod assets;
 mod editor;
 mod import;
+mod pexels;
 mod presets;
 mod recording;
 mod screenshot;
 mod share;
-mod pexels;
-mod team;
 mod shortcuts;
+mod team;
 mod tray;
 mod windows;
 
@@ -82,7 +82,12 @@ fn list_recordings() -> Vec<RecordingSummary> {
         .filter_map(|p| {
             let bundle = umi_project::Bundle::new(&p);
             let project = bundle.read_project().ok()?;
-            Some(RecordingSummary { name: project.display_name(bundle.name()), duration: project.duration, created_at: project.created_at.to_rfc3339(), path: p })
+            Some(RecordingSummary {
+                name: project.display_name(bundle.name()),
+                duration: project.duration,
+                created_at: project.created_at.to_rfc3339(),
+                path: p,
+            })
         })
         .collect();
     out.sort_by(|a, b| b.created_at.cmp(&a.created_at));

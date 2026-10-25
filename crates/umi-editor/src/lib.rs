@@ -177,7 +177,6 @@ pub struct RecordingInfo {
     pub has_keys: bool,
 }
 
-
 /// An open document with its undo history.
 pub struct Session {
     pub doc: Document,
@@ -253,8 +252,7 @@ impl Session {
             Op::AddMove { kind, time } => selection = doc.add_move(kind, time),
             Op::AddOverlay { file, kind, duration, time } => {
                 // A video plays for its own length unless told otherwise.
-                let duration =
-                    duration.or_else(|| (kind == MediaKind::Video).then(|| media.duration(&file)).flatten());
+                let duration = duration.or_else(|| (kind == MediaKind::Video).then(|| media.duration(&file)).flatten());
                 selection = Some(Selection::Overlay(doc.add_overlay(file, kind, duration, time)));
             }
             Op::Retime { selection: s, start, end } => doc.retime(s, start, end),
@@ -357,4 +355,3 @@ pub fn item_span(doc: &Document, s: Selection) -> Option<(f64, f64)> {
         Selection::Clip(_) | Selection::Music => None,
     }
 }
-

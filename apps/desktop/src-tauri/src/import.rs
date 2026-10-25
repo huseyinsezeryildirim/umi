@@ -44,6 +44,7 @@ pub fn import_file(library: &Path, file: &Path, name: Option<&str>) -> Result<Pa
             title: None,
             camera_off: None,
             title_auto: None,
+            windows: None,
         };
         bundle.write_project(&project).map_err(|e| e.to_string())?;
         bundle.write_cursor(&CursorData::default()).map_err(|e| e.to_string())
@@ -187,7 +188,11 @@ fn hls_download(body: &serde_json::Value, folder: &Path, progress: &dyn Fn(f64))
     let base = url.split('?').next().unwrap_or(url).rsplit_once('/').map(|(b, _)| b.to_string()).ok_or("bad stream address")?;
     let address = |name: &str| {
         let full = if name.starts_with("http") { name.to_string() } else { format!("{base}/{name}") };
-        if query.is_empty() || full.contains("Signature=") { full } else { format!("{full}{}{query}", if full.contains('?') { "&" } else { "?" }) }
+        if query.is_empty() || full.contains("Signature=") {
+            full
+        } else {
+            format!("{full}{}{query}", if full.contains('?') { "&" } else { "?" })
+        }
     };
     let fetch = |u: &str| -> Result<String, String> {
         ureq::get(u).call().map_err(|e| format!("Couldn't download: {e}"))?.body_mut().read_to_string().map_err(|e| e.to_string())
@@ -206,7 +211,11 @@ fn hls_download(body: &serde_json::Value, folder: &Path, progress: &dyn Fn(f64))
         let list_base = list_url.split('?').next().unwrap_or(list_url).rsplit_once('/').map(|(b, _)| b.to_string()).unwrap_or_default();
         for segment in segments {
             let full = if segment.starts_with("http") { segment.clone() } else { format!("{list_base}/{segment}") };
-            let full = if query.is_empty() || full.contains("Signature=") { full } else { format!("{full}{}{query}", if full.contains('?') { "&" } else { "?" }) };
+            let full = if query.is_empty() || full.contains("Signature=") {
+                full
+            } else {
+                format!("{full}{}{query}", if full.contains('?') { "&" } else { "?" })
+            };
             download(&full, file, &|_| {})?;
             done += 1;
             progress(done as f64 / total as f64 * 0.9);

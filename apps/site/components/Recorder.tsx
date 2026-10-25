@@ -120,6 +120,8 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
       return; // The visitor closed the picker.
     }
 
+    const label = display.getVideoTracks()[0]?.label.trim() ?? "";
+
     // One sound source is recorded as it is; the screen's sound and the voice together are mixed
     // into one track. The mixer starts suspended unless it's told to run.
     const sources = [display, ...(mic ? [mic] : [])].filter((s) => s.getAudioTracks().length);
@@ -226,6 +228,8 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
         camShape: b.shape,
         mirror: b.mirror,
         cameraOff,
+        // Some browsers name the shared window here (others only "screen:0:0" and the like).
+        windowTitle: /^(screen|window|tab|display|web-contents|monitor)\b|:\d/i.test(label) ? undefined : label || undefined,
       });
       setStage("edit");
     };

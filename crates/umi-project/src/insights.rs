@@ -4,6 +4,7 @@
 
 use crate::captions::filler_words;
 use crate::edit::CaptionWord;
+use crate::project::WindowSpan;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
@@ -165,6 +166,155 @@ pub fn insights(words: &[CaptionWord]) -> Option<Insights> {
     Some(Insights { title, summary, chapters: chapters(&sentences, &idf) })
 }
 
+/// Windows that say nothing about the recording: the system's own, and Umi's.
+const NOT_CONTENT: &[&str] = &[
+    "umi",
+    "dock",
+    "window server",
+    "windowserver",
+    "loginwindow",
+    "control center",
+    "notification center",
+    "spotlight",
+    "systemuiserver",
+    "program manager",
+    "explorer",
+    "shellexperiencehost",
+    "searchhost",
+    "startmenuexperiencehost",
+    "gnome-shell",
+    "plasmashell",
+];
+
+/// Browsers and editors put their own name at the end of a window's title, and unread counts
+/// or "edited" marks at the start: what's left is the page or document.
+fn clean_window_title(title: &str, app: &str) -> String {
+    let mut t = title.trim().trim_start_matches(['●', '•', '*']).trim().to_string();
+    if t.starts_with('(') {
+        if let Some(end) = t.find(')') {
+            if t[1..end].chars().all(|c| c.is_ascii_digit() || c == '+') {
+                t = t[end + 1..].trim().to_string();
+            }
+        }
+    }
+    for sep in [" — ", " - ", " – ", " | ", " · "] {
+        if let Some(i) = t.rfind(sep) {
+            let tail = t[i + sep.len()..].trim().to_lowercase();
+            let app = app.to_lowercase();
+            let known = [
+                "google chrome",
+                "chrome",
+                "firefox",
+                "mozilla firefox",
+                "safari",
+                "microsoft edge",
+                "edge",
+                "brave",
+                "arc",
+                "opera",
+                "visual studio code",
+                "cursor",
+            ];
+            if !app.is_empty() && (tail == app || app.contains(&tail) || tail.contains(&app)) || known.contains(&tail.as_str()) {
+                t = t[..i].trim().to_string();
+            }
+        }
+    }
+    t
+}
+
+/// A title from what was on screen: the window (or app) that was in front the longest
+/// ("Onboarding flow in Figma"), or the two apps that shared the time ("Figma and Safari").
+pub fn screen_title(spans: &[WindowSpan], duration: f64) -> Option<String> {
+    let mut by_window: Vec<((String, String), f64)> = Vec::new();
+    let mut by_app: Vec<(String, f64)> = Vec::new();
+    for (i, span) in spans.iter().enumerate() {
+        let end = spans.get(i + 1).map_or(duration, |n| n.start).max(span.start);
+        let seconds = end - span.start;
+        let app = span.app.trim().to_string();
+        if NOT_CONTENT.contains(&app.to_lowercase().as_str()) || seconds <= 0.0 {
+            continue;
+        }
+        let title = clean_window_title(&span.title, &app);
+        if app.is_empty() && title.is_empty() {
+            continue;
+        }
+        match by_window.iter_mut().find(|(k, _)| k.0 == app && k.1 == title) {
+            Some((_, s)) => *s += seconds,
+            None => by_window.push(((app.clone(), title), seconds)),
+        }
+        if !app.is_empty() {
+            match by_app.iter_mut().find(|(a, _)| *a == app) {
+                Some((_, s)) => *s += seconds,
+                None => by_app.push((app, seconds)),
+            }
+        }
+    }
+    let total: f64 = by_window.iter().map(|w| w.1).sum();
+    if total <= 0.0 {
+        return None;
+    }
+    by_window.sort_by(|a, b| b.1.total_cmp(&a.1));
+    by_app.sort_by(|a, b| b.1.total_cmp(&a.1));
+    let ((app, title), seconds) = &by_window[0];
+    let named = |app: &str, title: &str| -> String {
+        let same = title.is_empty() || title.eq_ignore_ascii_case(app);
+        let text = if same {
+            app.to_string()
+        } else if app.is_empty() || title.chars().count() + app.chars().count() > 56 {
+            title.to_string()
+        } else {
+            format!("{title} in {app}")
+        };
+        text.chars().take(80).collect()
+    };
+    if *seconds >= 0.5 * total {
+        return Some(named(app, title));
+    }
+    match by_app.as_slice() {
+        [(a, s), ..] if *s >= 0.6 * total => Some(a.clone()),
+        [(a, _), (b, _), ..] => Some(format!("{a} and {b}")),
+        [(a, _)] => Some(a.clone()),
+        [] => Some(named(app, title)),
+    }
+}
+
+/// The app that was in front most of the time, if one was.
+fn main_app(spans: &[WindowSpan], duration: f64) -> Option<String> {
+    let mut by_app: Vec<(String, f64)> = Vec::new();
+    for (i, span) in spans.iter().enumerate() {
+        let end = spans.get(i + 1).map_or(duration, |n| n.start).max(span.start);
+        let app = span.app.trim();
+        if app.is_empty() || NOT_CONTENT.contains(&app.to_lowercase().as_str()) {
+            continue;
+        }
+        match by_app.iter_mut().find(|(a, _)| a == app) {
+            Some((_, s)) => *s += end - span.start,
+            None => by_app.push((app.to_string(), end - span.start)),
+        }
+    }
+    let total: f64 = by_app.iter().map(|a| a.1).sum();
+    by_app.sort_by(|a, b| b.1.total_cmp(&a.1));
+    by_app.into_iter().next().filter(|a| total > 0.0 && a.1 >= 0.6 * total).map(|a| a.0)
+}
+
+/// The recording's title from what was said and what was on screen: the spoken topic and the
+/// app it was shown in ("Revenue, dashboard and report in Safari"), or the screen alone when
+/// little was said.
+pub fn title(words: &[CaptionWord], spans: &[WindowSpan], duration: f64) -> Option<String> {
+    match insights(words) {
+        Some(found) => Some(match main_app(spans, duration) {
+            Some(app)
+                if !found.title.to_lowercase().contains(&app.to_lowercase()) && found.title.chars().count() + app.chars().count() <= 60 =>
+            {
+                format!("{} in {app}", found.title)
+            }
+            _ => found.title,
+        }),
+        None => screen_title(spans, duration),
+    }
+}
+
 /// Chapter starts where neighbouring stretches stop sharing words.
 fn chapters(sentences: &[Sentence], idf: &HashMap<String, f64>) -> Vec<Chapter> {
     let total = sentences.last().map_or(0.0, |s| s.start);
@@ -218,6 +368,22 @@ pub fn chapter_text(chapters: &[Chapter], output_time: impl Fn(f64) -> Option<f6
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn span(start: f64, app: &str, title: &str) -> WindowSpan {
+        WindowSpan { start, app: app.into(), title: title.into() }
+    }
+
+    #[test]
+    fn names_a_recording_after_the_window_in_front() {
+        let spans = [span(0.0, "Umi", ""), span(1.0, "Figma", "Onboarding flow – Figma"), span(50.0, "Slack", "(3) general")];
+        assert_eq!(screen_title(&spans, 60.0).as_deref(), Some("Onboarding flow in Figma"));
+        let spans = [span(0.0, "Google Chrome", "Pull request #42 · acme/web - Google Chrome")];
+        assert_eq!(screen_title(&spans, 10.0).as_deref(), Some("Pull request #42 · acme/web in Google Chrome"));
+        let spans = [span(0.0, "Safari", "A"), span(10.0, "Xcode", "B"), span(20.0, "Safari", "C"), span(30.0, "Xcode", "D")];
+        assert_eq!(screen_title(&spans, 40.0).as_deref(), Some("Safari and Xcode"));
+        assert_eq!(screen_title(&[span(0.0, "", "Quarterly review")], 5.0).as_deref(), Some("Quarterly review"));
+        assert_eq!(screen_title(&[span(0.0, "Umi", "Umi")], 5.0), None);
+    }
 
     fn words(script: &[(f64, &str)]) -> Vec<CaptionWord> {
         let mut out = vec![];

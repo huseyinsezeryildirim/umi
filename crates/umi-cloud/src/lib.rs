@@ -404,7 +404,8 @@ impl Client {
             Self::put(url, gif, "image/gif")?;
         }
         let parts: Vec<serde_json::Value> = etags.iter().map(|(n, e)| serde_json::json!({ "partNumber": n, "etag": e })).collect();
-        let body = serde_json::json!({ "parts": parts, "durationMs": details.duration_ms, "width": details.width, "height": details.height });
+        let body =
+            serde_json::json!({ "parts": parts, "durationMs": details.duration_ms, "width": details.width, "height": details.height });
         let done: VideoBody = self.send("POST", &format!("/api/videos/{}/complete", reservation.video.id), Some(body))?;
         Ok(done.video)
     }

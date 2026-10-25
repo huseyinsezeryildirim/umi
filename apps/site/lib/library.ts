@@ -21,6 +21,8 @@ export type Take = {
   camBg?: "none" | "blur" | "remove";
   /** Where the camera was turned off while recording (seconds). */
   cameraOff?: [number, number][];
+  /** The shared window's title, when the browser says it (names the recording). */
+  windowTitle?: string;
 };
 
 function open(account: string): Promise<IDBDatabase> {
@@ -81,6 +83,7 @@ export async function saveTake(account: string, take: Take): Promise<string> {
       : {}),
     audio: { microphoneTrack: 0 },
     ...(camera && take.cameraOff?.length ? { cameraOff: take.cameraOff } : {}),
+    ...(take.windowTitle ? { windows: [{ start: 0, app: "", title: take.windowTitle }] } : {}),
   };
   const db = await open(account);
   const files = [[screen, "screen.webm"], ...(camera ? [[camera, "camera.webm"]] : [])] as [Blob, string][];

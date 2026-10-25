@@ -208,9 +208,24 @@ impl Editor {
     /// Opens a recording from its project.json and cursor.json (may be empty) and the screen
     /// video's length. `preset`: the look a recording without an edit starts with.
     #[wasm_bindgen(constructor)]
-    pub fn new(id: String, name: String, project: &str, cursor: &str, media_duration: f64, preset: Option<String>) -> Result<Editor, JsError> {
-        let project: RecordingProject = serde_json::from_str(project).map_err(err)?;
-        let cursor: CursorData = if cursor.trim().is_empty() { CursorData::default() } else { serde_json::from_str(cursor).map_err(err)? };
+    pub fn new(
+        id: String,
+        name: String,
+        project: &str,
+        cursor: &str,
+        media_duration: f64,
+        preset: Option<String>,
+    ) -> Result<Editor, JsError> {
+        let mut project: RecordingProject = serde_json::from_str(project).map_err(err)?;
+        // Named after the shared window until what was said names it.
+        let named = project.title.is_none()
+            && project
+                .windows
+                .as_deref()
+                .and_then(|w| umi_project::insights::screen_title(w, project.duration))
+                .is_some_and(|t| project.suggest_title(&t));
+        let cursor: CursorData =
+            if cursor.trim().is_empty() { CursorData::default() } else { serde_json::from_str(cursor).map_err(err)? };
         let preset: Option<StylePreset> = match preset {
             Some(p) => Some(serde_json::from_str(&p).map_err(err)?),
             None => None,
@@ -218,7 +233,10 @@ impl Editor {
         let edit: EditSettings = project.effective_edit(preset.as_ref());
         let doc = Document::new(project, edit, cursor, media_duration);
         let schedule = Schedule::new(&doc.edit, doc.total());
-        Ok(Editor { session: Session::new(doc), id, name, schedule, view: None })
+        let mut session = Session::new(doc);
+        // Saved with the new title.
+        session.dirty |= named;
+        Ok(Editor { session, id, name, schedule, view: None })
     }
 
     /// What the UI shows (`EditorState` as JSON).
@@ -255,8 +273,10 @@ impl Editor {
             words.iter().map(|w| CaptionWord { id: uuid::Uuid::new_v4(), start: w.start, end: w.end, text: w.text.clone() }).collect();
         edit.captions.language = language;
         edit.captions.enabled = true;
-        if let Some(found) = umi_project::insights::insights(&edit.captions.words) {
-            if self.session.doc.project.suggest_title(&found.title) {
+        let project = &self.session.doc.project;
+        let windows = project.windows.clone().unwrap_or_default();
+        if let Some(title) = umi_project::insights::title(&edit.captions.words, &windows, project.duration) {
+            if self.session.doc.project.suggest_title(&title) {
                 self.session.dirty = true;
             }
         }
@@ -383,8 +403,17 @@ impl Editor {
     /// Starts the renderer on a GPU from [`open_gpu`] (the editor takes it over).
     pub fn attach(&mut self, gpu: WebGpu) {
         let doc = &self.session.doc;
-        let renderer = Renderer::new(gpu.gpu.clone(), doc.project.clone(), doc.edit.clone(), doc.cursor.clone(), Some(bundle(&self.id).into()));
-        self.view = Some(View { gpu: gpu.gpu, surface: gpu.surface, canvas: gpu.canvas, format: gpu.format, blit: gpu.blit, configured: (0, 0), renderer });
+        let renderer =
+            Renderer::new(gpu.gpu.clone(), doc.project.clone(), doc.edit.clone(), doc.cursor.clone(), Some(bundle(&self.id).into()));
+        self.view = Some(View {
+            gpu: gpu.gpu,
+            surface: gpu.surface,
+            canvas: gpu.canvas,
+            format: gpu.format,
+            blit: gpu.blit,
+            configured: (0, 0),
+            renderer,
+        });
     }
 
     /// Copies a frame into a slot: "screen", "camera" or an overlay's id. `source` is a
@@ -492,7 +521,8 @@ impl Editor {
             wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
             other => return Err(err(format!("canvas unavailable: {other:?}"))),
         };
-        let target = frame.texture.create_view(&wgpu::TextureViewDescriptor { format: Some(view.format.add_srgb_suffix()), ..Default::default() });
+        let target =
+            frame.texture.create_view(&wgpu::TextureViewDescriptor { format: Some(view.format.add_srgb_suffix()), ..Default::default() });
         let source = output.create_view(&Default::default());
         let bind = view.gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("blit"),
@@ -588,8 +618,11 @@ pub fn track_region(rect: &str, anchor: f64, times: Vec<f64>, width: usize, heig
     use umi_project::track::{Gray, track_frames};
     let rect: Rect = serde_json::from_str(rect).map_err(err)?;
     let size = width * height;
-    let frames: Vec<(f64, Gray)> =
-        times.iter().enumerate().filter_map(|(i, t)| luma.get(i * size..(i + 1) * size).map(|px| (*t, Gray::new(width, height, px.to_vec())))).collect();
+    let frames: Vec<(f64, Gray)> = times
+        .iter()
+        .enumerate()
+        .filter_map(|(i, t)| luma.get(i * size..(i + 1) * size).map(|px| (*t, Gray::new(width, height, px.to_vec()))))
+        .collect();
     serde_json::to_string(&track_frames(&frames, rect, anchor)).map_err(err)
 }
 

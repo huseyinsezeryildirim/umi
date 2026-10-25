@@ -424,14 +424,21 @@ fn auto_title(app: AppHandle, bundle: PathBuf) {
         let track = project.audio.microphone_track.map(|t| t as usize).filter(|t| *t < tracks).unwrap_or(0);
         let Ok(samples) = umi_ai::transcribe::read_mono_16k(&screen, track) else { return };
         let Ok((words, _)) = umi_ai::transcribe::transcribe(&model.path(), &samples, None, |_| {}) else { return };
-        let words: Vec<umi_project::edit::CaptionWord> =
-            words.into_iter().map(|w| umi_project::edit::CaptionWord { id: uuid::Uuid::new_v4(), start: w.start, end: w.end, text: w.text }).collect();
-        let Some(found) = umi_project::insights::insights(&words) else { return };
+        let words: Vec<umi_project::edit::CaptionWord> = words
+            .into_iter()
+            .map(|w| umi_project::edit::CaptionWord { id: uuid::Uuid::new_v4(), start: w.start, end: w.end, text: w.text })
+            .collect();
+        if umi_project::insights::insights(&words).is_none() {
+            return;
+        }
         // Re-read: the editor may have saved meanwhile.
         if let Ok(latest) = files.read_project() {
             project = latest;
         }
-        if project.suggest_title(&found.title) && files.write_project(&project).is_ok() {
+        // What was said, and the app it was shown in.
+        let windows = project.windows.clone().unwrap_or_default();
+        let Some(title) = umi_project::insights::title(&words, &windows, project.duration) else { return };
+        if project.suggest_title(&title) && files.write_project(&project).is_ok() {
             let _ = app.emit("library:changed", ());
         }
     });

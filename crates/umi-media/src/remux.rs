@@ -9,10 +9,7 @@ use std::path::Path;
 /// `output` (container from its extension), interleaved by time.
 pub fn remux(inputs: &[&Path], output: &Path) -> Result<(), MediaError> {
     init();
-    let mut opened = inputs
-        .iter()
-        .map(|p| ff::format::input(p).map_err(|e| MediaError::open(p, e)))
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut opened = inputs.iter().map(|p| ff::format::input(p).map_err(|e| MediaError::open(p, e))).collect::<Result<Vec<_>, _>>()?;
     let mut out = ff::format::output(output).map_err(|e| MediaError::open(output, e))?;
 
     // (input, stream index) → output stream, for the first video and the first audio.
