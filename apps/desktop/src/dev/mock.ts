@@ -416,9 +416,9 @@ mockIPC(
         return { connected: true, server: "https://umi.cam" };
       case "share_state":
       case "share_update":
-        return { id: "s2Zty2QoHiLz", url: "https://umi.cam/v/s2Zty2QoHiLz", title: "Product demo", status: "ready", allowDownload: true, hasPassword: false, allowComments: true, expiresAt: null };
+        return { durationMs: 192000, id: "s2Zty2QoHiLz", url: "https://umi.cam/v/s2Zty2QoHiLz", title: "Product demo", status: "ready", allowDownload: true, hasPassword: false, allowComments: true, expiresAt: null };
       case "share_insights":
-        return { views: 42, watchedSeconds: 2310, averageSeconds: 55, completion: 0.62, retention: [1, 0.97, 0.95, 0.93, 0.9, 0.88, 0.86, 0.85, 0.83, 0.82, 0.8, 0.79, 0.77, 0.75, 0.74, 0.72, 0.7, 0.68, 0.65, 0.62], embeddedViews: 9, countries: [{ country: "TR", count: 21 }, { country: "DE", count: 9 }, { country: "US", count: 7 }, { country: "NL", count: 5 }] };
+        return { views: 42, watchedSeconds: 2310, averageSeconds: 55, completion: 0.62, retention: [1, 0.92, 0.86, 0.83, 0.82, 0.81, 0.8, 0.79, 0.78, 0.77, 0.66, 0.64, 0.63, 0.63, 0.62, 0.61, 0.6, 0.59, 0.58, 0.55], embeddedViews: 9, countries: [{ country: "TR", count: 21 }, { country: "DE", count: 9 }, { country: "US", count: 7 }, { country: "NL", count: 5 }] };
       case "team_list":
         return [{ id: "W1", name: "Umi Team", role: "owner", members: 3, inviteCode: "k3Jd9aQpLx2mZt7RbV0c" }];
       case "team_detail":
