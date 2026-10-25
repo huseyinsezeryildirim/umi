@@ -1,0 +1,235 @@
+:root {
+  --ink: #0e111e;
+  --ice-top: #f1f7fc;
+  --ice-bottom: #e1effc;
+  --accent: #116ff5;
+  --text-2: #4a4f58;
+  --text-3: #7b818c;
+  color-scheme: light;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--ice-top), var(--ice-bottom) 60%, #fff);
+  -webkit-font-smoothing: antialiased;
+}
+a {
+  color: inherit;
+}
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 16px 20px;
+  backdrop-filter: blur(14px);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 20px;
+  text-decoration: none;
+}
+.nav nav {
+  display: flex;
+  gap: 22px;
+  font-size: 15px;
+}
+.nav nav a {
+  text-decoration: none;
+  color: var(--text-2);
+}
+.hero {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 56px 20px 24px;
+  text-align: center;
+}
+.pill {
+  display: inline-block;
+  margin: 0 0 18px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(17, 111, 245, 0.1);
+}
+h1 {
+  margin: 0;
+  font-size: clamp(36px, 6vw, 64px);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+.lead {
+  max-width: 640px;
+  margin: 20px auto 0;
+  font-size: 19px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.cta {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 30px;
+  flex-wrap: wrap;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 24px;
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 16px;
+  text-decoration: none;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.btn:hover {
+  transform: translateY(-1px);
+}
+.btn-ink {
+  color: #fff;
+  background: var(--ink);
+  box-shadow: 0 10px 24px rgba(14, 17, 30, 0.25);
+}
+.btn-glass {
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(14, 17, 30, 0.08), 0 2px 6px rgba(14, 17, 30, 0.06);
+}
+.fine {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.shot {
+  margin: 44px auto 0;
+  max-width: 1040px;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 30px 80px rgba(14, 17, 30, 0.2), 0 0 0 1px rgba(14, 17, 30, 0.06);
+  background: linear-gradient(135deg, #9eccfa, #2e5eb8);
+}
+.shot img {
+  display: block;
+  width: 100%;
+}
+.shot.empty {
+  aspect-ratio: 16 / 9;
+}
+.shot.empty img {
+  display: none;
+}
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  max-width: 1120px;
+  margin: 72px auto 0;
+  padding: 0 20px;
+}
+.features article {
+  padding: 22px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 0 1px rgba(14, 17, 30, 0.06);
+}
+.features h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+.features p {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.downloads,
+.pricing {
+  max-width: 1120px;
+  margin: 72px auto 0;
+  padding: 0 20px;
+}
+h2 {
+  font-size: 32px;
+  letter-spacing: -0.02em;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px;
+  border-radius: 16px;
+  background: #fff;
+  text-decoration: none;
+  box-shadow: 0 0 0 1px rgba(14, 17, 30, 0.07);
+}
+.card span {
+  font-size: 14px;
+  color: var(--text-3);
+}
+.card-you {
+  box-shadow: 0 0 0 2px var(--accent), 0 10px 24px rgba(17, 111, 245, 0.15);
+}
+.pricing {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.plan {
+  padding: 26px;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(14, 17, 30, 0.07);
+}
+.plan-cloud {
+  color: #fff;
+  background: linear-gradient(135deg, #1a2350, var(--ink));
+}
+.plan h3 {
+  margin: 0;
+}
+.price {
+  font-size: 30px;
+  font-weight: 700;
+  margin: 10px 0 14px;
+}
+.price small {
+  font-size: 15px;
+  font-weight: 500;
+  opacity: 0.7;
+}
+.plan ul {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.8;
+}
+.foot {
+  margin: 80px 0 30px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-3);
+}
+@media (max-width: 640px) {
+  .nav nav a:not(:last-child) {
+    display: none;
+  }
+  .hero {
+    padding-top: 28px;
+  }
+}
