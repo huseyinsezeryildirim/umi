@@ -5,6 +5,7 @@
 mod chrome;
 mod cursor;
 mod text;
+pub use text::add_font;
 
 use crate::ops::{SizeSource, TexRef};
 use parking_lot::Mutex;
@@ -64,6 +65,11 @@ pub struct RasterCache {
 impl RasterCache {
     pub fn get(&self, key: &str) -> Option<Arc<RasterImage>> {
         self.images.lock().get(key).cloned()
+    }
+
+    /// Puts an image in the cache under `key` (kept like loaded image files).
+    pub fn insert(&self, key: String, image: RasterImage) {
+        self.images.lock().insert(key, Arc::new(image));
     }
 
     fn get_or_insert(&self, key: &str, make: impl FnOnce() -> Option<RasterImage>) -> Option<Arc<RasterImage>> {

@@ -23,27 +23,58 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return <MotionConfig reducedMotion="user">{children}</MotionConfig>;
 }
 
-/** iOS only autoplays a video it knows is muted (React doesn't write the `muted` attribute) and,
- *  in Low Power Mode, only after the visitor touches the page. Start every autoplay video,
- *  including ones mounted later, and try again on the first touch or scroll. */
+/**
+ * Autoplay videos play only while they're on screen (and the tab is visible): a page full of
+ * looping videos otherwise keeps decoding all of them and gets sluggish after a while.
+ * iOS only autoplays a video it knows is muted (React doesn't write the `muted` attribute) and,
+ * in Low Power Mode, only after the visitor touches the page, so a touch tries again.
+ */
 function useAutoplay() {
   useEffect(() => {
-    const start = (v: HTMLVideoElement) => {
+    const visible = new Set<HTMLVideoElement>();
+    const play = (v: HTMLVideoElement) => {
       v.muted = true;
       v.defaultMuted = true;
       v.setAttribute("muted", "");
       v.setAttribute("playsinline", "");
-      if (v.paused) v.play().catch(() => {});
+      if (v.paused && !document.hidden) v.play().catch(() => {});
     };
-    const all = () => document.querySelectorAll<HTMLVideoElement>("video[autoplay]").forEach(start);
-    all();
-    const observer = new MutationObserver(all);
-    observer.observe(document.body, { childList: true, subtree: true });
-    const events = ["touchstart", "pointerdown", "scroll"] as const;
-    events.forEach((e) => addEventListener(e, all, { passive: true }));
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const v = e.target as HTMLVideoElement;
+          if (e.isIntersecting) {
+            visible.add(v);
+            play(v);
+          } else {
+            visible.delete(v);
+            v.pause();
+          }
+        }
+      },
+      { rootMargin: "200px 0px" },
+    );
+    const watched = new WeakSet<HTMLVideoElement>();
+    const watch = () =>
+      document.querySelectorAll<HTMLVideoElement>("video[autoplay]").forEach((v) => {
+        if (watched.has(v)) return;
+        watched.add(v);
+        // Started by the observer when it comes into view.
+        v.pause();
+        io.observe(v);
+      });
+    watch();
+    const mo = new MutationObserver(watch);
+    mo.observe(document.body, { childList: true, subtree: true });
+    const retry = () => visible.forEach(play);
+    const onVisibility = () => (document.hidden ? visible.forEach((v) => v.pause()) : retry());
+    document.addEventListener("visibilitychange", onVisibility);
+    addEventListener("touchstart", retry, { passive: true, once: true });
     return () => {
-      observer.disconnect();
-      events.forEach((e) => removeEventListener(e, all));
+      io.disconnect();
+      mo.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
+      removeEventListener("touchstart", retry);
     };
   }, []);
 }

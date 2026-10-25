@@ -42,6 +42,16 @@ export function App() {
   if ((import.meta.env.DEV || import.meta.env.VITE_DEMO) && new URLSearchParams(location.search).has("open")) {
     void invoke<RecordingSummary[]>("list_recordings").then((list) => list[0] && open(list[0].path));
   }
+  // The website opens a recording it just saved with `?open=<id>`.
+  if (import.meta.env.VITE_WEB) {
+    const q = new URLSearchParams(location.search);
+    const id = q.get("open");
+    if (id) {
+      q.delete("open");
+      history.replaceState(null, "", `${location.pathname}?${q}`);
+      void open(id);
+    }
+  }
   if ((import.meta.env.DEV || import.meta.env.VITE_DEMO) && new URLSearchParams(location.search).get("tab") === "team") setTimeout(() => window.dispatchEvent(new Event("umi:team")), 50);
 
   installRecordingFlow((bundle) => {

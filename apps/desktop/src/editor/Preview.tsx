@@ -43,13 +43,25 @@ export function Preview(props: { editor: Editor }) {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const { w, h } = box();
       if (w < 10 || h < 10) return;
-      const buffer = await invoke<ArrayBuffer>("editor_frame", {
+      const buffer = await invoke<ArrayBuffer | ImageBitmap>("editor_frame", {
         id: ed.state().id,
         time: t,
         width: Math.round(w * dpr),
         height: Math.round(h * dpr),
         flat: flat(),
+        playing: ed.playing(),
       });
+      // The web app's renderer hands over a GPU bitmap instead of pixels.
+      if (buffer instanceof ImageBitmap) {
+        if (canvas.width !== buffer.width || canvas.height !== buffer.height) {
+          canvas.width = buffer.width;
+          canvas.height = buffer.height;
+        }
+        canvas.getContext("2d")!.drawImage(buffer, 0, 0);
+        setFrameSize({ w: buffer.width, h: buffer.height });
+        buffer.close();
+        return;
+      }
       const view = new DataView(buffer);
       const fw = view.getUint32(0, true);
       const fh = view.getUint32(4, true);

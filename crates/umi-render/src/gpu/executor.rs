@@ -253,6 +253,31 @@ impl Executor {
         }
     }
 
+    /// Copies a browser image (a video element's current frame, a `VideoFrame`, a bitmap) into
+    /// a slot, on the GPU: no pixels pass through the CPU.
+    #[cfg(target_arch = "wasm32")]
+    pub fn upload_external(&mut self, slot: TexRef, source: wgpu::CopyExternalImageSourceInfo, size: (u32, u32)) {
+        let gpu = self.gpu.clone();
+        let format = wgpu::TextureFormat::Rgba8UnormSrgb;
+        if self.videos.get(&slot).is_none_or(|v| v.rgba.size != size || v.format != format) {
+            let rgba = Self::make_tex(&gpu, size, format, "video");
+            self.videos.insert(slot.clone(), VideoSlot { rgba, format, planes: None });
+        }
+        let Some(video) = self.videos.get(&slot) else { return };
+        gpu.queue.copy_external_image_to_texture(
+            &source,
+            wgpu::CopyExternalImageDestInfo {
+                texture: &video.rgba.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+                color_space: wgpu::PredefinedColorSpace::Srgb,
+                premultiplied_alpha: true,
+            },
+            wgpu::Extent3d { width: size.0, height: size.1, depth_or_array_layers: 1 },
+        );
+    }
+
     /// Forgets a video slot (e.g. an overlay no longer on screen).
     pub fn drop_video(&mut self, slot: &TexRef) {
         self.videos.remove(slot);
@@ -402,6 +427,20 @@ impl Executor {
 
     /// The finished frame as tightly packed RGBA8 (sRGB).
     pub fn read_output(&mut self) -> Result<Vec<u8>, GpuError> {
+        let read = self.copy_output();
+        let slice = read.buffer.slice(..read.size);
+        let (tx, rx) = std::sync::mpsc::channel();
+        slice.map_async(wgpu::MapMode::Read, move |r| {
+            let _ = tx.send(r);
+        });
+        self.gpu.device.poll(wgpu::PollType::wait_indefinitely()).map_err(|e| GpuError::Readback(e.to_string()))?;
+        rx.recv().map_err(|e| GpuError::Readback(e.to_string()))?.map_err(|e| GpuError::Readback(e.to_string()))?;
+        read.collect()
+    }
+
+    /// Copies the output into the readback buffer; map it (the caller decides how to wait,
+    /// the browser can't block) and then [`Readback::collect`].
+    pub fn copy_output(&mut self) -> Readback {
         let (w, h) = self.canvas;
         let bytes_per_row = align((w * 4) as u64);
         let size = bytes_per_row * h as u64;
@@ -414,35 +453,19 @@ impl Executor {
             });
             self.readback = Some((buffer, size));
         }
-        let Some((buffer, _)) = &self.readback else { return Err(GpuError::Readback("no buffer".into())) };
+        let buffer = self.readback.as_ref().map(|(b, _)| b.clone()).expect("made above");
         let output = &self.target(Target::Output).texture;
         let mut encoder = self.gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("readback") });
         encoder.copy_texture_to_buffer(
             output.as_image_copy(),
             wgpu::TexelCopyBufferInfo {
-                buffer,
+                buffer: &buffer,
                 layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(bytes_per_row as u32), rows_per_image: None },
             },
             wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
         );
         self.gpu.queue.submit([encoder.finish()]);
-        let slice = buffer.slice(..size);
-        let (tx, rx) = std::sync::mpsc::channel();
-        slice.map_async(wgpu::MapMode::Read, move |r| {
-            let _ = tx.send(r);
-        });
-        self.gpu.device.poll(wgpu::PollType::wait_indefinitely()).map_err(|e| GpuError::Readback(e.to_string()))?;
-        rx.recv().map_err(|e| GpuError::Readback(e.to_string()))?.map_err(|e| GpuError::Readback(e.to_string()))?;
-        let mut out = Vec::with_capacity((w * h * 4) as usize);
-        {
-            let data = slice.get_mapped_range().map_err(|e| GpuError::Readback(e.to_string()))?;
-            for row in 0..h as usize {
-                let start = row * bytes_per_row as usize;
-                out.extend_from_slice(&data[start..start + (w * 4) as usize]);
-            }
-        }
-        buffer.unmap();
-        Ok(out)
+        Readback { buffer, size, bytes_per_row, width: w, height: h }
     }
 
     /// The output texture (for zero-copy presentation or encoding).
@@ -668,4 +691,30 @@ fn f32_to_f16(v: f32) -> u16 {
         return sign | ((m + 0x1000) >> 13) as u16;
     }
     sign | ((exp as u32) << 10 | (mant + 0x1000) >> 13) as u16
+}
+
+/// A frame copied out of the GPU, waiting to be mapped.
+pub struct Readback {
+    pub buffer: wgpu::Buffer,
+    pub size: u64,
+    pub bytes_per_row: u64,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl Readback {
+    /// The mapped frame as tight RGBA rows; unmaps the buffer.
+    pub fn collect(&self) -> Result<Vec<u8>, GpuError> {
+        let (w, h) = (self.width, self.height);
+        let mut out = Vec::with_capacity((w * h * 4) as usize);
+        {
+            let data = self.buffer.slice(..self.size).get_mapped_range().map_err(|e| GpuError::Readback(e.to_string()))?;
+            for row in 0..h as usize {
+                let start = row * self.bytes_per_row as usize;
+                out.extend_from_slice(&data[start..start + (w * 4) as usize]);
+            }
+        }
+        self.buffer.unmap();
+        Ok(out)
+    }
 }

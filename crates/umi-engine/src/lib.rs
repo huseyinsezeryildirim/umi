@@ -5,7 +5,7 @@ pub mod audio_mix;
 pub mod combine;
 pub mod compose;
 pub mod export;
-pub mod schedule;
+pub use umi_project::schedule;
 pub mod sources;
 pub mod stretch;
 pub mod track;

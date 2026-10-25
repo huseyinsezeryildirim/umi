@@ -9,7 +9,9 @@
     "build": "vite build",
     "tauri": "tauri",
     "typecheck": "tsc --noEmit",
-    "build:demo": "VITE_DEMO=1 vite build --base /demo/ --outDir ../site/public/demo --emptyOutDir"
+    "build:demo": "VITE_DEMO=1 vite build --base /demo/ --outDir ../site/public/demo --emptyOutDir",
+    "build:web": "VITE_WEB=1 vite build --base /editor/ --outDir ../site/public/editor --emptyOutDir",
+    "wasm": "cd ../.. && cargo build -p umi-web --target wasm32-unknown-unknown --release && wasm-bindgen --target web --out-dir apps/desktop/src/web/pkg target/wasm32-unknown-unknown/release/umi_web.wasm"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",
@@ -17,7 +19,10 @@
     "@tauri-apps/plugin-opener": "^2.7.2",
     "@umi/ui": "workspace:*",
     "lucide-solid": "^1.61.0",
-    "solid-js": "^1.9.17"
+    "solid-js": "^1.9.17",
+    "mediabunny": "^1.62.1",
+    "@huggingface/transformers": "^4.3.1",
+    "@mediapipe/tasks-vision": "^1.1.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.4",

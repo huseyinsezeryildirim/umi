@@ -2,7 +2,8 @@
 // The model (~80 MB) downloads once from Hugging Face and the browser keeps it cached.
 import { type AutomaticSpeechRecognitionPipeline, pipeline } from "@huggingface/transformers";
 
-type In = { audio: Float32Array };
+/** `language`: a Whisper language name or code; empty lets Whisper detect it. */
+type In = { audio: Float32Array; language?: string };
 export type Out =
   | { type: "loading"; progress: number }
   | { type: "working"; progress: number }
@@ -34,7 +35,7 @@ self.onmessage = async (e: MessageEvent<In>) => {
   try {
     asr ??= load();
     const run = await asr;
-    const { audio } = e.data;
+    const { audio, language } = e.data;
     const words: { text: string; start: number; end: number }[] = [];
     // 30-second pieces, so progress shows and long recordings don't hold everything at once.
     const piece = 16000 * 30;
@@ -42,7 +43,7 @@ self.onmessage = async (e: MessageEvent<In>) => {
       post({ type: "working", progress: at / audio.length });
       const part = audio.subarray(at, Math.min(audio.length, at + piece));
       if (part.length < 1600) continue;
-      const out = (await run(part, { return_timestamps: "word" })) as { chunks?: { text: string; timestamp: [number, number | null] }[] };
+      const out = (await run(part, { return_timestamps: "word", ...(language ? { language } : {}) })) as { chunks?: { text: string; timestamp: [number, number | null] }[] };
       const offset = at / 16000;
       for (const c of out.chunks ?? []) {
         const text = c.text.trim();

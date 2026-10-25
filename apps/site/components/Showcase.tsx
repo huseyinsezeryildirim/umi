@@ -308,7 +308,9 @@ function Cutout() {
     off.width = c.width;
     off.height = c.height;
     const og = off.getContext("2d", { willReadFrequently: true })!;
-    let frame = requestAnimationFrame(function draw() {
+    // Only while on screen: combining the matte reads pixels every frame.
+    let frame = 0;
+    const draw = () => {
       const a = cam.current;
       const m = matte.current;
       if (a && m && a.readyState >= 2 && m.readyState >= 2) {
@@ -322,37 +324,213 @@ function Cutout() {
         g.putImageData(px, 0, 0);
       }
       frame = requestAnimationFrame(draw);
+    };
+    const videos = () => [cam.current, matte.current].filter((v): v is HTMLVideoElement => !!v);
+    const io = new IntersectionObserver(([e]) => {
+      cancelAnimationFrame(frame);
+      if (e.isIntersecting && !document.hidden) {
+        videos().forEach((v) => void v.play().catch(() => {}));
+        frame = requestAnimationFrame(draw);
+      } else videos().forEach((v) => v.pause());
     });
-    return () => cancelAnimationFrame(frame);
+    io.observe(c);
+    return () => {
+      io.disconnect();
+      cancelAnimationFrame(frame);
+    };
   }, []);
   return (
     <>
-      <video ref={cam} src="/media/camera.mp4" autoPlay muted loop playsInline className="hidden" />
-      <video ref={matte} src="/media/camera-matte.mp4" autoPlay muted loop playsInline className="hidden" />
+      <video ref={cam} src="/media/camera.mp4" muted loop playsInline className="hidden" />
+      <video ref={matte} src="/media/camera-matte.mp4" muted loop playsInline className="hidden" />
       <canvas ref={canvas} width={200} height={200} className="block w-full drop-shadow-[0_8px_14px_rgb(0_0_0/0.25)]" />
     </>
   );
 }
 
-/** A recording of Umi's own editor doing the thing (made from the editor demo, see scripts). */
-function EditorClip({ name }: { name: string }) {
+function BlurScene() {
+  const ref = useRef<HTMLDivElement>(null);
+  // Blur, then pixelate, then spotlight.
+  const i = useBeat(ref, [1800, 1800, 1800]);
   return (
-    <div className="w-[92%] overflow-hidden rounded-[10px] bg-white shadow-[0_0_0_1px_rgb(17_24_39/0.08),0_14px_30px_-14px_rgb(20_40_90/0.35)]">
-      <video src={`/media/editor-${name}.mp4`} poster={`/media/editor-${name}.jpg`} autoPlay muted loop playsInline className="block w-full" />
+    <div ref={ref} className="relative w-[80%]">
+      <Win>
+        <div className="relative grid gap-2 p-3 text-[10.5px]">
+          <i className="h-2 w-1/3 rounded bg-ink/15" />
+          <div className={`relative z-10 flex items-center gap-2 rounded-md border border-black/10 bg-white px-2 py-1.5 font-mono text-ink transition-shadow duration-500 ${i === 2 ? "shadow-[0_0_0_3px_rgb(255_255_255/0.9),0_8px_20px_rgb(0_0_0/0.25)]" : ""}`}>
+            <span className="text-muted">Password</span>
+            <span className="relative ml-auto tracking-wider">
+              hunter2-prod
+              {i === 0 && <motion.span layoutId="mask" className="absolute -inset-1 rounded-[4px] bg-white/10 backdrop-blur-[3.5px]" />}
+              {i === 1 && (
+                <motion.span
+                  layoutId="mask"
+                  className="absolute -inset-1 rounded-[3px]"
+                  style={{ background: "repeating-conic-gradient(#9aa3b2 0 25%, #c9ced8 0 50%) 0 0 / 8px 8px" }}
+                />
+              )}
+            </span>
+          </div>
+          <i className="h-2 w-2/3 rounded bg-ink/10" />
+          <i className="h-2 w-1/2 rounded bg-ink/10" />
+          {/* Highlight: everything dims except the field. */}
+          <motion.span
+            className="pointer-events-none absolute inset-0 bg-ink/45"
+            style={{ maskImage: "linear-gradient(#000,#000)", WebkitMaskImage: "linear-gradient(#000,#000)" }}
+            animate={{ opacity: i === 2 ? 1 : 0 }}
+            transition={{ duration: 0.5 }}
+          />
+        </div>
+      </Win>
+      <div className="mt-2.5 flex justify-center">
+        <Pills items={["Blur", "Pixelate", "Highlight"]} active={i} />
+      </div>
+    </div>
+  );
+}
+
+function ClipsScene() {
+  const ref = useRef<HTMLDivElement>(null);
+  const i = useBeat(ref, [1200, 1200, 1600]);
+  return (
+    <div ref={ref} className="w-[82%] rounded-[10px] bg-white p-3 shadow-[0_0_0_0.5px_rgb(0_0_0/0.12),0_12px_30px_-10px_rgb(20_40_90/0.3)]">
+      <div className="relative flex h-7 gap-1">
+        <motion.i className="rounded-md bg-[#b6cff0]" animate={{ flexGrow: 1 }} style={{ flexBasis: 0 }} />
+        <motion.i className="relative rounded-md bg-[#9ec3f5]" animate={{ flexGrow: i === 2 ? 0.5 : 1, opacity: i >= 1 ? 1 : 0.0001 }} style={{ flexBasis: 0 }} transition={{ duration: 0.6, ease: EASE }}>
+          {i === 2 && <span className="absolute top-1 right-1 rounded bg-ink px-1 text-[9px] font-bold text-white">2×</span>}
+        </motion.i>
+        <motion.span className="absolute top-[-4px] bottom-[-4px] w-0.5 rounded bg-record" animate={{ left: i === 0 ? "50%" : "50%" }} />
+      </div>
+      <div className="mt-1.5 flex h-5 items-center gap-[2px] rounded-md bg-[#e2f5ec] px-1.5">
+        {Array.from({ length: 32 }).map((_, k) => (
+          <i key={k} className="w-[2px] rounded-full bg-[#13a874]" style={{ height: `${30 + ((k * 37) % 60)}%` }} />
+        ))}
+      </div>
+      <p className="mt-2 text-center text-[10px] text-muted">{i === 0 ? "Split at 0:12" : i === 1 ? "Two clips" : "Second clip at 2×"}</p>
+    </div>
+  );
+}
+
+function ZoomScene() {
+  const ref = useRef<HTMLDivElement>(null);
+  const i = useBeat(ref, [1400, 2200, 1000]);
+  return (
+    <div ref={ref} className="w-[80%]">
+      <div className="relative aspect-[16/9] overflow-hidden rounded-[10px] bg-[linear-gradient(135deg,#e4edf9,#c9daf2)]">
+        {/* The whole picture zooms toward the click, like the export does. */}
+        <motion.div className="absolute inset-0 p-[7%]" style={{ transformOrigin: "84% 26%" }} animate={{ scale: i === 1 ? 1.6 : 1 }} transition={{ duration: 0.9, ease: EASE }}>
+          <div className="relative h-full overflow-hidden rounded-[8px] bg-white shadow-[0_0_0_0.5px_rgb(0_0_0/0.12),0_10px_24px_-10px_rgb(20_40_90/0.35)]">
+            <div className="flex gap-[4px] border-b border-black/5 px-2 py-1.5">
+              <i className="size-[6px] rounded-full bg-[#ff5f57]" />
+              <i className="size-[6px] rounded-full bg-[#febc2e]" />
+              <i className="size-[6px] rounded-full bg-[#28c840]" />
+            </div>
+            <div className="grid gap-1.5 p-2.5">
+              <div className="flex items-center gap-2">
+                <i className="h-2 w-1/3 rounded bg-ink/20" />
+                <motion.i className="ml-auto h-3.5 w-[24%] rounded bg-ink" animate={{ scale: i === 1 ? [1, 0.92, 1] : 1 }} transition={{ delay: 0.9, duration: 0.3 }} />
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                <i className="h-5 rounded bg-ink/[0.07]" />
+                <i className="h-5 rounded bg-ink/[0.07]" />
+                <i className="h-5 rounded bg-ink/[0.07]" />
+              </div>
+              <div className="flex h-7 items-end gap-1">
+                {[40, 55, 45, 70, 62, 85, 76].map((h, k) => (
+                  <i key={k} className="flex-1 rounded-t-[2px] bg-accent/45" style={{ height: `${h}%` }} />
+                ))}
+              </div>
+            </div>
+          </div>
+          <motion.div className="absolute" animate={{ left: i === 0 ? "45%" : "82%", top: i === 0 ? "62%" : "27%" }} transition={{ duration: 0.8, ease: EASE }}>
+            <Cursor />
+          </motion.div>
+        </motion.div>
+      </div>
+      <div className="relative mt-2.5 h-5 rounded-md bg-white shadow-[0_0_0_1px_rgb(17_24_39/0.08)]">
+        <span className="absolute inset-y-1 left-[30%] w-[38%] rounded bg-accent/15 text-center text-[9px] leading-3 font-semibold text-accent">1.6× zoom</span>
+        <motion.span className="absolute top-0 bottom-0 w-0.5 rounded bg-record" animate={{ left: ["8%", "92%"] }} transition={{ duration: 4.6, repeat: Infinity, ease: "linear" }} />
+      </div>
+    </div>
+  );
+}
+
+function UmsScene() {
+  const ref = useRef<HTMLDivElement>(null);
+  // Found → button pressed → cut.
+  const i = useBeat(ref, [1500, 700, 2300]);
+  const words: [string, boolean][] = [
+    ["So", false],
+    ["um", true],
+    ["this", false],
+    ["is", false],
+    ["uh", true],
+    ["the", false],
+    ["new", false],
+    ["like", true],
+    ["page.", false],
+  ];
+  const cut = i === 2;
+  return (
+    <div ref={ref} className="w-[84%] overflow-hidden rounded-[10px] bg-white text-left shadow-[0_0_0_0.5px_rgb(0_0_0/0.12),0_12px_30px_-10px_rgb(20_40_90/0.3)]">
+      {/* The editor's Captions panel. */}
+      <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
+        <span className="text-[10.5px] font-semibold">Transcript</span>
+        <motion.span
+          className="rounded-md px-2 py-1 text-[9.5px] font-semibold"
+          animate={{ backgroundColor: i === 1 ? "#0e62d6" : cut ? "rgb(17 24 39 / 0.06)" : "#116ff5", color: cut ? "#6b7280" : "#ffffff", scale: i === 1 ? 0.94 : 1 }}
+          transition={{ duration: 0.25 }}
+        >
+          {cut ? "3 removed · 1.4 s" : "Remove filler words · 3"}
+        </motion.span>
+      </div>
+      <p className="flex flex-wrap gap-x-1 gap-y-1 px-3 py-2.5 text-[12px] leading-tight">
+        {words.map(([w, f], k) => (
+          <motion.span
+            key={k}
+            className={`overflow-hidden rounded-[4px] whitespace-nowrap ${f ? "px-1" : ""}`}
+            animate={{
+              backgroundColor: f && !cut ? "rgb(255 59 48 / 0.12)" : "rgb(255 59 48 / 0)",
+              color: f ? "#e5372c" : "#111827",
+              width: f && cut ? 0 : "auto",
+              opacity: f && cut ? 0 : 1,
+              paddingLeft: f && cut ? 0 : f ? 4 : 0,
+              paddingRight: f && cut ? 0 : f ? 4 : 0,
+            }}
+            transition={{ duration: 0.5, ease: EASE }}
+          >
+            {w}
+          </motion.span>
+        ))}
+      </p>
+      {/* The timeline: the cut stretches close up. */}
+      <div className="border-t border-black/5 bg-[#f7f9fc] px-3 py-2.5">
+        <div className="flex h-5 gap-[3px]">
+          {words.map(([, f], k) => (
+            <motion.i
+              key={k}
+              className="rounded-[3px]"
+              style={{ flexBasis: 0 }}
+              animate={{ flexGrow: f && cut ? 0.0001 : f ? 0.6 : 1, backgroundColor: f ? "#ffc9c4" : "#b9d0f2", marginRight: f && cut ? -3 : 0 }}
+              transition={{ duration: 0.55, ease: EASE }}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
 const CARDS: [string, string, () => React.ReactNode][] = [
-  ["Blur, pixelate or highlight", "Hide a password or a face, or make one spot stand out. It follows the content.", () => <EditorClip name="masks" />],
+  ["Blur, pixelate or highlight", "Hide a password or a face, or make one spot stand out. It follows the content.", () => <BlurScene />],
   ["Scenes for screen and camera", "Switch any stretch to camera only, split or floating.", () => <LayoutScene />],
-  ["Automatic zoom", "Zooms come from your clicks. Change them on the timeline.", () => <EditorClip name="zoom" />],
+  ["Automatic zoom", "Zooms come from your clicks. Change them on the timeline.", () => <ZoomScene />],
   ["Captions, on your computer", "Words appear as you say them, the current one lit.", () => <CaptionScene />],
-  ["Cut the ums", "One click cuts every um and uh. Or delete words in the transcript.", () => <EditorClip name="ums" />],
+  ["Cut the ums", "One click cuts every um and uh. Or delete words in the transcript.", () => <UmsScene />],
   ["Text that animates", "Titles, lower thirds and big numbers, in and out.", () => <TextScene />],
   ["Any background", "Gradients, photos, your wallpaper or your own image.", () => <BackgroundScene />],
   ["Camera without the room", "Blur or remove your background. No green screen.", () => <CameraScene />],
-  ["Clips, speed and music", "Split, delete, speed up and lay music underneath.", () => <EditorClip name="clips" />],
+  ["Clips, speed and music", "Split, speed up and lay music underneath.", () => <ClipsScene />],
 ];
 
 export function EditorGrid() {
@@ -434,7 +612,8 @@ export function Storage() {
             {spots.map((_, k) => (
               <path key={k} d={path(k)} fill="none" stroke={k === active ? PLACES[k].tint : "#e3e8ef"} strokeWidth={k === active ? 2 : 1.5} strokeDasharray={k === active ? "0" : "4 5"} style={{ transition: "stroke 0.4s" }} />
             ))}
-            <motion.circle
+            {/* Animated in script every frame, so only while it can be seen. */}
+            {inView && <motion.circle
               key={active}
               r="6"
               fill={PLACES[active].tint}
@@ -442,7 +621,7 @@ export function Storage() {
               animate={{ offsetDistance: "100%" } as never}
               transition={{ duration: 1.3, ease: EASE, repeat: Infinity, repeatDelay: 0.6 }}
               style={{ offsetPath: `path("${path(active)}")` } as never}
-            />
+            />}
           </svg>
           {/* The recording */}
           <div className="absolute top-1/2 left-1/2 w-[30%] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-[1.6%] shadow-[0_0_0_1px_rgb(17_24_39/0.06),0_18px_40px_-16px_rgb(20_40_90/0.35)]">

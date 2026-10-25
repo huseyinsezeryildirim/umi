@@ -15,7 +15,28 @@ struct Fonts {
 
 fn fonts() -> &'static Mutex<Fonts> {
     static FONTS: OnceLock<Mutex<Fonts>> = OnceLock::new();
-    FONTS.get_or_init(|| Mutex::new(Fonts { system: FontSystem::new(), cache: SwashCache::new() }))
+    FONTS.get_or_init(|| {
+        // The browser has no system fonts to read: the page adds them with [`add_font`].
+        #[cfg(target_arch = "wasm32")]
+        let system = FontSystem::new_with_locale_and_db("en-US".into(), cosmic_text::fontdb::Database::new());
+        #[cfg(not(target_arch = "wasm32"))]
+        let system = FontSystem::new();
+        Mutex::new(Fonts { system, cache: SwashCache::new() })
+    })
+}
+
+/// Adds a font (TTF/OTF bytes) and makes its family the one for every style of text.
+pub fn add_font(data: Vec<u8>) {
+    let mut fonts = fonts().lock();
+    let db = fonts.system.db_mut();
+    let before = db.len();
+    db.load_font_data(data);
+    let family = db.faces().nth(before).and_then(|f| f.families.first()).map(|(name, _)| name.clone());
+    if let Some(family) = family {
+        db.set_sans_serif_family(family.clone());
+        db.set_serif_family(family.clone());
+        db.set_monospace_family(family);
+    }
 }
 
 #[derive(Clone, Copy)]

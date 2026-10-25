@@ -2,13 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { type Account, type Plan, deleteAccount, me, resendVerification, setPlanForTesting, signOut } from "@/lib/account";
+import { saveTake } from "@/lib/library";
 import { Recorder } from "./Recorder";
 import { Mark } from "./ui";
 
-/** After signing in: the web recorder and editor, with the account in the corner. */
+/**
+ * After signing in: the library and editor (the Mac app's own, built for the web, at /editor)
+ * and the web recorder for new recordings, with the account in the corner.
+ */
 export function Workspace() {
   const [account, setAccount] = useState<Account | null>(null);
   const [error, setError] = useState("");
+  const [view, setView] = useState<{ kind: "library"; open?: string } | { kind: "record" } | { kind: "saving" }>(() =>
+    typeof location !== "undefined" && new URLSearchParams(location.search).has("record") ? { kind: "record" } : { kind: "library" },
+  );
+
+  // The editor asks for a new recording ("New recording" in its library).
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin === location.origin && e.data?.umi === "record") setView({ kind: "record" });
+    };
+    addEventListener("message", onMessage);
+    return () => removeEventListener("message", onMessage);
+  }, []);
 
   useEffect(() => {
     me()
@@ -34,10 +50,43 @@ export function Workspace() {
       </main>
     );
 
+  const menu = (side: "left" | "right") => <AccountMenu account={account} onChange={setAccount} side={side} />;
   return (
     <>
       {!account.emailVerified && <VerifyBanner email={account.email} />}
-      <Recorder account={<AccountMenu account={account} onChange={setAccount} />} />
+      {view.kind === "record" && (
+        <Recorder
+          account={menu("right")}
+          onCancel={() => setView({ kind: "library" })}
+          onTake={(take) => {
+            setView({ kind: "saving" });
+            void saveTake(account.id, take).then(
+              (id) => setView({ kind: "library", open: id }),
+              () => setView({ kind: "library" }),
+            );
+          }}
+        />
+      )}
+      {view.kind === "saving" && (
+        <main className="grid min-h-[100svh] place-items-center text-[15px] text-muted">
+          <div className="flex flex-col items-center gap-3">
+            <Mark className="size-8 animate-pulse text-accent" />
+            Saving your recording…
+          </div>
+        </main>
+      )}
+      {view.kind === "library" && (
+        <>
+          <iframe
+            title="Umi"
+            src={`/editor/index.html?account=${encodeURIComponent(account.id)}${view.open ? `&open=${encodeURIComponent(view.open)}` : ""}`}
+            className="fixed inset-0 h-full w-full border-0"
+            allow="clipboard-write; fullscreen"
+          />
+          {/* Where the Mac app has its window buttons. */}
+          <div className="fixed top-[13px] left-4 z-10">{menu("left")}</div>
+        </>
+      )}
     </>
   );
 }
@@ -64,7 +113,7 @@ function VerifyBanner({ email }: { email: string | null }) {
 
 const PLAN_NAMES: Record<Plan, string> = { free: "Free", pro: "Pro", team: "Team" };
 
-function AccountMenu({ account, onChange }: { account: Account; onChange: (a: Account) => void }) {
+function AccountMenu({ account, onChange, side = "right" }: { account: Account; onChange: (a: Account) => void; side?: "left" | "right" }) {
   const [open, setOpen] = useState(false);
   const letter = (account.email ?? "?")[0].toUpperCase();
   return (
@@ -73,7 +122,7 @@ function AccountMenu({ account, onChange }: { account: Account; onChange: (a: Ac
         {letter}
       </button>
       {open && (
-        <div className="absolute top-11 right-0 z-50 w-60 rounded-2xl bg-white p-2 text-left shadow-[0_0_0_1px_rgb(17_24_39/0.08),0_20px_50px_-12px_rgb(17_24_39/0.25)]">
+        <div className={`absolute top-11 ${side === "left" ? "left-0" : "right-0"} z-50 w-60 rounded-2xl bg-white p-2 text-left shadow-[0_0_0_1px_rgb(17_24_39/0.08),0_20px_50px_-12px_rgb(17_24_39/0.25)]`}>
           <p className="truncate px-3 pt-2 text-[14px] font-medium">{account.email}</p>
           <p className="px-3 pb-2 text-[12px] text-faint">
             {PLAN_NAMES[account.plan]} plan

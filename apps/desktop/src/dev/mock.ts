@@ -512,6 +512,10 @@ mockIPC(
         return new Float32Array(Math.round(48000 * (p.seconds as number)) * 2).buffer;
       case "presets_list":
         return { presets: [{ id: "A", name: "Product demos" }, { id: "B", name: "Tutorials" }], defaultId: "A" };
+      case "music_fetch":
+        return `/tmp/${String(p.url).split("/").pop()}`;
+      case "bundle_import":
+        return `${p.base}-A1B2C3.${String(p.file).split(".").pop()}`;
       case "music_tracks":
         return (music as unknown[]).map((t) => ({ ...(t as object), downloaded: false }));
       case "system_wallpapers":

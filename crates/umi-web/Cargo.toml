@@ -1,0 +1,26 @@
+[package]
+name = "umi-web"
+description = "Umi's editor in the browser: the editor session (umi-editor) and the GPU renderer (umi-render, on WebGPU), for WebAssembly."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+umi-editor = { path = "../umi-editor" }
+umi-project.workspace = true
+umi-render = { path = "../umi-render" }
+serde.workspace = true
+serde_json.workspace = true
+uuid = { workspace = true, features = ["rng-getrandom"] }
+getrandom = "0.4"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["OffscreenCanvas", "ImageBitmap", "HtmlVideoElement", "HtmlCanvasElement", "VideoFrame", "HtmlImageElement"] }
+wgpu = "30"
+
+[lints]
+workspace = true
