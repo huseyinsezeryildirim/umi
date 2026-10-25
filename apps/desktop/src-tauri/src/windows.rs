@@ -13,7 +13,7 @@ pub struct Spec {
 pub const LAUNCHER: Spec = Spec { view: "launcher", size: (360.0, 560.0), transparent: true, focus: true };
 pub const BUBBLE: Spec = Spec { view: "bubble", size: (240.0, 240.0), transparent: true, focus: false };
 /// A column on the left, like Loom's: stop, time, sound, pen, pause, start over, discard.
-pub const CONTROLS: Spec = Spec { view: "controls", size: (64.0, 320.0), transparent: true, focus: false };
+pub const CONTROLS: Spec = Spec { view: "controls", size: (64.0, 360.0), transparent: true, focus: false };
 pub const COUNTDOWN: Spec = Spec { view: "countdown", size: (240.0, 240.0), transparent: true, focus: false };
 pub const SHOT: Spec = Spec { view: "shot", size: (1120.0, 760.0), transparent: false, focus: true };
 pub const PROMPTER: Spec = Spec { view: "prompter", size: (520.0, 220.0), transparent: true, focus: true };
@@ -47,7 +47,10 @@ pub fn show(app: &AppHandle, spec: &Spec, at: Option<(f64, f64)>) -> tauri::Resu
         _ => (origin.x + (display.width - spec.size.0) / 2.0, origin.y + (display.height - spec.size.1) / 2.0),
     });
     if let Some(w) = app.get_webview_window(spec.view) {
-        w.set_position(LogicalPosition::new(place.0, place.1))?;
+        // The bubble comes back where it was dragged to.
+        if spec.view != "bubble" || at.is_some() {
+            w.set_position(LogicalPosition::new(place.0, place.1))?;
+        }
         w.show()?;
         // The bubble turned its camera off when hidden; it starts it again.
         if spec.view == "bubble" {
@@ -71,7 +74,35 @@ pub fn show(app: &AppHandle, spec: &Spec, at: Option<(f64, f64)>) -> tauri::Resu
         .visible_on_all_workspaces(true)
         .focused(spec.focus)
         .build()?;
+    if spec.transparent {
+        float_over_full_screen(&window, 25);
+    }
     Ok(window)
+}
+
+/// The floating windows (bubble, control bar, countdown, prompter) stay visible when another
+/// app is full screen: macOS shows a window in a full-screen Space only when it's marked as a
+/// full-screen auxiliary and sits above normal windows.
+#[allow(unexpected_cfgs, unsafe_code)]
+/// `level` 25 is NSStatusWindowLevel (above other apps' windows); the drawing layer goes one
+/// below, so the bubble and the control bar stay on top of it.
+pub fn float_over_full_screen(window: &WebviewWindow, level: isize) {
+    #[cfg(target_os = "macos")]
+    {
+        use objc::{msg_send, sel, sel_impl};
+        // canJoinAllSpaces | stationary | fullScreenAuxiliary
+        let behavior: usize = (1 << 0) | (1 << 4) | (1 << 8);
+        let w = window.clone();
+        let _ = window.run_on_main_thread(move || {
+            let Ok(ns_window) = w.ns_window() else { return };
+            let ns_window = ns_window as *mut objc::runtime::Object;
+            // SAFETY: this window's own NSWindow, on the main thread.
+            unsafe {
+                let _: () = msg_send![ns_window, setCollectionBehavior: behavior];
+                let _: () = msg_send![ns_window, setLevel: level];
+            }
+        });
+    }
 }
 
 /// The recorder, with the camera bubble when the camera was left on.
@@ -124,7 +155,7 @@ pub fn ink_set(app: AppHandle, drawing: bool, color: Option<String>) -> Result<(
         Some(w) => w,
         None => {
             let (origin, display) = main_display(&app);
-            WebviewWindowBuilder::new(&app, "ink", WebviewUrl::App("index.html?view=ink".into()))
+            let w = WebviewWindowBuilder::new(&app, "ink", WebviewUrl::App("index.html?view=ink".into()))
                 .title(umi_capture::screen::INK_WINDOW_TITLE)
                 .inner_size(display.width, display.height)
                 .position(origin.x, origin.y)
@@ -137,7 +168,9 @@ pub fn ink_set(app: AppHandle, drawing: bool, color: Option<String>) -> Result<(
                 .visible_on_all_workspaces(true)
                 .focused(drawing)
                 .build()
-                .map_err(|e| e.to_string())?
+                .map_err(|e| e.to_string())?;
+            float_over_full_screen(&w, 24);
+            w
         }
     };
     window.set_ignore_cursor_events(!drawing).map_err(|e| e.to_string())?;

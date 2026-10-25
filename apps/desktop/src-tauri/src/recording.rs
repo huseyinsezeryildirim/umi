@@ -147,6 +147,8 @@ pub struct Status {
     paused: bool,
     elapsed: f64,
     level: f32,
+    /// The camera is shown in the video now (it can be turned off and on while recording).
+    camera_visible: bool,
 }
 
 #[tauri::command]
@@ -161,6 +163,7 @@ pub fn record_status(state: State<'_, AppState>) -> Status {
         paused: current.as_ref().is_some_and(|r| r.is_paused()),
         elapsed: current.as_ref().map_or(0.0, |r| r.elapsed()),
         level,
+        camera_visible: current.as_ref().is_none_or(|r| r.camera_visible()),
     }
 }
 
@@ -297,6 +300,21 @@ pub fn record_pause(app: AppHandle, state: State<'_, AppState>, paused: bool) {
         if paused { r.pause() } else { r.resume() }
     }
     let _ = app.emit("recording", if paused { "paused" } else { "resumed" });
+}
+
+/// Turns the camera off or on while recording: the bubble goes away or comes back, and the
+/// video hides the camera for that stretch (the camera keeps recording, so it can be undone).
+#[tauri::command]
+pub fn record_camera(app: AppHandle, state: State<'_, AppState>, visible: bool) -> Result<(), String> {
+    if let Some(r) = state.recorder.current.lock().as_ref() {
+        r.set_camera_visible(visible);
+    }
+    if visible {
+        crate::windows::show(&app, &crate::windows::BUBBLE, None).map_err(|e| e.to_string())?;
+    } else {
+        crate::windows::hide(&app, "bubble");
+    }
+    Ok(())
 }
 
 /// Stops and returns the new recording's bundle.

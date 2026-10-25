@@ -1,1 +1,0 @@
-import{O as e,x as t}from"./web-DO7bYQfM.js";import{k as n}from"./index-MB2vDEav.js";var r={name:`square`,size:24,node:[[`rect`,{width:`18`,height:`18`,x:`3`,y:`3`,rx:`2`,key:`afitv7`}]]};r.node;var i=i=>t(n,e(i,{icon:r}));export{i as t};

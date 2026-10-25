@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
-import { Pause, PenLine, Play, RotateCcw, Square, Trash2 } from "lucide-solid";
+import { Camera, CameraOff, Pause, PenLine, Play, RotateCcw, Square, Trash2 } from "lucide-solid";
 import { formatClock, recorder } from "./api";
 import { INK_COLORS } from "./Ink";
 
@@ -13,13 +13,18 @@ export function Controls() {
   const [confirm, setConfirm] = createSignal(false);
   const [drawing, setDrawing] = createSignal(false);
   const [color, setColor] = createSignal<string>(INK_COLORS[0]);
+  /** Whether this recording has a camera, and whether it's showing. */
+  const [hasCamera, setHasCamera] = createSignal(false);
+  const [cameraOn, setCameraOn] = createSignal(true);
 
   onMount(() => {
+    void recorder.settings().then((s) => setHasCamera(s.cameraOn && !s.cameraOnly));
     const timer = window.setInterval(async () => {
       const s = await recorder.status();
       setElapsed(s.elapsed);
       setPaused(s.paused);
       setLevel(s.level);
+      setCameraOn(s.cameraVisible);
     }, 100);
     const off = listen<{ drawing: boolean }>("ink:mode", (e) => setDrawing(e.payload.drawing));
     onCleanup(() => {
@@ -68,6 +73,21 @@ export function Controls() {
           </>
         }
       >
+        <Show when={hasCamera()}>
+          <button
+            type="button"
+            class="controls__btn"
+            onClick={() => {
+              setCameraOn(!cameraOn());
+              void recorder.camera(cameraOn());
+            }}
+            title={cameraOn() ? "Turn the camera off" : "Turn the camera on"}
+          >
+            <Show when={cameraOn()} fallback={<CameraOff size={15} />}>
+              <Camera size={15} />
+            </Show>
+          </button>
+        </Show>
         <button type="button" class="controls__btn" data-on={drawing() ? "true" : "false"} onClick={() => pen(!drawing())} title="Draw on screen (⌥⇧D) · Esc to stop">
           <PenLine size={15} />
         </button>

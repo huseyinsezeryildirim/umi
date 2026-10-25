@@ -65,6 +65,8 @@ export interface Status {
   paused: boolean;
   elapsed: number;
   level: number;
+  /** The camera shows in the video now (it can be turned off and on while recording). */
+  cameraVisible: boolean;
 }
 
 export const recorder = {
@@ -73,6 +75,8 @@ export const recorder = {
   sources: () => invoke<Sources>("record_sources"),
   meter: (microphone: string | null) => invoke("record_meter", { microphone }),
   status: () => invoke<Status>("record_status"),
+  /** Camera off/on while recording (the bubble hides; the video hides the camera there). */
+  camera: (visible: boolean) => invoke("record_camera", { visible }),
   cameraPreview: (camera: string | null, onFrame: (jpeg: ArrayBuffer) => void) => {
     const frames = new Channel<ArrayBuffer>();
     frames.onmessage = onFrame;

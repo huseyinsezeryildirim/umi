@@ -121,9 +121,9 @@
 /* On the left, as in the app. */
 .desk__controls {
   left: 16px;
-  top: calc(50% - 160px);
+  top: calc(50% - 180px);
   width: 64px;
-  height: 320px;
+  height: 360px;
   animation: desk-drop 0.4s cubic-bezier(0.25, 1, 0.5, 1);
 }
 /* Holds the app's bubble (position: fixed inside); the transform keeps it in this box. */

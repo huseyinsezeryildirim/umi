@@ -37,6 +37,8 @@ type Session = {
   stop: () => void;
   restart: () => void;
   discard: () => void;
+  /** Camera off/on in the video from now (the camera keeps recording). */
+  camera: (visible: boolean) => void;
 };
 
 /** `onTake` gets the finished recording (the page saves it and opens the editor). */
@@ -58,6 +60,8 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
   const [count, setCount] = useState(3);
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
+  /** The camera is shown (it can be turned off and on while recording). */
+  const [camShown, setCamShown] = useState(true);
   const session = useRef<Session | null>(null);
   const skipCountdown = useRef<() => void>(() => {});
 
@@ -132,7 +136,7 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
     const cam = camOn ? camera : null;
     const owned = [display, camera, mic];
     // From here the session owns the camera and microphone streams.
-    session.current = { pause() {}, resume() {}, stop() {}, restart() {}, discard() {} };
+    session.current = { pause() {}, resume() {}, stop() {}, restart() {}, discard() {}, camera() {} };
 
     // 3, 2, 1 on the page; Skip starts at once.
     setStage("countdown");
@@ -156,6 +160,10 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
     let recorders: { rec: MediaRecorder; chunks: Blob[] }[] = [];
     let active = 0; // seconds recorded before the current stretch
     let since = 0; // when the current stretch started (0 while paused)
+    const now = () => active + (since ? (performance.now() - since) / 1000 : 0);
+    // Where the camera was turned off: the editor hides it there.
+    let cameraOff: [number, number][] = [];
+    let offSince: number | null = null;
     const begin = () => {
       recorders = [screenStream, cam].filter(Boolean).map((s) => {
         const rec = new MediaRecorder(s!, type ? { mimeType: type, videoBitsPerSecond: s === cam ? 2_500_000 : 8_000_000 } : undefined);
@@ -166,6 +174,9 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
       recorders.forEach((r) => r.rec.start(1000));
       active = 0;
       since = performance.now();
+      cameraOff = [];
+      offSince = null;
+      setCamShown(true);
       setPaused(false);
       setElapsed(0);
     };
@@ -178,7 +189,8 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
       if (ended) return;
       ended = true;
       clearInterval(tick);
-      const duration = active + (since ? (performance.now() - since) / 1000 : 0);
+      const duration = now();
+      if (offSince !== null) cameraOff.push([offSince, duration]);
       const blobs = await Promise.all(
         recorders.map(
           (r) =>
@@ -212,6 +224,7 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
         camSize: b.size === "S" ? 0.18 : b.size === "M" ? 0.24 : 0.32,
         camShape: b.shape,
         mirror: b.mirror,
+        cameraOff,
       });
       setStage("edit");
     };
@@ -234,6 +247,14 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
         begin();
       },
       discard: () => void end(false),
+      camera: (visible) => {
+        if (!visible && offSince === null) offSince = now();
+        if (visible && offSince !== null) {
+          cameraOff.push([offSince, now()]);
+          offSince = null;
+        }
+        setCamShown(visible);
+      },
     };
     // The browser's own "Stop sharing" button ends it too.
     display.getVideoTracks()[0].addEventListener("ended", () => void end(true));
@@ -303,7 +324,7 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
         )}
       </AnimatePresence>
 
-      {camera && camOn && stage !== "edit" && <Bubble stream={camera} place={bubble} onPlace={setBubble} />}
+      {camera && camOn && camShown && stage !== "edit" && <Bubble stream={camera} place={bubble} onPlace={setBubble} />}
 
       <AnimatePresence>
         {stage === "countdown" && (
@@ -318,7 +339,7 @@ export function Recorder({ account, onTake, onCancel }: { account?: React.ReactN
             </button>
           </motion.div>
         )}
-        {stage === "recording" && <Controls key="controls" elapsed={elapsed} paused={paused} session={session} />}
+        {stage === "recording" && <Controls key="controls" elapsed={elapsed} paused={paused} session={session} hasCamera={!!camera && camOn} camShown={camShown} />}
       </AnimatePresence>
     </div>
   );
@@ -364,18 +385,16 @@ function Bubble({ stream, place, onPlace }: { stream: MediaStream; place: Place;
     >
       <video ref={video} autoPlay muted playsInline className={`pointer-events-none size-full object-cover ${place.mirror ? "-scale-x-100" : ""}`} />
       {hover && (
-        // Three dots for the size and mirror, in a small row near the bottom.
+        // Shape and mirror, in a small row near the bottom.
         <div className="absolute bottom-[11%] left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-full bg-[rgb(14_17_30/0.72)] p-1 backdrop-blur-md">
-          {(Object.keys(SIZES) as Size[]).map((s, i) => (
-            <PillButton key={s} label={["Small", "Medium", "Large"][i]} on={place.size === s} onClick={() => onPlace({ ...place, size: s })}>
-              <span className="rounded-full bg-current" style={{ width: 4 + i * 3, height: 4 + i * 3 }} />
+          {(["circle", "rounded", "square"] as CameraShape[]).map((shape) => (
+            <PillButton key={shape} label={shape === "rounded" ? "Rounded" : shape === "circle" ? "Circle" : "Square"} on={place.shape === shape} onClick={() => onPlace({ ...place, shape })}>
+              <span className={`size-2.5 border-[1.5px] border-current ${shape === "circle" ? "rounded-full" : shape === "rounded" ? "rounded-[35%]" : "rounded-[2px]"}`} />
             </PillButton>
           ))}
           <PillButton label="Mirror" on={place.mirror} onClick={() => onPlace({ ...place, mirror: !place.mirror })}>
-            {/* Lucide flip-horizontal-2, as in the desktop bubble. */}
-            <svg viewBox="0 0 24 24" className="size-[13px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 12H8M16 12h-2M22 12h-2M4 12H2" />
-              <path d="M7.298 20.288A1 1 0 008 22h8a1 1 0 00.703-1.712l-3.991-3.99a1 1 0 00-1.424-.001zM7.298 3.712A1 1 0 018 2h8a1 1 0 01.703 1.712l-3.991 3.99a1 1 0 01-1.424.001z" />
+            <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v18M8 7 3 12l5 5zM16 7l5 5-5 5z" />
             </svg>
           </PillButton>
         </div>
@@ -399,7 +418,7 @@ function PillButton({ label, on, onClick, children }: { label: string; on: boole
 }
 
 /** The bar on the left while recording: stop, time, pause, start over, delete. */
-function Controls({ elapsed, paused, session }: { elapsed: number; paused: boolean; session: React.RefObject<Session | null> }) {
+function Controls({ elapsed, paused, session, hasCamera, camShown }: { elapsed: number; paused: boolean; session: React.RefObject<Session | null>; hasCamera: boolean; camShown: boolean }) {
   const [confirm, setConfirm] = useState<"restart" | "discard" | null>(null);
   return (
     <motion.div
@@ -424,6 +443,20 @@ function Controls({ elapsed, paused, session }: { elapsed: number; paused: boole
           </svg>
         )}
       </BarButton>
+      {hasCamera && (
+        <BarButton label={camShown ? "Turn the camera off" : "Turn the camera on"} onClick={() => session.current?.camera(!camShown)}>
+          {camShown ? (
+            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 10l5-3v10l-5-3z" />
+              <rect x="3" y="6" width="12" height="12" rx="2" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 10l5-3v10l-5-3zM3 3l18 18M7 6h6a2 2 0 0 1 2 2v6M15 18H5a2 2 0 0 1-2-2V8a2 2 0 0 1 1-1.7" />
+            </svg>
+          )}
+        </BarButton>
+      )}
       <BarButton label="Start over" onClick={() => setConfirm("restart")}>
         <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4" />

@@ -800,6 +800,7 @@ pub fn run() {
             recording::record_prepare,
             recording::record_begin,
             recording::record_pause,
+            recording::record_camera,
             recording::record_stop,
             recording::record_cancel,
             recording::copy_file_to_clipboard,

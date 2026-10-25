@@ -552,6 +552,7 @@ mod tests {
             edit: None,
             camera_only: None,
             title: None,
+            camera_off: None,
             title_auto: None,
         };
         Document::new(project, EditSettings::default(), CursorData::default(), duration)
