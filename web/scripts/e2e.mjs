@@ -395,20 +395,34 @@ async function main() {
   check(accepted === 10 && limited === 429, "per-IP comment rate limit: 10 accepted, then 429");
   await api("DELETE", `/api/videos/${spam.id}`);
 
-  console.log("\nReports (separate video)");
+  console.log("\nReports and the moderation panel (separate video)");
   const { video: reported } = await upload(small, null, { title: "reported" });
   check((await viewer("POST", `/v/${reported.id}/report`, { reason: "nonsense" })).status === 400, "unknown reason → 400");
-  check((await viewer("POST", `/v/${reported.id}/report`, { reason: "spam", details: "ads" })).status === 200, "a report → 200");
-  check((await get(`/v/${reported.id}`)).status === 200, "one spam report doesn't hide it");
   const reportFrom = (ip, reason) =>
-    fetch(`${BASE}/v/${reported.id}/report`, { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": ip }, body: JSON.stringify({ reason }) });
-  check((await reportFrom("203.0.113.1", "illegal")).status === 200, "an illegal-content report → 200");
-  check((await get(`/v/${reported.id}`)).status === 200, "one person can't take a video down");
-  await reportFrom("203.0.113.2", "illegal");
-  check((await get(`/v/${reported.id}`)).status === 451, "a second person reporting illegal content hides the page → 451");
-  check((await get(`/v/${reported.id}/video.mp4`)).status === 451, "…and the video file → 451");
+    fetch(`${BASE}/v/${reported.id}/report`, { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": ip }, body: JSON.stringify({ reason, details: "e2e" }) });
+  for (const [ip, reason] of [["203.0.113.1", "illegal"], ["203.0.113.2", "illegal"], ["203.0.113.3", "spam"], ["203.0.113.4", "abuse"]]) await reportFrom(ip, reason);
+  check((await get(`/v/${reported.id}`)).status === 200, "reports alone never hide a video (the moderator decides)");
+  const admin = (path, form, cookie) =>
+    fetch(`${BASE}/adagiris${path}`, { method: form ? "POST" : "GET", redirect: "manual", headers: cookie ? { cookie } : {}, body: form ? new URLSearchParams(form) : undefined });
+  check((await admin("")).status === 200 && (await (await admin("")).text()).includes("Sign in"), "panel asks to sign in");
+  check((await admin("/login", { email: "hi@ux.center", password: "wrong" })).status === 401, "wrong password → 401");
+  const signIn = await admin("/login", { email: "hi@ux.center", password: process.env.UMI_ADMIN_PASSWORD  });
+  const adminCookie = (signIn.headers.get("set-cookie") ?? "").split(";")[0];
+  check(signIn.status === 303 && adminCookie.startsWith("umi_admin="), "moderator signs in");
+  const page = await (await admin("", null, adminCookie)).text();
+  check(page.includes(reported.id) && page.includes("4</b> open reports"), "the reported video waits in the panel with its 4 reports");
+  check((await admin(`/videos/${reported.id}/video.mp4`, null, adminCookie)).status === 200, "moderator can watch it");
+  check((await admin(`/videos/${reported.id}/video.mp4`)).status === 303, "…but not without signing in");
+  await admin(`/videos/${reported.id}/hide`, {}, adminCookie);
+  check((await get(`/v/${reported.id}`)).status === 451, "Hide → the link shows \"under review\" (451)");
   check((await api("GET", `/api/videos/${reported.id}`)).data?.video?.underReview === true, "owner sees it's under review");
-  await api("DELETE", `/api/videos/${reported.id}`);
+  await admin(`/videos/${reported.id}/unhide`, {}, adminCookie);
+  check((await get(`/v/${reported.id}`)).status === 200, "Show again → the link works");
+  check(!(await (await admin("", null, adminCookie)).text()).includes(reported.id), "a decision closes the reports");
+  await admin(`/videos/${reported.id}/delete`, {}, adminCookie);
+  check((await get(`/v/${reported.id}`)).status === 410, "Delete → the video is gone (410)");
+  check((await admin(`/videos/${reported.id}/delete`, {}, adminCookie)).status === 303, "deleting twice is harmless");
+  check((await fetch(`${BASE}/adagiris/videos/${reported.id}/hide`, { method: "POST", redirect: "manual", headers: { cookie: adminCookie, origin: "https://evil.example" } })).status === 403, "cross-site actions are refused");
 
   console.log("\nPlan changes");
   const freeTok = args["free-token"];

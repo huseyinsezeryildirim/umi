@@ -181,8 +181,8 @@ export async function handleAuth(request: Request, env: AppEnv, path: string): P
   if (path === "/api/auth/signup" && method === "POST") {
     const { email, password } = credentials(await readJson(request));
     checkPassword(password);
-    // Accounts per address: free links can't be multiplied by signing up again and again.
-    await throttle(env, `signup:${request.headers.get("cf-connecting-ip") ?? "local"}`, String(env.DEV_TOOLS ?? "") === "1" ? 100 : 5, 60 * 60 * 1000);
+    // One account per address a day: free links can't be multiplied by signing up again and again.
+    await throttle(env, `signup:${request.headers.get("cf-connecting-ip") ?? "local"}`, String(env.DEV_TOOLS ?? "") === "1" ? 100 : 1, 24 * 60 * 60 * 1000);
     const taken = await env.DB.prepare("SELECT 1 FROM accounts WHERE email = ?").bind(email).first();
     if (taken) throw new HttpError(409, "email_taken", "There's already an account with this email. Sign in instead.");
     const id = `acc_${randomId(16)}`;
