@@ -74,7 +74,9 @@ function LiveDemo() {
   return (
     <div className="relative overflow-hidden rounded-[28px] p-[3%] shadow-[0_50px_120px_-40px_rgb(20_60_130/0.45)] sm:rounded-[36px]">
       <img src="/photos/sky.jpg" alt="" className="absolute inset-0 size-full object-cover" />
-      <div ref={box} className="relative aspect-[16/10] overflow-hidden rounded-xl bg-white shadow-[0_0_0_0.5px_rgb(0_0_0/0.2),0_30px_70px_-20px_rgb(0_0_0/0.4)] sm:rounded-2xl">
+      {/* A Mac window's corner at this scale: the toolbar buttons sit close to it, so a bigger
+          radius would clip Export. */}
+      <div ref={box} style={{ borderRadius: Math.max(3, 12 * scale) }} className="relative aspect-[16/10] overflow-hidden bg-white shadow-[0_0_0_0.5px_rgb(0_0_0/0.2),0_30px_70px_-20px_rgb(0_0_0/0.4)]">
         <img src="/media/editor.jpg" alt="The Umi editor" className="absolute inset-0 size-full object-cover" />
         {live && (
           <iframe
