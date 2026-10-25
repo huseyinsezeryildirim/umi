@@ -230,13 +230,6 @@ video::-webkit-media-controls-overlay-play-button {
   -webkit-appearance: none;
 }
 
-.mark {
-  display: inline-block;
-  background: currentColor;
-  -webkit-mask: url("/umi-mark.svg") center / contain no-repeat;
-  mask: url("/umi-mark.svg") center / contain no-repeat;
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

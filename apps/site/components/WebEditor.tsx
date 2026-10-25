@@ -51,18 +51,6 @@ export function Editor({ take, account, onRestart }: { take: Take; account?: Rea
   const state = useRef({ look, kept, zooms, lines });
   state.current = { look, kept, zooms, lines };
 
-  // Recorded WebM has no length until it's been seeked to the end once.
-  useEffect(() => {
-    const v = screen.current!;
-    const fix = () => {
-      if (v.duration === Infinity) {
-        v.currentTime = 1e9;
-        v.addEventListener("seeked", () => (v.currentTime = 0), { once: true });
-      }
-    };
-    v.addEventListener("loadedmetadata", fix, { once: true });
-  }, []);
-
   // Automatic zoom: look for where things happen, in the background.
   useEffect(() => {
     let alive = true;
@@ -377,8 +365,11 @@ export function Editor({ take, account, onRestart }: { take: Take; account?: Rea
         </aside>
       </div>
 
-      <video ref={screen} src={urls.screen} playsInline preload="auto" className="hidden" />
-      {urls.camera && <video ref={cam} src={urls.camera} muted playsInline preload="auto" className="hidden" />}
+      {/* Sources for the canvas. Kept rendered (not display:none) so every browser keeps decoding frames. */}
+      <div aria-hidden className="pointer-events-none fixed top-0 left-0 size-px overflow-hidden opacity-0">
+        <video ref={screen} src={urls.screen} playsInline preload="auto" />
+        {urls.camera && <video ref={cam} src={urls.camera} muted playsInline preload="auto" />}
+      </div>
     </div>
   );
 }
