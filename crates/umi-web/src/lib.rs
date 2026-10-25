@@ -24,6 +24,12 @@ fn err(e: impl std::fmt::Display) -> JsError {
     JsError::new(&e.to_string())
 }
 
+/// Rust errors go to the browser console with their message (instead of "unreachable").
+#[wasm_bindgen(start)]
+pub fn start() {
+    std::panic::set_hook(Box::new(|info| web_sys::console::error_1(&format!("umi: {info}").into())));
+}
+
 /// Adds a font for text and captions (TTF/OTF bytes; the browser has no system fonts here).
 #[wasm_bindgen(js_name = addFont)]
 pub fn add_font(data: Vec<u8>) {
@@ -53,6 +59,8 @@ struct View {
     gpu: Arc<Gpu>,
     surface: wgpu::Surface<'static>,
     canvas: web_sys::OffscreenCanvas,
+    format: wgpu::TextureFormat,
+    blit: Blit,
     configured: (u32, u32),
     renderer: Renderer,
 }
@@ -73,15 +81,101 @@ pub struct WebGpu {
     gpu: Arc<Gpu>,
     surface: wgpu::Surface<'static>,
     canvas: web_sys::OffscreenCanvas,
+    format: wgpu::TextureFormat,
+    blit: Blit,
 }
 
-/// Opens the GPU (WebGPU) for drawing into `canvas`.
+#[wasm_bindgen]
+impl WebGpu {
+    /// "webgpu" or "webgl2".
+    pub fn backend(&self) -> String {
+        if self.gpu.adapter_info.backend == wgpu::Backend::Gl { "webgl2".into() } else { "webgpu".into() }
+    }
+}
+
+/// Draws the renderer's output onto the canvas (sRGB in, sRGB out).
+struct Blit {
+    pipeline: wgpu::RenderPipeline,
+    layout: wgpu::BindGroupLayout,
+    sampler: wgpu::Sampler,
+}
+
+impl Blit {
+    fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Blit {
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("blit"),
+            source: wgpu::ShaderSource::Wgsl(
+                r#"
+@group(0) @binding(0) var t: texture_2d<f32>;
+@group(0) @binding(1) var s: sampler;
+struct V { @builtin(position) p: vec4<f32>, @location(0) uv: vec2<f32> };
+@vertex fn vs(@builtin(vertex_index) i: u32) -> V {
+    let uv = vec2<f32>(f32((i << 1u) & 2u), f32(i & 2u));
+    var o: V;
+    o.p = vec4<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, 0.0, 1.0);
+    o.uv = uv;
+    return o;
+}
+@fragment fn fs(v: V) -> @location(0) vec4<f32> { return textureSample(t, s, v.uv); }
+"#
+                .into(),
+            ),
+        });
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("blit"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("blit"),
+            bind_group_layouts: &[Some(&layout)],
+            immediate_size: 0,
+        });
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("blit"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState { module: &shader, entry_point: Some("vs"), buffers: &[], compilation_options: Default::default() },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs"),
+                targets: &[Some(format.into())],
+                compilation_options: Default::default(),
+            }),
+            primitive: Default::default(),
+            depth_stencil: None,
+            multisample: Default::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
+        Blit { pipeline, layout, sampler }
+    }
+}
+
+/// Opens the GPU for drawing into `canvas`: WebGPU where the browser has it, WebGL2 otherwise.
 #[wasm_bindgen(js_name = openGpu)]
 pub async fn open_gpu(canvas: web_sys::OffscreenCanvas) -> Result<WebGpu, JsError> {
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::BROWSER_WEBGPU,
+    let instance = wgpu::util::new_instance_with_webgpu_detection(wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::BROWSER_WEBGPU | wgpu::Backends::GL,
         ..wgpu::InstanceDescriptor::new_without_display_handle()
-    });
+    })
+    .await;
     let surface = instance.create_surface(wgpu::SurfaceTarget::OffscreenCanvas(canvas.clone())).map_err(err)?;
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
@@ -91,10 +185,16 @@ pub async fn open_gpu(canvas: web_sys::OffscreenCanvas) -> Result<WebGpu, JsErro
         })
         .await
         .map_err(err)?;
-    let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor { label: Some("umi"), ..Default::default() }).await.map_err(err)?;
+    // WebGL2 offers less than WebGPU's defaults: ask for what this adapter has.
+    let (device, queue) = adapter
+        .request_device(&wgpu::DeviceDescriptor { label: Some("umi"), required_limits: adapter.limits(), ..Default::default() })
+        .await
+        .map_err(err)?;
     let pipelines = umi_render::gpu::Pipelines::new(&device);
+    let format = surface.get_capabilities(&adapter).formats.first().copied().ok_or_else(|| err("the canvas can't be drawn into"))?;
     let gpu = Arc::new(Gpu { adapter_info: adapter.get_info(), device, queue, pipelines });
-    Ok(WebGpu { gpu, surface, canvas })
+    let blit = Blit::new(&gpu.device, format.add_srgb_suffix());
+    Ok(WebGpu { gpu, surface, canvas, format, blit })
 }
 
 /// The bundle path the renderer resolves relative image names against: `/web/<id>` (there
@@ -284,7 +384,7 @@ impl Editor {
     pub fn attach(&mut self, gpu: WebGpu) {
         let doc = &self.session.doc;
         let renderer = Renderer::new(gpu.gpu.clone(), doc.project.clone(), doc.edit.clone(), doc.cursor.clone(), Some(bundle(&self.id).into()));
-        self.view = Some(View { gpu: gpu.gpu, surface: gpu.surface, canvas: gpu.canvas, configured: (0, 0), renderer });
+        self.view = Some(View { gpu: gpu.gpu, surface: gpu.surface, canvas: gpu.canvas, format: gpu.format, blit: gpu.blit, configured: (0, 0), renderer });
     }
 
     /// Copies a frame into a slot: "screen", "camera" or an overlay's id. `source` is a
@@ -371,18 +471,19 @@ impl Editor {
         if view.configured != size {
             view.canvas.set_width(size.0);
             view.canvas.set_height(size.1);
+            let srgb = view.format.add_srgb_suffix();
             view.surface.configure(
                 &view.gpu.device,
                 &wgpu::SurfaceConfiguration {
-                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_DST,
-                    format: wgpu::TextureFormat::Rgba8Unorm,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    format: view.format,
                     width: size.0,
                     height: size.1,
                     present_mode: wgpu::PresentMode::Fifo,
                     desired_maximum_frame_latency: 1,
                     alpha_mode: wgpu::CompositeAlphaMode::Opaque,
                     color_space: Default::default(),
-                    view_formats: vec![],
+                    view_formats: if srgb != view.format { vec![srgb] } else { vec![] },
                 },
             );
             view.configured = size;
@@ -391,13 +492,32 @@ impl Editor {
             wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
             other => return Err(err(format!("canvas unavailable: {other:?}"))),
         };
+        let target = frame.texture.create_view(&wgpu::TextureViewDescriptor { format: Some(view.format.add_srgb_suffix()), ..Default::default() });
+        let source = output.create_view(&Default::default());
+        let bind = view.gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("blit"),
+            layout: &view.blit.layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&source) },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&view.blit.sampler) },
+            ],
+        });
         let mut encoder = view.gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("present") });
-        // The output is sRGB-encoded bytes; the canvas shows bytes as they are.
-        encoder.copy_texture_to_texture(
-            output.as_image_copy(),
-            frame.texture.as_image_copy(),
-            wgpu::Extent3d { width: size.0, height: size.1, depth_or_array_layers: 1 },
-        );
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("present"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &target,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), store: wgpu::StoreOp::Store },
+                })],
+                ..Default::default()
+            });
+            pass.set_pipeline(&view.blit.pipeline);
+            pass.set_bind_group(0, &bind, &[]);
+            pass.draw(0..3, 0..1);
+        }
         view.gpu.queue.submit([encoder.finish()]);
         view.gpu.queue.present(frame);
         view.canvas.transfer_to_image_bitmap().map_err(|e| err(format!("{e:?}")))

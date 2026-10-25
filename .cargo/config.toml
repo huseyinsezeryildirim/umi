@@ -1,4 +1,4 @@
-
-# The web build of the editor session gets randomness from the page (see crates/umi-wasm).
+# The web build (crates/umi-web): randomness comes from the page, and web-sys's newer APIs
+# (VideoFrame, which the WebGL2 path needs for copying decoded frames) are turned on.
 [target.wasm32-unknown-unknown]
-rustflags = ["--cfg", 'getrandom_backend="custom"']
+rustflags = ["--cfg", 'getrandom_backend="custom"', "--cfg=web_sys_unstable_apis"]
