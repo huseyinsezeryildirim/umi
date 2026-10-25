@@ -18,6 +18,9 @@ pub enum VideoCodec {
 pub enum Container {
     Mp4,
     Mov,
+    /// MP4 written front to back for uploading while it's made: the index goes at the end
+    /// (no fast-start rewrite); only the first bytes (the media box size) change at the end.
+    StreamingMp4,
 }
 
 #[derive(Debug, Clone)]
@@ -92,7 +95,7 @@ impl Encoder {
     pub fn create(path: &Path, settings: &EncoderSettings) -> Result<Self, MediaError> {
         crate::init();
         let format = match settings.container {
-            Container::Mp4 => "mp4",
+            Container::Mp4 | Container::StreamingMp4 => "mp4",
             Container::Mov => "mov",
         };
         let mut output = ff::format::output_as(path, format).map_err(|e| MediaError::open(path, e))?;
@@ -180,7 +183,9 @@ impl Encoder {
         };
 
         let mut opts = ff::Dictionary::new();
-        opts.set("movflags", "+faststart");
+        if settings.container != Container::StreamingMp4 {
+            opts.set("movflags", "+faststart");
+        }
         output.write_header_with(opts)?;
         let video_tb = output.stream(video_stream).map(|s| s.time_base()).unwrap_or(time_base);
         let audio = audio.map(|mut a| {

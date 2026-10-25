@@ -16,6 +16,9 @@ pub enum CloudError {
     Network(String),
     #[error("{0}")]
     Io(#[from] std::io::Error),
+    /// The file being uploaded couldn't be finished (e.g. its export failed).
+    #[error("{0}")]
+    Aborted(String),
 }
 
 impl CloudError {
@@ -137,6 +140,22 @@ pub struct Insights {
 pub struct Country {
     pub country: String,
     pub count: u64,
+}
+
+/// A link made before its video exists (Instant mode copies it the moment recording stops).
+#[derive(Debug, Clone)]
+pub struct Reservation {
+    pub video: Video,
+    upload: UploadPlan,
+}
+
+/// What's known once the growing file is finished.
+pub struct Finished {
+    pub duration_ms: u64,
+    pub width: u32,
+    pub height: u32,
+    pub poster: Option<Vec<u8>>,
+    pub gif: Option<Vec<u8>>,
 }
 
 pub struct Client {
@@ -298,6 +317,88 @@ impl Client {
         let done: VideoBody =
             self.send("POST", &format!("/api/videos/{}/complete", created.video.id), Some(serde_json::json!({ "parts": parts })))?;
         progress(1.0);
+        Ok(done.video)
+    }
+}
+
+impl Client {
+    /// Creates the link now; the video comes later through [`upload_growing`](Self::upload_growing).
+    /// The size isn't known yet, so it asks for room for a long video (the real size is
+    /// recorded when the upload completes).
+    pub fn reserve(&self, title: &str) -> Result<Reservation, CloudError> {
+        let mut last = None;
+        for hint in [4u64 << 30, 1 << 30, 256 << 20] {
+            let body = serde_json::json!({ "title": title, "sizeBytes": hint, "contentType": "video/mp4", "allowDownload": true });
+            match self.send::<Created>("POST", "/api/videos", Some(body)) {
+                Ok(c) => return Ok(Reservation { video: c.video, upload: c.upload }),
+                Err(e @ CloudError::Server { status: 413, .. }) => last = Some(e),
+                Err(e) => return Err(e),
+            }
+        }
+        Err(last.unwrap_or_else(|| CloudError::Network("couldn't reserve a link".into())))
+    }
+
+    /// Uploads `file` while it's still being written: whole parts go up as soon as they
+    /// exist; once `finished` returns details, the rest follows and the upload completes
+    /// (an error from `finished` stops it).
+    /// The first part goes last (the MP4 writer patches its first bytes when it finishes).
+    /// `progress` gets bytes sent so far.
+    pub fn upload_growing(
+        &self,
+        reservation: &Reservation,
+        file: &Path,
+        finished: &dyn Fn() -> Option<Result<Finished, String>>,
+        progress: &dyn Fn(u64),
+    ) -> Result<Video, CloudError> {
+        let plan = &reservation.upload;
+        let part_size = plan.part_size;
+        let url = |n: u32| -> Result<&str, CloudError> {
+            plan.parts.iter().find(|p| p.part_number == n).map(|p| p.url.as_str()).ok_or_else(|| CloudError::Server {
+                status: 413,
+                code: "too_large".into(),
+                message: "This recording is longer than one link can hold.".into(),
+            })
+        };
+        let read = |n: u32, len: u64| -> Result<Vec<u8>, CloudError> {
+            let mut f = std::fs::File::open(file)?;
+            let offset = (n as u64 - 1) * part_size;
+            f.seek(SeekFrom::Start(offset))?;
+            let mut buf = Vec::with_capacity(len as usize);
+            f.take(len).read_to_end(&mut buf)?;
+            Ok(buf)
+        };
+        let mut etags: Vec<(u32, String)> = vec![];
+        let mut next = 2u32;
+        let mut sent = 0u64;
+        let details = loop {
+            let done = finished().transpose().map_err(CloudError::Aborted)?;
+            let len = std::fs::metadata(file).map(|m| m.len()).unwrap_or(0);
+            // Whole parts after the first; when done, also the partial last one.
+            while (next as u64) * part_size <= len || (done.is_some() && (next as u64 - 1) * part_size < len) {
+                let size = part_size.min(len - (next as u64 - 1) * part_size);
+                let bytes = read(next, size)?;
+                etags.push((next, Self::put(url(next)?, &bytes, "video/mp4")?));
+                sent += bytes.len() as u64;
+                progress(sent);
+                next += 1;
+            }
+            if let Some(d) = done {
+                let first = read(1, part_size.min(len))?;
+                etags.insert(0, (1, Self::put(url(1)?, &first, "video/mp4")?));
+                progress(sent + first.len() as u64);
+                break d;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(250));
+        };
+        if let (Some(url), Some(jpeg)) = (&plan.thumbnail_url, &details.poster) {
+            Self::put(url, jpeg, "image/jpeg")?;
+        }
+        if let (Some(url), Some(gif)) = (&plan.gif_url, &details.gif) {
+            Self::put(url, gif, "image/gif")?;
+        }
+        let parts: Vec<serde_json::Value> = etags.iter().map(|(n, e)| serde_json::json!({ "partNumber": n, "etag": e })).collect();
+        let body = serde_json::json!({ "parts": parts, "durationMs": details.duration_ms, "width": details.width, "height": details.height });
+        let done: VideoBody = self.send("POST", &format!("/api/videos/{}/complete", reservation.video.id), Some(body))?;
         Ok(done.video)
     }
 }

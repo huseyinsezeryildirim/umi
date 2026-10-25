@@ -18,6 +18,8 @@ pub enum Format {
     Mp4,
     Mov,
     Gif,
+    /// MP4 that can be uploaded while it's written (see `Container::StreamingMp4`).
+    StreamingMp4,
 }
 
 #[derive(Debug, Clone)]
@@ -63,7 +65,11 @@ pub fn export(
             height: size.1,
             fps,
             codec: VideoCodec::H264,
-            container: if settings.format == Format::Mov { Container::Mov } else { Container::Mp4 },
+            container: match settings.format {
+                Format::Mov => Container::Mov,
+                Format::StreamingMp4 => Container::StreamingMp4,
+                _ => Container::Mp4,
+            },
             bit_rate: 0,
             audio: true,
             hardware: settings.hardware,

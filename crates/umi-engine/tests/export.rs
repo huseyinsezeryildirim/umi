@@ -68,3 +68,45 @@ fn joins_takes_end_to_end() {
     let n = reader.read(&mut buf).unwrap() / 2;
     assert!((n as f64 / 48_000.0 - 5.0).abs() < 0.15, "{}", n as f64 / 48_000.0);
 }
+
+/// Instant mode's upload-while-exporting MP4: index at the end, decodes like any MP4, and
+/// only its first bytes differ from what was on disk mid-export.
+#[test]
+fn streaming_mp4_plays_and_only_patches_its_head() {
+    if !Path::new(BUNDLE).exists() {
+        return;
+    }
+    let project = Bundle::new(BUNDLE).read_project().unwrap();
+    let mut edit = project.effective_edit(None);
+    edit.clips = vec![Clip::new(0.0, 4.0, 1.0)];
+    let out = Path::new("/tmp/umi-golden/streaming.mp4");
+    let snapshot = std::sync::Mutex::new(Vec::<u8>::new());
+    let gpu = Gpu::new().unwrap();
+    let cancel = AtomicBool::new(false);
+    let settings = ExportSettings { format: Format::StreamingMp4, resolution: 720, fps: 30, hardware: true };
+    export(
+        gpu,
+        Path::new(BUNDLE),
+        edit,
+        &settings,
+        out,
+        &|p| {
+            if p > 0.7 && snapshot.lock().unwrap().is_empty() {
+                *snapshot.lock().unwrap() = std::fs::read(out).unwrap_or_default();
+            }
+        },
+        &cancel,
+    )
+    .unwrap();
+    let d = umi_media::duration(out).unwrap();
+    assert!((d - 4.0).abs() < 0.15, "{d}");
+    let fin = std::fs::read(out).unwrap();
+    let mid = snapshot.into_inner().unwrap();
+    assert!(mid.len() > 100_000, "nothing written mid-export ({} bytes)", mid.len());
+    let differ = mid.iter().zip(&fin).enumerate().filter(|(_, (a, b))| a != b).map(|(i, _)| i).max();
+    assert!(differ.is_none_or(|i| i < 64), "bytes changed at {differ:?}");
+    // The index is at the end (no fast-start rewrite).
+    let moov = fin.windows(4).rposition(|w| w == b"moov").unwrap();
+    let mdat = fin.windows(4).position(|w| w == b"mdat").unwrap();
+    assert!(moov > mdat);
+}
