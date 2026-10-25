@@ -45,22 +45,22 @@ Hedef: **Loom'un hızı + Cap Studio'nun cilası**, native ve ücretsiz. Ayrınt
 - [x] Hazır müzik kütüphanesi: 50 CC0 parça (FreePD arşivi, archive.org/details/freepd), seçilince indirilir ve önbelleğe alınır
 
 ## M3 — Paylaşım ve izleyici sayfası (ücretli bulut)
-- [ ] Durdur → yükle → link panoda; yeniden denenebilir/devam ettirilebilir yükleme
-- [ ] İzleyici sayfası: hesapsız izleme, hız, tam ekran, `t=` zaman linki, OG önizleme
-- [ ] İndirme izni, link iptali, şifre, **link süresi (expiry)**
-- [ ] Cloudflare R2 + Workers backend
+- [x] Durdur → yükle → link panoda; yeniden denenebilir/devam ettirilebilir yükleme
+- [x] İzleyici sayfası: hesapsız izleme, hız, tam ekran, `t=` zaman linki, OG önizleme
+- [x] İndirme izni, link iptali, şifre, **link süresi (expiry)**
+- [x] Cloudflare R2 + Workers backend
 
 ## M4 — Loom'un kayıt anı özellikleri ve cila
-- [ ] Kamera balonu: daire/squircle, 3–5 boyut, köşeye yapışma, konum hafızası, ayna, arka plan bulanıklığı
-- [ ] Kayıt sırasında çizim (birkaç saniye sonra kaybolan), tıklama halkası canlı
-- [ ] Dock/menü çubuğu/masaüstü simgelerini gizleme
-- [ ] GIF dışa aktarma, hız segmentleri, en-boy oranları, blur/pixelate maskeleri
-- [ ] Klip birleştirme / MP4 içe aktarma, stil presetleri
-- [ ] Instant mode: kayıt sürerken yükleme
-- [ ] Kendi depolama alanını bağlama (S3/R2), embed
+- [x] Kamera balonu: daire/squircle, 3–5 boyut, köşeye yapışma, konum hafızası, ayna, arka plan bulanıklığı
+- [x] Kayıt sırasında çizim (birkaç saniye sonra kaybolan, ⌥⇧D); tıklama halkası editörde
+- [x] Masaüstü simgelerini gizleme (macOS); Dock/menü çubuğu için alan kaydı
+- [x] GIF dışa aktarma, hız segmentleri, en-boy oranları, blur/pixelate maskeleri
+- [x] Klip birleştirme / MP4 içe aktarma, stil presetleri
+- [ ] Instant mode: kayıt sürerken yükleme (şimdilik durdurunca yükleniyor)
+- [x] Kendi depolama alanını bağlama (sunucuda R2/S3 uç noktası), embed
 
 ## Sonrası
 Sahneler (split, kamera-only geçişleri), cihaz çerçeveleri, metin overlay, tuş gösterimi, teleprompter, konfeti, screenshot modu.
 
 ## Kapsam dışı
-AI (özet, transkript düzenleme, dolgu kelime silme), ekip/workspace.
+Ekip/workspace (ücretli, hesap altyapısı gerekiyor). AI özellikleri (özet, transkript düzenleme, dolgu kelime silme) artık cihazda ve ücretsiz.
