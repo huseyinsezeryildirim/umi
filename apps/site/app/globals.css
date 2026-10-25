@@ -1,0 +1,168 @@
+@import "tailwindcss";
+
+/* Umi's look on the web: near-white surfaces on an icy-blue wash, ink text, one ink
+   button for the main action, soft-blue secondary actions, blue accent (same tokens as
+   the app's design system). */
+@theme {
+  --font-sans: var(--font-inter), "SF Pro Text", -apple-system, system-ui, sans-serif;
+  --color-ink: #0e111e;
+  --color-ink-2: #1d2130;
+  --color-text: #3b4152;
+  --color-muted: #6b7386;
+  --color-accent: #116ff5;
+  --color-accent-hover: #0b62dc;
+  --color-accent-light: #6fb5ef;
+  --color-tint: rgb(17 111 245 / 0.1);
+  --color-ice-top: #f3f8fe;
+  --color-ice: #e7f1fc;
+  --color-hairline: rgb(14 17 30 / 0.08);
+  --color-record: #ff4d4d;
+  --shadow-soft: 0 1px 2px rgb(14 17 30 / 0.04), 0 8px 24px rgb(14 17 30 / 0.06);
+  --shadow-lift: 0 2px 4px rgb(14 17 30 / 0.05), 0 24px 60px rgb(14 17 30 / 0.12);
+  --shadow-ink: 0 4px 10px rgb(14 17 30 / 0.25);
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-marquee: marquee 40s linear infinite;
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes float {
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+}
+
+@layer base {
+  html {
+    background: var(--color-ice-top);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #dcecff 0%, transparent 60%),
+      linear-gradient(180deg, var(--color-ice-top) 0%, #ffffff 40%, var(--color-ice-top) 100%);
+    min-height: 100vh;
+    overflow-x: clip;
+  }
+  ::selection {
+    background: rgb(17 111 245 / 0.18);
+  }
+  :focus-visible {
+    outline: 3px solid rgb(17 111 245 / 0.35);
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+}
+
+/* Lenis smooth scrolling. */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+@layer components {
+  /* ───── Buttons: ink (one per view), secondary (soft blue), ghost ───── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 h-10 text-[15px] font-medium whitespace-nowrap select-none;
+    transition:
+      transform 160ms var(--ease-out-soft),
+      background-color 160ms,
+      box-shadow 240ms var(--ease-out-soft);
+  }
+  .btn:active {
+    transform: scale(0.97);
+  }
+  .btn-sm {
+    @apply h-9 px-3.5 text-sm rounded-[10px];
+  }
+  .btn-lg {
+    @apply h-12 px-6 text-base rounded-2xl;
+  }
+  .btn-ink {
+    @apply bg-ink text-white font-semibold;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.14),
+      var(--shadow-ink);
+  }
+  .btn-ink:hover {
+    @apply bg-ink-2;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.14),
+      0 10px 24px rgb(14 17 30 / 0.28);
+  }
+  .btn-secondary {
+    @apply bg-tint text-accent;
+  }
+  .btn-secondary:hover {
+    background: rgb(17 111 245 / 0.16);
+  }
+  .btn-ghost {
+    @apply text-text;
+  }
+  .btn-ghost:hover {
+    background: rgb(14 17 30 / 0.05);
+  }
+
+  .tag {
+    @apply inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-accent;
+    box-shadow:
+      inset 0 0 0 1px var(--color-hairline),
+      var(--shadow-soft);
+  }
+  .card {
+    @apply relative overflow-hidden rounded-3xl bg-white;
+    box-shadow:
+      inset 0 0 0 1px var(--color-hairline),
+      var(--shadow-soft);
+  }
+  /* A soft light that follows the pointer over cards. */
+  .spotlight::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), rgb(17 111 245 / 0.07), transparent 60%);
+    opacity: 0;
+    transition: opacity 300ms;
+  }
+  .spotlight:hover::before {
+    opacity: 1;
+  }
+  kbd {
+    @apply inline-grid min-w-7 h-7 place-items-center rounded-lg bg-white px-1.5 font-sans text-[13px] font-semibold text-ink;
+    box-shadow:
+      inset 0 -2px 0 rgb(14 17 30 / 0.08),
+      0 0 0 1px rgb(14 17 30 / 0.1),
+      0 2px 6px rgb(14 17 30 / 0.08);
+  }
+}
+
+/* The logo: two rings of dots. */
+.mark {
+  display: inline-block;
+  background: currentColor;
+  -webkit-mask: url("/umi-mark.svg") center / contain no-repeat;
+  mask: url("/umi-mark.svg") center / contain no-repeat;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -15,7 +15,7 @@ features (links, insights, teams) are paid.
 ```bash
 pnpm install
 pnpm dev                      # the desktop app (tauri dev)
-pnpm --filter @umi/site dev   # the website on http://localhost:3100
+pnpm --filter @umi/site dev   # the website on http://localhost:3210
 cargo test --workspace --release
 ```
 
