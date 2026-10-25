@@ -25,6 +25,7 @@ crossbeam-channel = "0.5"
 dirs = "6"
 image = { version = "0.25", default-features = false, features = ["jpeg"] }
 base64 = "0.22"
+trash = "5"
 umi-project.workspace = true
 umi-render = { path = "../../../crates/umi-render" }
 umi-media = { path = "../../../crates/umi-media" }

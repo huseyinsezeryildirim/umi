@@ -17,8 +17,11 @@ fn tracks_a_region() {
     // The anchor keeps the placed rect; times ascend.
     assert!(keys.iter().any(|k| (k.t - 3.0).abs() < 0.04 && (k.rect.min_x() - 0.3).abs() < 1e-9));
     assert!(keys.windows(2).all(|w| w[0].t < w[1].t));
+    // Size is kept; the rect may leave the frame with content scrolled off screen, but
+    // never by more than its own size.
     for k in &keys {
-        assert!(k.rect.min_x() >= 0.0 && k.rect.max_x() <= 1.0001 && k.rect.min_y() >= 0.0 && k.rect.max_y() <= 1.0001);
+        assert!((k.rect.width() - 0.15).abs() < 1e-9 && (k.rect.height() - 0.1).abs() < 1e-9);
+        assert!(k.rect.max_x() > 0.0 && k.rect.min_x() < 1.0 && k.rect.max_y() > -1.0 && k.rect.min_y() < 2.0);
     }
 }
 

@@ -115,3 +115,14 @@
   place-items: center;
   background: rgba(255, 255, 255, 0.6);
 }
+.lib__more {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  opacity: 0;
+  transition: opacity var(--umi-fast);
+}
+.lib__card:hover .lib__more,
+.lib__more:focus-within {
+  opacity: 1;
+}

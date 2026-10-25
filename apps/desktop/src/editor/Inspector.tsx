@@ -483,8 +483,8 @@ function MaskMotion(props: { editor: Editor; maskId: string }) {
         onChange={setMode}
         options={[
           { value: "fixed", label: "Fixed" },
-          { value: "stick", label: "Stick to content" },
-          { value: "keys", label: "Keyframes" },
+          { value: "stick", label: "Follow" },
+          { value: "keys", label: "Manual" },
         ]}
       />
       <Show when={job()}>
@@ -497,10 +497,10 @@ function MaskMotion(props: { editor: Editor; maskId: string }) {
       </Show>
       <div class="umi-section__hint">
         {mode() === "stick"
-          ? "The mask moves with what's under it as the screen scrolls. Move it on the preview to stick it somewhere else."
+          ? "Automatic: the mask sticks to what's under it and moves when the page scrolls. Drag it on the preview to stick it somewhere else."
           : mode() === "keys"
-            ? "Move the mask on the preview at different moments; it glides between them."
-            : "The mask stays in one place. Pick Stick to content to make it follow a scrolling message or a moving window."}
+            ? "You place it: move the mask on the preview at different moments and it glides between those spots."
+            : "The mask stays in one place. Follow makes it move with scrolling content; Manual lets you place it over time."}
       </div>
     </>
   );
