@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Merged into the app bundle's Info.plist by Tauri. macOS ends any app that opens the camera or
+     microphone without saying why, so these are required. -->
+<plist version="1.0">
+<dict>
+  <key>NSCameraUsageDescription</key>
+  <string>Umi shows your camera in the recording bubble and records it with your screen.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Umi records your voice with your screen.</string>
+  <key>NSScreenCaptureUsageDescription</key>
+  <string>Umi records the screen, window or area you choose.</string>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>Umi opens your recordings in Finder.</string>
+</dict>
+</plist>
