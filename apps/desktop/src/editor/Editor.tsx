@@ -47,6 +47,9 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
         void (e.shiftKey ? ed.redo() : ed.undo());
       } else if (e.ctrlKey && !e.metaKey && e.key.toLowerCase() === "y") {
         void ed.redo();
+      } else if (mod && e.key.toLowerCase() === "a") {
+        // Select everything on the timeline.
+        ed.setSelected([...document.querySelectorAll<HTMLElement>(".ed-timeline [data-sel]")].map((el) => JSON.parse(el.dataset.sel!)));
       } else if (mod && e.key.toLowerCase() === "j" && ed.selection()?.kind === "clip") {
         void ed.apply({ op: "joinClips", index: (ed.selection() as { id: number }).id });
       } else if (mod) {

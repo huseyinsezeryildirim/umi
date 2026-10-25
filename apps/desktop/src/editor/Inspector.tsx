@@ -6,6 +6,7 @@ import {
   Camera,
   Clapperboard,
   Crosshair,
+  Layers,
   Merge,
   Image,
   Monitor,
@@ -52,7 +53,18 @@ export function Inspector(props: { editor: Editor }) {
 
   return (
     <aside class="ed-inspector umi-panel">
-      <Show when={ed.selection()}>{(s) => <SelectionPanel editor={ed} selection={s()} />}</Show>
+      <Show when={ed.selected().length > 1} fallback={<Show when={ed.selection()}>{(s) => <SelectionPanel editor={ed} selection={s()} />}</Show>}>
+        <div class="ed-sel">
+          <div class="ed-sel__header">
+            <Layers size={15} />
+            <span>{ed.selected().length} items selected</span>
+            <Button size="sm" variant="danger" onClick={() => void ed.deleteSelection()} tip="Delete all" shortcut="⌫">
+              <Trash2 size={14} />
+            </Button>
+          </div>
+          <div class="umi-section__hint">Drag one of them on the timeline to move them together. Shift-click to add or remove items.</div>
+        </div>
+      </Show>
 
       <div class="ed-inspector__tabs">
         <Tabs<Tab>

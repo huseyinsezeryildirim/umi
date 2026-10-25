@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, Index, on, For, onCleanup, onMount, Show } from "solid-js";
 import { Menu, tokens, toast } from "@umi/ui";
 import { Clapperboard, Cuboid, EyeOff, Layers, Link2, Plus, Type, ZoomIn } from "lucide-solid";
-import { formatTime, type Editor } from "./store";
+import { formatTime, sameSelection, type Editor } from "./store";
 import { placementEnd, type Placement, type Selection } from "./types";
 
 const LABEL_W = 96;
@@ -44,6 +44,7 @@ export function Timeline(props: { editor: Editor }) {
   let scroller!: HTMLDivElement;
   const [width, setWidth] = createSignal(800);
   const [hoverX, setHoverX] = createSignal<number | null>(null);
+  const [marquee, setMarquee] = createSignal<{ left: number; top: number; right: number; bottom: number } | null>(null);
   const [magnet, setMagnet] = createSignal<{ index: number; mode: "start" | "end" } | null>(null);
 
   let content!: HTMLDivElement;
@@ -94,13 +95,56 @@ export function Timeline(props: { editor: Editor }) {
     return list;
   });
 
-  const sameSelection = (a: Selection | null, b: Selection) => !!a && a.kind === b.kind && ("id" in a ? a.id === (b as { id: unknown }).id : true);
 
   // ───── Interactions ─────
 
   const timeAt = (clientX: number) => {
     const r = scroller.getBoundingClientRect();
     return (clientX - r.left + scroller.scrollLeft - LABEL_W - 12) / scale();
+  };
+
+  /**
+   * Pointer down on an empty part of a lane: a click seeks (and clears the selection), a
+   * drag draws a box that selects everything it touches (Shift adds to the selection).
+   */
+  const laneDown = (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    const r0 = content.getBoundingClientRect();
+    const sx = e.clientX - r0.left;
+    const sy = e.clientY - r0.top;
+    const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+    const before = additive ? ed.selected() : [];
+    let boxing = false;
+    const move = (m: PointerEvent) => {
+      const r = content.getBoundingClientRect();
+      const mx = m.clientX - r.left;
+      const my = m.clientY - r.top;
+      if (!boxing && Math.hypot(mx - sx, my - sy) < 5) return;
+      boxing = true;
+      const box = { left: Math.min(sx, mx), top: Math.min(sy, my), right: Math.max(sx, mx), bottom: Math.max(sy, my) };
+      setMarquee(box);
+      const hit: Selection[] = [];
+      content.querySelectorAll<HTMLElement>("[data-sel]").forEach((el) => {
+        const b = el.getBoundingClientRect();
+        const l = b.left - r.left;
+        const t = b.top - r.top;
+        if (l < box.right && l + b.width > box.left && t < box.bottom && t + b.height > box.top) hit.push(JSON.parse(el.dataset.sel!));
+      });
+      const merged = [...before];
+      for (const s of hit) if (!merged.some((x) => sameSelection(x, s))) merged.push(s);
+      ed.setSelected(merged);
+    };
+    const up = (u: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setMarquee(null);
+      if (!boxing) {
+        if (!additive) ed.setSelection(null);
+        ed.setTime(timeAt(u.clientX));
+      }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
   };
 
   const seek = (e: PointerEvent) => {
@@ -150,15 +194,28 @@ export function Timeline(props: { editor: Editor }) {
   /** Drag an item (move) or its edges (trim). Times move in source or output units. */
   const dragItem = (item: Item, mode: "move" | "start" | "end", e: PointerEvent) => {
     e.stopPropagation();
-    ed.setSelection(item.selection);
+    if (e.shiftKey || e.metaKey || e.ctrlKey) {
+      ed.toggleSelection(item.selection);
+      return;
+    }
+    // Dragging one of several selected items moves them all.
+    const group = mode === "move" && ed.isSelected(item.selection) && ed.selected().length > 1 ? ed.selected().filter((s) => s.kind !== "clip") : null;
+    if (!group) ed.setSelection(item.selection);
     const origin = { start: item.start, end: item.end, x: e.clientX };
     let started = false;
+    let applied = 0;
     const move = (m: PointerEvent) => {
       const dt = (m.clientX - origin.x) / scale();
       if (!started) {
         if (Math.abs(m.clientX - origin.x) < 3) return;
         started = true;
         void ed.gestureStart();
+      }
+      if (group) {
+        // Incremental, so each step moves everything by what changed since the last one.
+        void ed.apply({ op: "shiftMany", selections: group, delta: dt - applied });
+        applied = dt;
+        return;
       }
       const start = mode === "end" ? origin.start : origin.start + dt;
       const end = mode === "start" ? origin.end : origin.end + dt;
@@ -177,6 +234,10 @@ export function Timeline(props: { editor: Editor }) {
   const dragClip = (index: number, p: Placement, mode: "move" | "start" | "end", e: PointerEvent) => {
     e.stopPropagation();
     if (ed.blade()) return;
+    if (mode === "move" && (e.shiftKey || e.metaKey || e.ctrlKey)) {
+      ed.toggleSelection({ kind: "clip", id: index });
+      return;
+    }
     ed.setSelection({ kind: "clip", id: index });
     const ox = e.clientX;
     const oy = e.clientY;
@@ -315,17 +376,18 @@ export function Timeline(props: { editor: Editor }) {
           </div>
 
           {/* Clips */}
-          <div class="ed-lane ed-lane--clips" style={{ height: `${CLIP_H}px` }} onPointerDown={seek}>
+          <div class="ed-lane ed-lane--clips" style={{ height: `${CLIP_H}px` }} onPointerDown={laneDown}>
             <Index each={ed.state().placements}>
               {(p, i) => {
                 // Index keeps each clip's element while its placement changes (smooth trims).
-                const selected = () => sameSelection(ed.selection(), { kind: "clip", id: i });
+                const selected = () => ed.isSelected({ kind: "clip", id: i });
                 const width = () => Math.max(x(placementEnd(p()) - p().outputStart) - 2, 8);
                 return (
                   <div
                     class="ed-clip"
                     data-selected={selected() ? "true" : "false"}
                     data-magnet={magnet()?.index === i ? magnet()!.mode : ""}
+                    data-sel={JSON.stringify({ kind: "clip", id: i })}
                     style={{ left: `${12 + x(p().outputStart)}px`, width: `${width()}px` }}
                     onPointerDown={(e) => dragClip(i, p(), "move", e)}
                   >
@@ -366,7 +428,7 @@ export function Timeline(props: { editor: Editor }) {
           {/* Lanes */}
           <For each={lanes()}>
             {(lane) => (
-              <div class="ed-lane" style={{ height: `${LANE_H}px` }} onPointerDown={(e) => (ed.setSelection(null), seek(e))}>
+              <div class="ed-lane" style={{ height: `${LANE_H}px` }} onPointerDown={laneDown}>
                 <For each={lane.items}>
                   {(item) => {
                     const span = () => (item.output ? ([item.start, item.end] as [number, number]) : outputRange(ed.state().placements, item.start, item.end, duration()));
@@ -375,7 +437,8 @@ export function Timeline(props: { editor: Editor }) {
                         {(r) => (
                           <div
                             class="ed-item"
-                            data-selected={sameSelection(ed.selection(), item.selection) ? "true" : "false"}
+                            data-selected={ed.isSelected(item.selection) ? "true" : "false"}
+                            data-sel={JSON.stringify(item.selection)}
                             data-dashed={item.dashed ? "true" : "false"}
                             style={{ left: `${12 + x(r()[0])}px`, width: `${Math.max(x(r()[1] - r()[0]) - 2, 12)}px`, "--lane": item.color }}
                             onPointerDown={(e) => dragItem(item, "move", e)}
@@ -404,6 +467,11 @@ export function Timeline(props: { editor: Editor }) {
               </div>
             )}
           </For>
+
+          {/* Selection box */}
+          <Show when={marquee()}>
+            {(m) => <div class="ed-marquee" style={{ left: `${m().left}px`, top: `${m().top}px`, width: `${m().right - m().left}px`, height: `${m().bottom - m().top}px` }} />}
+          </Show>
 
           {/* Selected span */}
           <Show when={ed.range()}>

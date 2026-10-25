@@ -20,6 +20,8 @@ type Op =
   | { op: "addMove"; kind: string; time: number }
   | { op: "retime"; selection: Selection; start: number; end: number }
   | { op: "delete"; selection: Selection }
+  | { op: "deleteMany"; selections: Selection[] }
+  | { op: "shiftMany"; selections: Selection[]; delta: number }
   | { op: "beginGesture" }
   | { op: "endGesture" }
   | { op: "undo" }
@@ -38,7 +40,13 @@ export function createEditor(initial: EditorState) {
   const [state, setState] = createSignal(initial);
   const [time, setTime] = createSignal(0);
   const [playing, setPlaying] = createSignal(false);
-  const [selection, setSelection] = createSignal<Selection | null>(null);
+  /** Selected items; the last one is the "primary" one the inspector shows. */
+  const [selected, setSelected] = createSignal<Selection[]>([]);
+  const selection = () => selected()[selected().length - 1] ?? null;
+  const setSelection = (s: Selection | null) => setSelected(s ? [s] : []);
+  const isSelected = (s: Selection) => selected().some((x) => sameSelection(x, s));
+  const toggleSelection = (s: Selection) =>
+    setSelected((list) => (list.some((x) => sameSelection(x, s)) ? list.filter((x) => !sameSelection(x, s)) : [...list, s]));
   const [range, setRange] = createSignal<[number, number] | null>(null);
   const [timelineZoom, setTimelineZoom] = createSignal(1);
   const [blade, setBlade] = createSignal(false);
@@ -52,7 +60,12 @@ export function createEditor(initial: EditorState) {
   let saveTimer: number | undefined;
 
   const apply = async (op: Op) => {
-    const body = op.op === "retime" || op.op === "delete" ? { ...op, selection: toRust(op.selection) } : op;
+    const body =
+      op.op === "retime" || op.op === "delete"
+        ? { ...op, selection: toRust(op.selection) }
+        : op.op === "deleteMany" || op.op === "shiftMany"
+          ? { ...op, selections: op.selections.map(toRust) }
+          : op;
     const next = await invoke<EditorState>("editor_apply", { id: state().id, op: body });
     batch(() => {
       setState(next);
@@ -81,6 +94,10 @@ export function createEditor(initial: EditorState) {
     time,
     playing,
     selection,
+    selected,
+    setSelected,
+    isSelected,
+    toggleSelection,
     range,
     timelineZoom,
     blade,
@@ -112,9 +129,12 @@ export function createEditor(initial: EditorState) {
     previousEdge: () => setTime(Math.max(0, ...edges().filter((e) => e < time() - 0.05))),
     nextEdge: () => setTime(Math.min(state().outputDuration, ...edges().filter((e) => e > time() + 0.05))),
     deleteSelection: async () => {
-      const s = selection();
-      if (s) {
-        await apply({ op: "delete", selection: s });
+      const list = selected();
+      if (list.length > 1) {
+        await apply({ op: "deleteMany", selections: list });
+        setSelection(null);
+      } else if (list.length === 1) {
+        await apply({ op: "delete", selection: list[0] });
         setSelection(null);
       } else if (range()) {
         const [a, b] = range()!;
@@ -135,4 +155,8 @@ export function formatTime(seconds: number, precise = true) {
   const rest = s - m * 60;
   if (m >= 60) return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}:${String(Math.floor(rest)).padStart(2, "0")}`;
   return precise ? `${m}:${rest.toFixed(1).padStart(4, "0")}` : `${m}:${String(Math.floor(rest)).padStart(2, "0")}`;
+}
+
+export function sameSelection(a: Selection | null, b: Selection) {
+  return !!a && a.kind === b.kind && ("id" in a ? a.id === (b as { id: unknown }).id : true);
 }
