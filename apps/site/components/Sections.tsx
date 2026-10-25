@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useInView } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { AppleIcon, LinuxIcon, LoomIcon, WindowsIcon } from "./icons";
 import { PLATFORMS } from "./Download";
-import { Mark } from "./ui";
+import { CopyButton, Mark } from "./ui";
 
 const EASE = [0.25, 1, 0.5, 1] as const;
 
@@ -398,7 +398,8 @@ export function Platforms() {
           <div className="flex h-full flex-col rounded-[28px] bg-[#f3f5f8] p-7">
             <h3 className="text-[22px] font-semibold tracking-tight">Build it yourself</h3>
             <p className="mt-1 text-[15px] text-muted">Umi is open source. Read it, change it, ship your own.</p>
-            <div className="mt-6 flex-1 rounded-2xl bg-[#0f1115] p-5 font-mono text-[13.5px] leading-7 text-white/85">
+            <div className="relative mt-6 flex-1 rounded-2xl bg-[#0f1115] p-5 font-mono text-[13.5px] leading-7 text-white/85">
+              <CopyButton dark className="absolute top-3 right-3" text={"git clone https://github.com/umi-cam/umi\ncd umi\npnpm install\npnpm dev"} />
               <p>
                 <span className="text-white/35">$ </span>git clone https://github.com/umi-cam/umi
               </p>
@@ -520,7 +521,11 @@ export function Agents() {
                 )}
                 {l.kind === "tool" && (
                   <p className="mt-3 flex items-center gap-2">
-                    <span className="grid size-4 place-items-center rounded-full bg-[#30d158] text-[10px] text-black">✓</span>
+                    <span className="grid size-4 shrink-0 place-items-center rounded-full bg-[#30d158] text-black">
+                      <svg viewBox="0 0 24 24" className="size-2.5" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="m5 12.5 4.5 4.5L19 7.5" />
+                      </svg>
+                    </span>
                     <span className="text-white">{l.text}</span>
                   </p>
                 )}
@@ -581,10 +586,13 @@ export function AgentKit() {
                 <i className="size-2" style={{ background: k.dot }} />
                 <h3 className="mt-5 text-[22px] font-semibold tracking-tight">{k.title}</h3>
                 <p className="mt-2 flex-1 text-[15px] text-muted">{k.text}</p>
-                <p className="mt-6 rounded-xl bg-white px-4 py-3 font-mono text-[13px] text-ink shadow-[0_0_0_1px_rgb(17_24_39/0.06)]">
-                  <span className="text-faint">{k.cmd.slice(0, 2).trim() === "$" || k.cmd.startsWith("→") ? k.cmd.slice(0, 2) : ""}</span>
-                  {k.cmd.startsWith("$ ") || k.cmd.startsWith("→ ") ? k.cmd.slice(2) : k.cmd}
-                </p>
+                <div className="mt-6 flex items-center gap-2 rounded-xl bg-white py-1.5 pr-1.5 pl-4 font-mono text-[13px] text-ink shadow-[0_0_0_1px_rgb(17_24_39/0.06)]">
+                  <p className="min-w-0 flex-1 py-1.5">
+                    <span className="text-faint">{k.cmd.slice(0, 2).trim() === "$" || k.cmd.startsWith("→") ? k.cmd.slice(0, 2) : ""}</span>
+                    {k.cmd.startsWith("$ ") || k.cmd.startsWith("→ ") ? k.cmd.slice(2) : k.cmd}
+                  </p>
+                  {k.cmd.startsWith("$ ") && <CopyButton text={k.cmd.slice(2)} />}
+                </div>
               </div>
             </Rise>
           ))}
@@ -599,7 +607,8 @@ export function AgentKit() {
                 </button>
               ))}
             </div>
-            <div className="mt-5 min-h-36 rounded-2xl bg-[#0f1115] p-5 font-mono text-[13px] leading-7 text-white/85">
+            <div className="relative mt-5 min-h-36 rounded-2xl bg-[#0f1115] p-5 pr-12 font-mono text-[13px] leading-7 text-white/85">
+              {tab === "Config" && <CopyButton dark className="absolute top-3 right-3" text={'{\n  "mcpServers": {\n    "umi": { "command": "umi-mcp" }\n  }\n}'} />}
               <AnimatePresence mode="wait">
                 <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
                   {KIT_TABS[tab].map((l) => (
@@ -683,7 +692,11 @@ export function Loom() {
             </a>
           </div>
           <p className="flex items-center gap-2 text-[14px] text-muted">
-            <span className="grid size-5 place-items-center rounded-full bg-[#30d158]/15 text-[11px] text-[#1f9d47]">✓</span>
+            <span className="grid size-5 place-items-center rounded-full bg-[#30d158]/15 text-[#1f9d47]">
+              <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="m5 12.5 4.5 4.5L19 7.5" />
+              </svg>
+            </span>
             Free. No account needed.
           </p>
         </div>
