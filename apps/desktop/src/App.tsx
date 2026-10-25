@@ -3,7 +3,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Button, Dialog, IconButton, Menu, Progress, Segmented, Spinner, toast } from "@umi/ui";
 import { ChevronDown, Circle, CircleHelp, Combine, Download, Film, FolderOpen, MoreHorizontal, PencilLine, Trash2, Upload } from "lucide-solid";
-import { onWeb, revealLabel } from "./platform";
+import { onWeb, revealLabel, teamsEnabled } from "./platform";
 import { EditableTitle } from "./EditableTitle";
 import { Editor } from "./editor/Editor";
 import { installRecordingFlow } from "./recorder/flow";
@@ -89,7 +89,7 @@ export function App() {
 function Library(props: { recordings: RecordingSummary[]; loading: boolean; opening: string | null; onOpen: (path: string) => void; onChanged: () => void; onTour: () => void }) {
   const [loom, setLoom] = createSignal(false);
   const [tab, setTab] = createSignal<"mine" | "team">("mine");
-  window.addEventListener("umi:team", () => setTab("team"));
+  window.addEventListener("umi:team", () => teamsEnabled && setTab("team"));
   /** Recordings picked with Shift/⌘-click, in the order picked (for combining). */
   const [picked, setPicked] = createSignal<string[]>([]);
   const [combining, setCombining] = createSignal<number | null>(null);
@@ -126,14 +126,16 @@ function Library(props: { recordings: RecordingSummary[]; loading: boolean; open
       <header class="lib__header" data-tauri-drag-region>
         <div class="lib__title">
           <h1>{tab() === "team" ? "Team" : "Recordings"}</h1>
-          <Segmented
-            value={tab()}
-            onChange={setTab}
-            options={[
-              { value: "mine", label: "Mine" },
-              { value: "team", label: "Team" },
-            ]}
-          />
+          <Show when={teamsEnabled}>
+            <Segmented
+              value={tab()}
+              onChange={setTab}
+              options={[
+                { value: "mine", label: "Mine" },
+                { value: "team", label: "Team" },
+              ]}
+            />
+          </Show>
         </div>
         <div class="lib__actions">
           <IconButton label="Show the tour" size="sm" onClick={props.onTour}>
