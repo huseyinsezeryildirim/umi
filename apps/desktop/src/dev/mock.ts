@@ -13,7 +13,8 @@ import cameraClip from "./camera.mp4";
 import { GRADIENTS } from "../editor/panels/Background";
 import fixture from "./state.json";
 import music from "../../src-tauri/resources/music.json";
-import type { EditorState, EditSettings, Selection } from "../editor/types";
+import { maskRectAt, sourceTimeAt, type Clip, type EditorState, type EditSettings, type Selection } from "../editor/types";
+import { isFiller } from "../editor/panels/Captions";
 
 const frames: [number, string][] = [
   [1, frame1],
@@ -27,7 +28,10 @@ const screens: [number, string][] = [
 ];
 /** What the narrator of the sample recording says. */
 const SAMPLE_WORDS = (() => {
-  const text = "Here’s the new dashboard. Open any card to see more. This week is our best one yet. To share it, click Share and copy the link.";
+  // `?fillers`: the take as it was really said, ums and all (for the "cut the ums" demo).
+  const text = new URLSearchParams(location.search).has("fillers")
+    ? "So um here’s the new dashboard. Uh open any card to see more. This week is um our best one yet. To share it, click Share and copy the link."
+    : "Here’s the new dashboard. Open any card to see more. This week is our best one yet. To share it, click Share and copy the link.";
   const words = text.split(" ");
   const start = 0.3;
   const step = 9.2 / words.length;
@@ -138,8 +142,10 @@ const uuid = () => crypto.randomUUID().toUpperCase();
  * A small stand-in renderer: the sample screen on the edit's background with its padding,
  * corners, shadow, zooms and cursor, so changes in the demo show up at once.
  */
-function frameAt(time: number, width: number, height: number): ArrayBuffer {
+function frameAt(output: number, width: number, height: number): ArrayBuffer {
   const edit = state.edit;
+  // Everything below is in recording time, like the Rust renderer.
+  const time = sourceTimeAt(state.placements, output);
   const canvas = new OffscreenCanvas(width, height);
   const g = canvas.getContext("2d")!;
   const screen = images.get(screens.reduce((best, s) => (time >= s[0] ? s : best), screens[0])[1])!;
@@ -210,6 +216,36 @@ function frameAt(time: number, width: number, height: number): ArrayBuffer {
   g.scale(scale, scale);
   g.translate(-sx, -sy);
   if (screen.complete) g.drawImage(screen, 0, 0, w, h);
+  // Privacy masks: blur, pixelate, or dim everything but the highlighted spot.
+  for (const m of edit.masks) {
+    if (time < m.start || time > m.end) continue;
+    const [[rx, ry], [rw, rh]] = maskRectAt(m, time);
+    const [mx, my, mw, mh] = [rx * w, ry * h, rw * w, rh * h];
+    g.save();
+    if (m.style === "highlight") {
+      g.beginPath();
+      g.rect(-w, -h, w * 3, h * 3);
+      g.roundRect(mx, my, mw, mh, 8);
+      g.fillStyle = `rgba(10,12,20,${0.25 + m.amount * 0.5})`;
+      g.fill("evenodd");
+    } else {
+      g.beginPath();
+      g.roundRect(mx, my, mw, mh, 6);
+      g.clip();
+      if (m.style === "blur") {
+        g.filter = `blur(${4 + m.amount * 16}px)`;
+        g.drawImage(screen, 0, 0, w, h);
+      } else {
+        const cells = Math.max(4, Math.round(30 - m.amount * 24));
+        const tiny = new OffscreenCanvas(cells, Math.max(2, Math.round((cells * mh) / mw)));
+        const t = tiny.getContext("2d")!;
+        t.drawImage(screen, (mx / w) * screen.naturalWidth, (my / h) * screen.naturalHeight, (mw / w) * screen.naturalWidth, (mh / h) * screen.naturalHeight, 0, 0, tiny.width, tiny.height);
+        g.imageSmoothingEnabled = false;
+        g.drawImage(tiny, mx, my, mw, mh);
+      }
+    }
+    g.restore();
+  }
   // Cursor.
   if (edit.cursor.visible) {
     const [cx, cy] = cursorAt(time);
@@ -300,6 +336,33 @@ function setEdit(edit: EditSettings, selection: Selection | null = null) {
   return state;
 }
 
+/** Lays clips end to end (what the Rust side does after any cut). */
+function setClips(clips: Clip[]) {
+  let t = 0;
+  const placements = clips.map((clip) => {
+    const p = { clip, outputStart: t };
+    t += (clip.end - clip.start) / clip.speed;
+    return p;
+  });
+  state = { ...state, placements, outputDuration: t };
+}
+const clips = () => state.placements.map((p) => ({ ...p.clip }));
+
+/** Takes recording-time ranges out of the video. */
+function cutSource(ranges: [number, number][]) {
+  let list = clips();
+  for (const [a, b] of ranges) {
+    list = list.flatMap((c) => {
+      if (b <= c.start || a >= c.end) return [c];
+      const out: Clip[] = [];
+      if (a > c.start + 0.05) out.push({ ...c, end: a });
+      if (b < c.end - 0.05) out.push({ ...c, start: b });
+      return out;
+    });
+  }
+  setClips(list);
+}
+
 function apply(op: Record<string, unknown>): EditorState {
   const e: EditSettings = structuredClone(state.edit);
   const time = (op.time as number) ?? 0;
@@ -347,6 +410,36 @@ function apply(op: Record<string, unknown>): EditorState {
       const id = uuid();
       e.moves.push({ id, start: time, end: time + 3, kind: op.kind as "glide" });
       return setEdit(e, { kind: "move", id });
+    }
+    case "split": {
+      const at = sourceTimeAt(state.placements, time);
+      setClips(clips().flatMap((c) => (at > c.start + 0.05 && at < c.end - 0.05 ? [{ ...c, end: at }, { ...c, start: at }] : [c])));
+      return { ...state, selection: null };
+    }
+    case "cut": {
+      cutSource([[sourceTimeAt(state.placements, op.start as number), sourceTimeAt(state.placements, op.end as number)]]);
+      return state;
+    }
+    case "deleteClip": {
+      setClips(clips().filter((_, i) => i !== op.index));
+      return state;
+    }
+    case "setSpeed": {
+      setClips(clips().map((c, i) => (i === op.index ? { ...c, speed: op.speed as number } : c)));
+      return state;
+    }
+    case "removeFillers":
+    case "cutWords": {
+      const words = state.edit.captions.words;
+      const ids = new Set((op.ids as string[]) ?? []);
+      cutSource(
+        words.flatMap((w, i) => {
+          if (op.op === "removeFillers" ? !isFiller(w.text) : !ids.has(w.id)) return [];
+          const next = words[i + 1];
+          return [[w.start - 0.02, next && next.start - w.end < 0.4 ? next.start - 0.01 : w.end] as [number, number]];
+        }),
+      );
+      return state;
     }
     case "setTitle":
       state = { ...state, name: String(op.title).trim() || "Dashboard walkthrough" };

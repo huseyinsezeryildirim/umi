@@ -7,7 +7,7 @@ import { placementEnd, type Placement, type Selection } from "./types";
 
 const LABEL_W = 96;
 const SCENE_LABELS = { default: "Default", cameraOnly: "Camera only", hideCamera: "Screen only", splitScreen: "Split screen", floating: "Floating" } as const;
-const MASK_LABELS = { blur: "Blur", pixelate: "Pixelate", highlight: "Spotlight" } as const;
+const MASK_LABELS = { blur: "Blur", pixelate: "Pixelate", highlight: "Highlight" } as const;
 const MOVE_LABELS = { glide: "Glide across", unfold: "Unfold", pullBack: "Pull back" } as const;
 const RULER_H = 26;
 const CLIP_H = 58;
@@ -105,7 +105,7 @@ export function Timeline(props: { editor: Editor }) {
     const blurs = e.masks.filter((m) => m.style !== "highlight");
     const spots = e.masks.filter((m) => m.style === "highlight");
     if (blurs.length) list.push({ id: "blur", title: "Blur", items: blurs.map(maskItem) });
-    if (spots.length) list.push({ id: "spotlight", title: "Spotlight", items: spots.map(maskItem) });
+    if (spots.length) list.push({ id: "spotlight", title: "Highlight", items: spots.map(maskItem) });
     if (e.texts.length) list.push({ id: "text", title: "Text", items: e.texts.map((x) => ({ selection: { kind: "text", id: x.id }, start: x.start, end: x.end, label: x.text, color: c.text })) });
     if (e.moves.length) list.push({ id: "moves", title: "3D", items: e.moves.map((x) => ({ selection: { kind: "move", id: x.id }, start: x.start, end: x.end, label: MOVE_LABELS[x.kind], color: c.move })) });
     return list;
@@ -585,7 +585,7 @@ function AddMenu(props: { editor: Editor }) {
       entries={[
         { label: "Zoom", icon: <ZoomIn size={15} />, shortcut: "Z", onSelect: () => void ed.apply({ op: "addZoom", time: ed.time() }) },
         { label: "Blur", icon: <EyeOff size={15} />, onSelect: () => void ed.apply({ op: "addMask", time: ed.time(), style: "blur" }) },
-        { label: "Spotlight", icon: <Sun size={15} />, onSelect: () => void ed.apply({ op: "addMask", time: ed.time(), style: "highlight" }) },
+        { label: "Highlight", icon: <Sun size={15} />, onSelect: () => void ed.apply({ op: "addMask", time: ed.time(), style: "highlight" }) },
         { label: "Image or video…", icon: <ImagePlus size={15} />, onSelect: () => void addMedia(ed) },
         { label: "Music…", icon: <Music size={15} />, onSelect: () => ed.requestPanel("audio") },
         { label: "AI voiceover…", icon: <Mic size={15} />, onSelect: () => ed.requestVoiceover() },
