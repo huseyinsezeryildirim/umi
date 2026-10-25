@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createResource, createSignal, For, Show } from "solid-js";
-import { Button, Section, SliderField, Spinner, Swatch, TextField, toast } from "@umi/ui";
+import { Button, ColorPicker, Section, SliderField, Spinner, Swatch, toast } from "@umi/ui";
 import { Blend, Droplets, Search, Image as ImageIcon, ImagePlus, Mountain, PaintBucket, Palette, Shuffle } from "lucide-solid";
 import type { JSX } from "solid-js";
 import type { Editor } from "../store";
@@ -52,13 +52,21 @@ const isSystemImage = (p: string) => p.startsWith("/System/") || /^[a-zA-Z]:\\Wi
 
 export function hexToRgba(hex: string) {
   const n = parseInt(hex.slice(1), 16);
-  return { r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255, a: 1 };
+  return {
+    r: ((n >> 16) & 255) / 255,
+    g: ((n >> 8) & 255) / 255,
+    b: (n & 255) / 255,
+    a: 1,
+  };
 }
 
 function colorHex(b: Background) {
   if (!("color" in b)) return null;
   const c = b.color._0;
-  const h = (v: number) => Math.round(v * 255).toString(16).padStart(2, "0");
+  const h = (v: number) =>
+    Math.round(v * 255)
+      .toString(16)
+      .padStart(2, "0");
   return `#${h(c.r)}${h(c.g)}${h(c.b)}`;
 }
 
@@ -139,15 +147,35 @@ export function BackgroundSection(props: { editor: Editor; gesture: object }) {
             )}
           </For>
         </div>
-        <SliderField label="Angle" value={edit().backgroundAngle} min={0} max={360} step={1} format={(v) => `${Math.round(v)}°`} onInput={(v) => set((e) => (e.backgroundAngle = v))} {...props.gesture} />
+        <SliderField
+          label="Angle"
+          value={edit().backgroundAngle}
+          min={0}
+          max={360}
+          step={1}
+          format={(v) => `${Math.round(v)}°`}
+          onInput={(v) => set((e) => (e.backgroundAngle = v))}
+          {...props.gesture}
+        />
       </Show>
       <Show when={kind() === "color"}>
         <div class="ed-swatches">
-          <For each={COLORS}>{(hex) => <Swatch label={hex} background={hex} selected={colorHex(edit().background) === hex} onClick={() => setBackground({ color: { _0: hexToRgba(hex) } })} />}</For>
-          <label class="ed-color-input" title="Any color">
-            <input type="color" value={colorHex(edit().background) ?? "#116ff5"} onInput={(e) => setBackground({ color: { _0: hexToRgba(e.currentTarget.value) } })} />
-          </label>
+          <For each={COLORS}>
+            {(hex) => (
+              <Swatch
+                label={hex}
+                background={hex}
+                selected={colorHex(edit().background) === hex}
+                onClick={() => setBackground({ color: { _0: hexToRgba(hex) } })}
+              />
+            )}
+          </For>
         </div>
+        <ColorPicker
+          value={colorHex(edit().background) ?? "#116ff5"}
+          selected={!COLORS.includes(colorHex(edit().background) ?? "")}
+          onInput={(hex) => setBackground({ color: { _0: hexToRgba(hex) } })}
+        />
       </Show>
       <Show when={kind() === "wallpaper"}>
         <Show when={!wallpapers.loading} fallback={<Spinner />}>
@@ -155,7 +183,13 @@ export function BackgroundSection(props: { editor: Editor; gesture: object }) {
             <div class="ed-wallpapers">
               <For each={wallpapers()}>
                 {(w) => (
-                  <button type="button" class="ed-wallpaper" title={w.name} data-selected={currentImage() === w.path ? "true" : "false"} onClick={() => setBackground({ image: { _0: w.path } })}>
+                  <button
+                    type="button"
+                    class="ed-wallpaper"
+                    title={w.name}
+                    data-selected={currentImage() === w.path ? "true" : "false"}
+                    onClick={() => setBackground({ image: { _0: w.path } })}
+                  >
                     <img src={w.thumb} alt={w.name} draggable={false} />
                   </button>
                 )}
@@ -176,7 +210,13 @@ export function BackgroundSection(props: { editor: Editor; gesture: object }) {
       <Show when={kind() === "blurred"}>
         <div class="umi-section__hint">Your recording, blurred and dimmed behind the screen.</div>
       </Show>
-      <SliderField label="Grain" value={edit().backgroundNoise} format={(v) => `${Math.round(v * 100)}%`} onInput={(v) => set((e) => (e.backgroundNoise = v))} {...props.gesture} />
+      <SliderField
+        label="Grain"
+        value={edit().backgroundNoise}
+        format={(v) => `${Math.round(v * 100)}%`}
+        onInput={(v) => set((e) => (e.backgroundNoise = v))}
+        {...props.gesture}
+      />
     </Section>
   );
 }
@@ -191,10 +231,9 @@ interface Photo {
   color?: string | null;
 }
 
-/** Free stock photos from Pexels (people add their own free API key once). */
+/** Free stock photos from Pexels (hidden in builds without the Pexels key). */
 function StockPhotos(props: { editor: Editor; current: string | null; onPick: (name: string) => void }) {
   const [connected, setConnected] = createSignal<boolean | null>(null);
-  const [key, setKey] = createSignal("");
   const [query, setQuery] = createSignal("");
   const [photos, setPhotos] = createSignal<Photo[]>([]);
   const [page, setPage] = createSignal(1);
@@ -222,16 +261,6 @@ function StockPhotos(props: { editor: Editor; current: string | null; onPick: (n
     if (on) void load(true);
   });
 
-  const connect = async () => {
-    try {
-      await invoke("pexels_connect", { key: key() });
-      setKey("");
-      setConnected(true);
-      void load(true);
-    } catch (e) {
-      toast(String(e));
-    }
-  };
   const search = (text: string) => {
     setQuery(text);
     window.clearTimeout(timer);
@@ -240,7 +269,13 @@ function StockPhotos(props: { editor: Editor; current: string | null; onPick: (n
   const use = async (p: Photo) => {
     setUsing(p.id);
     try {
-      props.onPick(await invoke<string>("pexels_use", { bundle: props.editor.state().recording.bundle, id: p.id, url: p.full }));
+      props.onPick(
+        await invoke<string>("pexels_use", {
+          bundle: props.editor.state().recording.bundle,
+          id: p.id,
+          url: p.full,
+        }),
+      );
     } catch (e) {
       toast(String(e));
     } finally {
@@ -249,28 +284,9 @@ function StockPhotos(props: { editor: Editor; current: string | null; onPick: (n
   };
 
   return (
-    <div class="ed-stock">
-      <div class="umi-field-label">Free photos</div>
-      <Show
-        when={connected()}
-        fallback={
-          <Show when={connected() === false}>
-            <div class="umi-section__hint">
-              Add a free Pexels API key to search millions of photos. Get one at{" "}
-              <a href="https://www.pexels.com/api/" target="_blank" rel="noreferrer">
-                pexels.com/api
-              </a>
-              .
-            </div>
-            <div class="ed-share__row">
-              <TextField value={key()} placeholder="Pexels API key" type="password" onInput={(e) => setKey(e.currentTarget.value)} />
-              <Button size="sm" disabled={!key().trim()} onClick={() => void connect()}>
-                Add
-              </Button>
-            </div>
-          </Show>
-        }
-      >
+    <Show when={connected()}>
+      <div class="ed-stock">
+        <div class="umi-field-label">Free photos</div>
         <label class="ed-stock__search">
           <Search size={14} />
           <input value={query()} placeholder="Search photos (mountains, office, sky…)" onInput={(e) => search(e.currentTarget.value)} />
@@ -307,7 +323,7 @@ function StockPhotos(props: { editor: Editor; current: string | null; onPick: (n
           </a>
           .
         </div>
-      </Show>
-    </div>
+      </div>
+    </Show>
   );
 }

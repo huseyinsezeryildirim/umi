@@ -1,12 +1,11 @@
-//! Free stock photos from Pexels as backgrounds. People bring their own API key (free at
-//! pexels.com/api); it lives in the OS keychain. Chosen photos are copied into the
-//! recording, so projects stay self-contained. Pexels asks for credit, shown in the picker.
+//! Free stock photos from Pexels as backgrounds. The app's key is baked in at build time
+//! (see build.rs); chosen photos are copied into the recording, so projects stay
+//! self-contained. Pexels asks for credit, shown in the picker.
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 const API: &str = "https://api.pexels.com/v1";
-const KEYCHAIN_SERVICE: &str = "cam.umi.pexels";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,12 +50,12 @@ struct RawSrc {
     medium: String,
 }
 
-/// The saved key, or `UMI_PEXELS_KEY` (handy for development and tests).
+/// `UMI_PEXELS_KEY` at run time (development), else the key the build baked in.
 pub fn key() -> Option<String> {
     std::env::var("UMI_PEXELS_KEY")
         .ok()
         .filter(|k| !k.trim().is_empty())
-        .or_else(|| keyring::Entry::new(KEYCHAIN_SERVICE, "api-key").ok()?.get_password().ok())
+        .or_else(|| option_env!("UMI_PEXELS_KEY_BUILTIN").map(str::to_string))
 }
 
 /// One page of photos: a search, or Pexels' curated picks without a query.
@@ -125,25 +124,6 @@ pub fn download(bundle: &std::path::Path, id: u64, url: &str) -> Result<String, 
 #[tauri::command]
 pub fn pexels_status() -> bool {
     key().is_some()
-}
-
-/// Checks the key with a tiny search, then keeps it in the keychain.
-#[tauri::command]
-pub async fn pexels_connect(key: String) -> Result<(), String> {
-    let key = key.trim().to_string();
-    tauri::async_runtime::spawn_blocking(move || {
-        search(&key, "", 1)?;
-        keyring::Entry::new(KEYCHAIN_SERVICE, "api-key").and_then(|e| e.set_password(&key)).map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-pub fn pexels_disconnect() {
-    if let Ok(entry) = keyring::Entry::new(KEYCHAIN_SERVICE, "api-key") {
-        let _ = entry.delete_credential();
-    }
 }
 
 #[tauri::command]

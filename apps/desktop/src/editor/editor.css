@@ -741,21 +741,6 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-.ed-color-input {
-  position: relative;
-  aspect-ratio: 1;
-  border-radius: 10px;
-  overflow: hidden;
-  background: conic-gradient(#f0443a, #ffc83d, #13a874, #116ff5, #7a5af8, #f0443a);
-  box-shadow: inset 0 0 0 1px var(--umi-hairline);
-  cursor: pointer;
-}
-.ed-color-input input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
 .ed-wallpapers {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
