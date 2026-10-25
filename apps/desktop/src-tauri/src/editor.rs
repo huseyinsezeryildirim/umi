@@ -40,6 +40,8 @@ pub enum Op {
     DeleteMany { selections: Vec<Selection> },
     /// Moves several timed items by the same amount (multi-selection drag).
     ShiftMany { selections: Vec<Selection>, delta: f64 },
+    /// Puts a voiceover on the Voice track, or replaces `replace`'s audio and text in place.
+    AddVoiceover { file: String, text: String, start: f64, duration: f64, replace: Option<uuid::Uuid> },
     /// Replaces the words of one caption line.
     EditCaptionLine { ids: Vec<uuid::Uuid>, text: String },
     /// Text-based editing: cuts these words out of the video.
@@ -208,6 +210,24 @@ impl EditorSession {
                     }
                 }
             }
+            Op::AddVoiceover { file, text, start, duration, replace } => {
+                let existing = replace.and_then(|id| doc.edit.voiceovers.iter_mut().find(|v| v.id == id));
+                let id = match existing {
+                    Some(v) => {
+                        v.file = file;
+                        v.text = text;
+                        v.end = v.start + duration;
+                        v.id
+                    }
+                    None => {
+                        let v = umi_project::edit::Voiceover { id: uuid::Uuid::new_v4(), file, start: start.max(0.0), end: start.max(0.0) + duration, text, volume: 1.0 };
+                        let id = v.id;
+                        doc.edit.voiceovers.push(v);
+                        id
+                    }
+                };
+                selection = Some(Selection::Voiceover(id));
+            }
             Op::EditCaptionLine { ids, text } => doc.edit_caption_line(&ids, &text),
             Op::CutWords { ids } => {
                 doc.cut_words(&ids);
@@ -297,7 +317,7 @@ impl EditorSession {
         };
         let mut slot = self.audio.lock();
         if slot.as_ref().is_none_or(|(e, _)| *e != edit) {
-            let mixer = AudioMixer::new(&self.bundle, Schedule::new(&edit, total), edit.music.as_ref()).map_err(|e| e.to_string())?;
+            let mixer = AudioMixer::new(&self.bundle, Schedule::new(&edit, total), &edit).map_err(|e| e.to_string())?;
             *slot = Some((edit, mixer));
         }
         let Some((_, mixer)) = slot.as_mut() else { unreachable!() };
@@ -411,6 +431,7 @@ fn item_span(doc: &Document, s: Selection) -> Option<(f64, f64)> {
         Selection::Text(id) => e.texts.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
         Selection::Move(id) => e.moves.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
         Selection::Overlay(id) => e.overlays.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
+        Selection::Voiceover(id) => e.voiceovers.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
         Selection::Clip(_) | Selection::Music => None,
     }
 }

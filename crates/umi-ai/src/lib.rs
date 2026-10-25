@@ -2,7 +2,9 @@
 //! Apache-2.0) and download once on first use into the app's data folder.
 
 pub mod models;
+pub mod onnx;
 pub mod transcribe;
+pub mod tts;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AiError {

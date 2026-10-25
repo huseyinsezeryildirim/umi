@@ -11,6 +11,7 @@ import {
   Sun,
   Layers,
   Merge,
+  Mic,
   Image,
   Monitor,
   MousePointer2,
@@ -425,6 +426,26 @@ function SelectionPanel(props: { editor: Editor; selection: Selection }) {
               </>
             );
           }}
+        </Match>
+        <Match when={s.kind === "voiceover" && (edit().voiceovers ?? []).find((x) => x.id === (s as { id: string }).id)}>
+          {(v) => (
+            <>
+              {header("Voiceover", <Mic size={15} />)}
+              <div class="ed-quote">{v().text || "Voiceover"}</div>
+              <SliderField
+                label="Volume"
+                value={v().volume}
+                max={2}
+                format={pct}
+                onInput={(x) => set((e) => (e.voiceovers ?? []).forEach((y) => y.id === v().id && (y.volume = x)))}
+                {...gesture}
+              />
+              <Button size="sm" onClick={() => ed.requestVoiceover(v().id)}>
+                <Sparkles size={14} /> Edit script…
+              </Button>
+              <div class="umi-section__hint">Other sound dips while the voice speaks. Drag it on the timeline to move it.</div>
+            </>
+          )}
         </Match>
         <Match when={s.kind === "scene" && edit().scenes.find((x) => x.id === (s as { id: string }).id)}>
           {(sc) => (

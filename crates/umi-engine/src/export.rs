@@ -69,7 +69,7 @@ pub fn export(
             hardware: settings.hardware,
         };
         let encoder = Box::new(Encoder::create(destination, &encoder_settings)?);
-        let mixer = Box::new(AudioMixer::new(bundle, source.schedule.clone(), edit.music.as_ref())?);
+        let mixer = Box::new(AudioMixer::new(bundle, source.schedule.clone(), &edit)?);
         Sink::Video { encoder, mixer }
     };
 

@@ -19,6 +19,7 @@ import {
 import { ExportDialog } from "./ExportDialog";
 import { Inspector } from "./Inspector";
 import { PresetsMenu } from "./Presets";
+import { VoiceoverDialog } from "./VoiceoverDialog";
 import { Preview } from "./Preview";
 import { formatTime, type Editor as EditorModel } from "./store";
 import { Timeline } from "./Timeline";
@@ -159,6 +160,7 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
         <Inspector editor={ed} />
       </main>
       <ExportDialog editor={ed} open={exporting()} onClose={() => setExporting(false)} />
+      <VoiceoverDialog editor={ed} />
       <Toaster />
     </div>
   );

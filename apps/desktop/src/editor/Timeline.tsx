@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, Index, on, For, onCleanup, onMount, Show } from "solid-js";
 import { Menu, tokens, toast } from "@umi/ui";
-import { Clapperboard, Cuboid, EyeOff, ImagePlus, Layers, Link2, Music, Plus, Sun, Type, ZoomIn } from "lucide-solid";
+import { Clapperboard, Cuboid, EyeOff, ImagePlus, Layers, Link2, Mic, Music, Plus, Sun, Type, ZoomIn } from "lucide-solid";
 import { chooseIntoBundle, extensionOf, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from "./panels/files";
 import { formatTime, sameSelection, type Editor } from "./store";
 import { placementEnd, type Placement, type Selection } from "./types";
@@ -24,6 +24,8 @@ interface Item {
   output?: boolean;
   /** Keyframe times (recording time) shown as diamonds; many become a tracked line. */
   marks?: number[];
+  /** Moves but can't be trimmed (a voiceover is as long as its audio). */
+  fixedLength?: boolean;
 }
 
 /** Maps a recording time to output time through the placements (null if cut away). */
@@ -88,6 +90,8 @@ export function Timeline(props: { editor: Editor }) {
     if (video2.length) list.push({ id: "video2", title: "Video 2", items: video2.map((o) => ({ selection: { kind: "overlay", id: o.id }, start: o.start, end: o.end, label: `Clip · ${formatTime(o.mediaOffset, false)}`, color: c.video2, output: true })) });
     const media = e.overlays.filter((o) => o.lane !== 2);
     if (media.length) list.push({ id: "media", title: "Media", items: media.map((o) => ({ selection: { kind: "overlay", id: o.id }, start: o.start, end: o.end, label: o.file, color: c.media, output: true })) });
+    const voices = e.voiceovers ?? [];
+    if (voices.length) list.push({ id: "voice", title: "Voice", items: voices.map((v) => ({ selection: { kind: "voiceover", id: v.id }, start: v.start, end: v.end, label: v.text || "Voiceover", color: c.voice, output: true, fixedLength: true })) });
     if (zooms.length) list.push({ id: "zoom", title: "Zoom", items: zooms });
     if (e.scenes.length) list.push({ id: "scenes", title: "Scenes", items: e.scenes.map((x) => ({ selection: { kind: "scene", id: x.id }, start: x.start, end: x.end, label: SCENE_LABELS[x.layout], color: c.scene })) });
     const maskItem = (x: (typeof e.masks)[number]) => ({
@@ -472,8 +476,10 @@ export function Timeline(props: { editor: Editor }) {
                                 }}
                               </For>
                             </Show>
-                            <div class="ed-trim ed-trim--start" onPointerDown={(e) => dragItem(item, "start", e)} />
-                            <div class="ed-trim ed-trim--end" onPointerDown={(e) => dragItem(item, "end", e)} />
+                            <Show when={!item.fixedLength}>
+                              <div class="ed-trim ed-trim--start" onPointerDown={(e) => dragItem(item, "start", e)} />
+                              <div class="ed-trim ed-trim--end" onPointerDown={(e) => dragItem(item, "end", e)} />
+                            </Show>
                           </div>
                         )}
                       </Show>
@@ -582,6 +588,7 @@ function AddMenu(props: { editor: Editor }) {
         { label: "Spotlight", icon: <Sun size={15} />, onSelect: () => void ed.apply({ op: "addMask", time: ed.time(), style: "highlight" }) },
         { label: "Image or video…", icon: <ImagePlus size={15} />, onSelect: () => void addMedia(ed) },
         { label: "Music…", icon: <Music size={15} />, onSelect: () => ed.requestPanel("audio") },
+        { label: "AI voiceover…", icon: <Mic size={15} />, onSelect: () => ed.requestVoiceover() },
         { kind: "separator" },
         { kind: "label", label: "Text" },
         { label: "Title", icon: <Type size={15} />, onSelect: () => void ed.apply({ op: "addText", style: "title", time: ed.time() }) },

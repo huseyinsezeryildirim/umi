@@ -139,6 +139,10 @@ impl AudioReader {
             frame
         };
         let input = (frame.format(), frame.channel_layout(), frame.rate());
+        // Mono is resampled as mono and copied to both sides at full level (FFmpeg's own
+        // mono → stereo would make it 3 dB quieter).
+        let mono = frame.channels() == 1;
+        let layout = if mono { ff::ChannelLayout::MONO } else { ff::ChannelLayout::STEREO };
         // A stream can change format midway: rebuild the resampler when it does.
         if self.resampler.as_ref().is_none_or(|r| {
             let i = r.input();
@@ -149,19 +153,25 @@ impl AudioReader {
                 input.1,
                 input.2,
                 ff::format::Sample::F32(ff::format::sample::Type::Packed),
-                ff::ChannelLayout::STEREO,
+                layout,
                 SAMPLE_RATE,
             )?);
         }
         // Room for everything this frame becomes at 48 kHz (upsampling makes more samples
         // than came in; a smaller buffer would leave the rest stuck in the resampler).
         let capacity = frame.samples() * SAMPLE_RATE as usize / frame.rate().max(1) as usize + 64;
-        let mut out = ff::frame::Audio::new(ff::format::Sample::F32(ff::format::sample::Type::Packed), capacity, ff::ChannelLayout::STEREO);
+        let mut out = ff::frame::Audio::new(ff::format::Sample::F32(ff::format::sample::Type::Packed), capacity, layout);
         if let Some(resampler) = &mut self.resampler {
             resampler.run(frame, &mut out)?;
         }
+        let stereo: Vec<f32>;
         let samples = out.samples() * CHANNELS;
-        let data: &[f32] = bytemuck_f32(out.data(0), samples);
+        let data: &[f32] = if mono {
+            stereo = bytemuck_f32(out.data(0), out.samples()).iter().flat_map(|s| [*s, *s]).collect();
+            &stereo
+        } else {
+            bytemuck_f32(out.data(0), samples)
+        };
         let frame_time = frame.pts().map(|p| p as f64 * self.time_base);
         let mut data = data;
         if let (Some(until), Some(start)) = (self.skip_until, frame_time) {

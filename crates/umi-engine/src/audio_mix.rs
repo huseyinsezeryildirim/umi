@@ -7,7 +7,8 @@ use crate::stretch::TimeStretch;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use umi_media::{AudioReader, CHANNELS, MediaError, SAMPLE_RATE, audio_streams, duration};
-use umi_project::edit::Music;
+use umi_project::EditSettings;
+use umi_project::edit::{Music, Voiceover};
 
 const RATE: f64 = SAMPLE_RATE as f64;
 
@@ -25,12 +26,15 @@ pub struct AudioMixer {
     /// two places of the same track at once.
     readers: HashMap<(usize, usize), Cursor>,
     music: Option<(Cursor, f64, Music)>,
+    /// Voice track items and a reader for each (opened when first heard).
+    voices: Vec<(Voiceover, Option<Cursor>)>,
     schedule: Schedule,
     scratch: Vec<f32>,
 }
 
 impl AudioMixer {
-    pub fn new(bundle: &Path, schedule: Schedule, music: Option<&Music>) -> Result<Self, MediaError> {
+    pub fn new(bundle: &Path, schedule: Schedule, edit: &EditSettings) -> Result<Self, MediaError> {
+        let music = edit.music.as_ref();
         let screen = bundle.join("screen.mov");
         let tracks = audio_streams(&screen).map(|s| s.len()).unwrap_or(0);
         let music = match music {
@@ -45,7 +49,8 @@ impl AudioMixer {
             }
             None => None,
         };
-        Ok(Self { screen, tracks, readers: HashMap::new(), music, schedule, scratch: vec![] })
+        let voices = edit.voiceovers.iter().map(|v| (Voiceover { file: bundle.join(&v.file).to_string_lossy().into_owned(), ..v.clone() }, None)).collect();
+        Ok(Self { screen, tracks, readers: HashMap::new(), music, voices, schedule, scratch: vec![] })
     }
 
     /// Mixes the soundtrack for output time `t0` into `out` (interleaved stereo).
@@ -89,6 +94,7 @@ impl AudioMixer {
             }
         }
         self.mix_music(t0, out)?;
+        self.mix_voices(t0, out)?;
         for s in out.iter_mut() {
             *s = s.clamp(-1.0, 1.0);
         }
@@ -159,4 +165,58 @@ impl AudioMixer {
         }
         Ok(())
     }
+
+    /// Voiceovers on top; everything else dips to [`DUCK`] while one speaks (eased over
+    /// [`DUCK_RAMP`] so it doesn't pump).
+    fn mix_voices(&mut self, t0: f64, out: &mut [f32]) -> Result<(), MediaError> {
+        if self.voices.is_empty() {
+            return Ok(());
+        }
+        let frames = out.len() / CHANNELS;
+        let t1 = t0 + frames as f64 / RATE;
+        for k in 0..frames {
+            let t = t0 + k as f64 / RATE;
+            let near = self
+                .voices
+                .iter()
+                .map(|(v, _)| ((t - (v.start - DUCK_RAMP)) / DUCK_RAMP).min((v.end + DUCK_RAMP - t) / DUCK_RAMP).clamp(0.0, 1.0))
+                .fold(0.0, f64::max);
+            let gain = 1.0 - (1.0 - DUCK) * near;
+            if gain < 1.0 {
+                for c in 0..CHANNELS {
+                    out[k * CHANNELS + c] *= gain as f32;
+                }
+            }
+        }
+        let mut buf = vec![0f32; out.len()];
+        for (voice, cursor) in &mut self.voices {
+            let (a, b) = (t0.max(voice.start), t1.min(voice.end));
+            if b <= a {
+                continue;
+            }
+            if cursor.is_none() {
+                *cursor = Some(Cursor { reader: AudioReader::open(Path::new(&voice.file), 0)?, position: f64::NAN, stretch: TimeStretch::new() });
+            }
+            let Some(cursor) = cursor else { continue };
+            let into = a - voice.start;
+            if !((cursor.position - into).abs() < 0.02) {
+                cursor.reader.seek(into)?;
+                cursor.position = into;
+            }
+            let offset = ((a - t0) * RATE).round() as usize;
+            let count = (((b - a) * RATE).round() as usize).min(frames.saturating_sub(offset));
+            let got = cursor.reader.read(&mut buf[..count * CHANNELS])? / CHANNELS;
+            cursor.position += got as f64 / RATE;
+            for k in 0..got {
+                for c in 0..CHANNELS {
+                    out[(offset + k) * CHANNELS + c] += buf[k * CHANNELS + c] * voice.volume as f32;
+                }
+            }
+        }
+        Ok(())
+    }
 }
+
+/// How loud the rest is under a voiceover, and how long the dip takes.
+const DUCK: f64 = 0.3;
+const DUCK_RAMP: f64 = 0.25;
