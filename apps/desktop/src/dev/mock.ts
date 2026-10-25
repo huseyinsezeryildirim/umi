@@ -8,6 +8,8 @@ import frame4 from "./frame-4.jpg";
 import frame8 from "./frame-8.jpg";
 import screenA from "./screen-a.jpg";
 import screenB from "./screen-b.jpg";
+import cameraFace from "./camera.jpg";
+import cameraClip from "./camera.mp4";
 import { GRADIENTS } from "../editor/panels/Background";
 import fixture from "./state.json";
 import music from "../../src-tauri/resources/music.json";
@@ -58,7 +60,7 @@ function cursorAt(t: number): [number, number] {
 }
 const images = new Map<string, HTMLImageElement>();
 const loaded = Promise.all(
-  [...frames, ...screens].map(
+  [...frames, ...screens, [0, cameraFace] as [number, string]].map(
     ([, url]) =>
       new Promise<void>((done) => {
         const img = new Image();
@@ -69,6 +71,10 @@ const loaded = Promise.all(
       }),
   ),
 );
+
+/** The webcam: a looping stock clip (Pexels), drawn in the camera bubble. */
+const webcam = Object.assign(document.createElement("video"), { src: cameraClip, muted: true, loop: true, playsInline: true, autoplay: true });
+void webcam.play().catch(() => {});
 
 let state: EditorState = {
   id: "fixture",
@@ -86,10 +92,12 @@ let state: EditorState = {
     { id: "Z2", start: 4.9, end: 7.8, scale: 2 },
   ];
   state.recording.duration = 10;
-  state.edit.captions = { ...state.edit.captions, enabled: true, words: SAMPLE_WORDS, language: "en" };
+  // The guided demo transcribes during the tour; screenshots start with captions.
+  const touring = new URLSearchParams(location.search).has("tour");
+  state.edit.captions = { ...state.edit.captions, enabled: !touring, words: touring ? [] : SAMPLE_WORDS, language: "en" };
   state.name = "Northwind walkthrough";
-  state.recording.hasCamera = false;
-  state.edit.camera.visible = false;
+  state.recording.hasCamera = true;
+  state.edit.camera = { ...state.edit.camera, visible: true, shape: "circle", position: [0.9, 0.82], mirrored: false };
 }
 let recordSettings = {
   target: null,
@@ -200,6 +208,36 @@ function frameAt(time: number, width: number, height: number): ArrayBuffer {
     g.fill(p);
   }
   g.restore();
+
+  // Camera bubble (a stock portrait stands in for the webcam).
+  const cam = edit.camera;
+  const face = images.get(cameraFace);
+  if (cam.visible && face?.complete) {
+    const d = Math.min(width, height) * (cam.size || 0.22) * 0.85;
+    const [px, py] = cam.position ?? [0.9, 0.82];
+    const cx = Math.min(Math.max(px * width, d / 2 + 8), width - d / 2 - 8);
+    const cy = Math.min(Math.max(py * height, d / 2 + 8), height - d / 2 - 8);
+    const r = cam.shape === "circle" ? d / 2 : cam.shape === "squircle" ? d * 0.28 : d * 0.08;
+    g.save();
+    g.shadowColor = "rgba(0,0,0,0.35)";
+    g.shadowBlur = d * 0.12;
+    g.shadowOffsetY = d * 0.04;
+    g.beginPath();
+    g.roundRect(cx - d / 2 - 3, cy - d / 2 - 3, d + 6, d + 6, r + 3);
+    g.fillStyle = "#fff";
+    g.fill();
+    g.restore();
+    g.save();
+    g.beginPath();
+    g.roundRect(cx - d / 2, cy - d / 2, d, d, r);
+    g.clip();
+    if (cam.mirrored) {
+      g.translate(cx * 2, 0);
+      g.scale(-1, 1);
+    }
+    g.drawImage(webcam.readyState >= 2 ? webcam : face, cx - d / 2, cy - d / 2, d, d);
+    g.restore();
+  }
 
   // Captions: the current line, the spoken word bright.
   const caps = edit.captions;
@@ -442,6 +480,9 @@ mockIPC(
       case "plugin:event|listen":
       case "plugin:event|unlisten":
         return null;
+      case "editor_export":
+        // Pretend to render for a moment.
+        return new Promise((done) => setTimeout(() => done((p.request as { destination: string }).destination), 1800));
       case "editor_transcribe":
         state = { ...state, edit: { ...state.edit, captions: { ...state.edit.captions, enabled: true, words: SAMPLE_WORDS } } };
         return state;
