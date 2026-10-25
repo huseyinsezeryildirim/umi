@@ -87,7 +87,8 @@ async function createVideo(request: Request, env: AppEnv, account: Account): Pro
   }
   if (size > maxUploadBytes(env)) throw new HttpError(413, "too_large", "Video exceeds the maximum upload size.");
   const contentType = body.contentType ?? "video/mp4";
-  if (contentType !== "video/mp4") throw new HttpError(400, "invalid_field", "Only video/mp4 is supported.");
+  // MP4 from the desktop app; WebM from the Chrome extension (plays in every current browser).
+  if (contentType !== "video/mp4" && contentType !== "video/webm") throw new HttpError(400, "invalid_field", "Only video/mp4 and video/webm are supported.");
 
   const id = randomId();
   const upload = await env.VIDEOS.createMultipartUpload(videoKey(id), {

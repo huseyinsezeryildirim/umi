@@ -28,7 +28,7 @@ export interface PageOptions {
   canonical: string;
   body: string;
   nonce: string;
-  og?: { image?: string; video?: { url: string; width: number | null; height: number | null } };
+  og?: { image?: string; video?: { url: string; width: number | null; height: number | null; type?: string } };
   /** oEmbed discovery URL (public videos only). */
   oembed?: string;
   /** "embed" = chrome-less, frameable by any site. "page" (default) = full page, never framed. */
@@ -60,7 +60,7 @@ export function page(o: PageOptions): Response {
     meta.push(
       `<meta property="og:video" content="${esc(v.url)}">`,
       `<meta property="og:video:secure_url" content="${esc(v.url)}">`,
-      `<meta property="og:video:type" content="video/mp4">`,
+      `<meta property="og:video:type" content="${esc(v.type ?? "video/mp4")}">`,
     );
     if (v.width && v.height) {
       meta.push(`<meta property="og:video:width" content="${v.width}">`, `<meta property="og:video:height" content="${v.height}">`);

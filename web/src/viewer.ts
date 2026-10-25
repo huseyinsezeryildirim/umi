@@ -132,7 +132,7 @@ export async function handleViewer(request: Request, env: AppEnv, id: string, wr
         og: isPublic
           ? {
               image: v.has_thumbnail ? `${canonical}/thumbnail.jpg` : undefined,
-              video: { url: `${canonical}/video.mp4`, width: v.width, height: v.height },
+              video: { url: `${canonical}/video.mp4`, width: v.width, height: v.height, type: v.content_type },
             }
           : undefined,
         oembed: isPublic ? `${origin}/oembed?url=${encodeURIComponent(canonical)}&format=json` : undefined,
