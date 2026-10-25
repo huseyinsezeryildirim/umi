@@ -459,6 +459,20 @@ impl Document {
         true
     }
 
+    /// Deletes several items at once. Clips go last-first so earlier indices stay valid; at
+    /// least one clip always remains.
+    pub fn delete_many(&mut self, selections: &[Selection]) {
+        let mut clips: Vec<usize> = selections.iter().filter_map(|s| if let Selection::Clip(i) = s { Some(*i) } else { None }).collect();
+        clips.sort_unstable();
+        clips.dedup();
+        for i in clips.into_iter().rev() {
+            self.delete_clip(i);
+        }
+        for s in selections.iter().filter(|s| !matches!(s, Selection::Clip(_))) {
+            self.delete(*s);
+        }
+    }
+
     /// Adds a media item at an output time; images last 4 s, videos keep their length (up to
     /// the end of the edit).
     pub fn add_overlay(&mut self, file: String, kind: MediaKind, media_duration: Option<f64>, output_time: f64) -> Uuid {
@@ -549,6 +563,19 @@ mod tests {
         assert_eq!(d.placements().len(), 2);
         assert!(d.join_clips(0));
         assert!((d.output_duration() - 10.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn deletes_many() {
+        let mut d = doc(10.0);
+        d.split(2.0);
+        d.split(4.0);
+        d.split(6.0);
+        let zoom = d.add_zoom(1.0).unwrap();
+        d.delete_many(&[Selection::Clip(1), Selection::Clip(3), zoom]);
+        assert_eq!(d.placements().len(), 2);
+        assert!((d.output_duration() - 4.0).abs() < 1e-9);
+        assert!(d.edit.zoom.segments.is_empty());
     }
 
     #[test]

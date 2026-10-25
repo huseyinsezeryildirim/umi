@@ -35,6 +35,9 @@ pub enum Op {
     AddOverlay { file: String, kind: MediaKind, duration: Option<f64>, time: f64 },
     Retime { selection: Selection, start: f64, end: f64 },
     Delete { selection: Selection },
+    DeleteMany { selections: Vec<Selection> },
+    /// Moves several timed items by the same amount (multi-selection drag).
+    ShiftMany { selections: Vec<Selection>, delta: f64 },
     BeginGesture,
     EndGesture,
     Undo,
@@ -179,6 +182,14 @@ impl EditorSession {
             Op::Delete { selection: s } => {
                 doc.delete(s);
             }
+            Op::DeleteMany { selections } => doc.delete_many(&selections),
+            Op::ShiftMany { selections, delta } => {
+                for s in selections {
+                    if let Some((start, end)) = item_span(&doc, s) {
+                        doc.retime(s, start + delta, end + delta);
+                    }
+                }
+            }
             Op::BeginGesture => history.begin_gesture(&doc.edit),
             Op::EndGesture => history.end_gesture(&doc.edit),
             Op::Undo => {
@@ -279,6 +290,20 @@ impl EditorSession {
             m.keyframes = keys;
         }
         Ok(self.apply(Op::SetEdit { edit: Box::new(edit) }))
+    }
+}
+
+/// Start and end of a timed item (source time; output time for media).
+fn item_span(doc: &Document, s: Selection) -> Option<(f64, f64)> {
+    let e = &doc.edit;
+    match s {
+        Selection::Zoom(id) => doc.zoom_segments().into_iter().find(|z| z.id == id).map(|z| (z.start, z.end)),
+        Selection::Mask(id) => e.masks.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
+        Selection::Scene(id) => e.scenes.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
+        Selection::Text(id) => e.texts.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
+        Selection::Move(id) => e.moves.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
+        Selection::Overlay(id) => e.overlays.iter().find(|m| m.id == id).map(|m| (m.start, m.end)),
+        Selection::Clip(_) | Selection::Music => None,
     }
 }
 

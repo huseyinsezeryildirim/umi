@@ -667,3 +667,12 @@
   opacity: 1;
   box-shadow: 0 0 14px 2px var(--umi-trim-glow);
 }
+
+.ed-marquee {
+  position: absolute;
+  z-index: 4;
+  border: 1px solid var(--umi-accent);
+  border-radius: 4px;
+  background: rgba(17, 111, 245, 0.1);
+  pointer-events: none;
+}
