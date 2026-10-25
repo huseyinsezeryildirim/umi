@@ -32,7 +32,8 @@ type Op =
   | { op: "beginGesture" }
   | { op: "endGesture" }
   | { op: "undo" }
-  | { op: "redo" };
+  | { op: "redo" }
+  | { op: "setTitle"; title: string };
 
 /** Rust's Selection enum is `{kind, id}` (adjacently tagged); music has no id. */
 function toRust(selection: Selection) {

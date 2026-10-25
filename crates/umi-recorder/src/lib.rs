@@ -449,6 +449,8 @@ impl Recording {
             audio: self.audio,
             edit: None,
             camera_only: self.options.camera_only.then_some(true),
+            title: None,
+            title_auto: None,
         };
         let mut project = project;
         if self.device.is_some() || matches!(self.options.target, Target::Device { .. }) {
@@ -550,6 +552,8 @@ pub fn recover(library: &Path) -> Vec<PathBuf> {
             audio: AudioInfo { system_track: (tracks >= 2).then_some(0), microphone_track: (tracks >= 1).then_some(tracks as u32 - 1) },
             edit: None,
             camera_only: None,
+            title: None,
+            title_auto: None,
         };
         if bundle.write_project(&project).is_ok() {
             if !bundle.file(umi_project::project::CURSOR_FILE).exists() {

@@ -3,6 +3,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Button, Dialog, IconButton, Menu, Progress, Segmented, Spinner, toast } from "@umi/ui";
 import { ChevronDown, Circle, CircleHelp, Combine, Download, Film, FolderOpen, MoreHorizontal, Trash2, Upload } from "lucide-solid";
+import { EditableTitle } from "./EditableTitle";
 import { Editor } from "./editor/Editor";
 import { installRecordingFlow } from "./recorder/flow";
 import { ShortcutsDialog } from "./ShortcutsDialog";
@@ -32,6 +33,8 @@ export function App() {
   const [shortcuts, setShortcuts] = createSignal(false);
   const [touring, setTouring] = createSignal(shouldTour());
   void listen("open-shortcuts", () => setShortcuts(true));
+  // A recording got its title from what was said (in the background, after recording).
+  void listen("library:changed", () => void refetch());
   void listen<string[]>("shortcuts-busy", (e) => toast(`${e.payload.length === 1 ? "A shortcut is" : "Some shortcuts are"} used by another app — change ${e.payload.length === 1 ? "it" : "them"} in Keyboard shortcuts`));
 
   // Recording (launcher, tray, shortcuts) is run from here; a finished recording opens.
@@ -273,7 +276,12 @@ function RecordingCard(props: { recording: RecordingSummary; index: number; open
         </div>
       </Dialog>
       <div class="lib__meta">
-        <div class="lib__name">{props.recording.name}</div>
+        <EditableTitle
+          class="lib__name"
+          value={props.recording.name}
+          onClick={props.onOpen}
+          onRename={(title) => void invoke("recording_rename", { path: props.recording.path, title }).then(props.onChanged, (e) => toast(`Couldn't rename: ${e}`))}
+        />
         <div class="lib__sub">{new Date(props.recording.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</div>
       </div>
     </div>

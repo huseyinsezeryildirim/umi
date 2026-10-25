@@ -54,6 +54,37 @@ pub struct RecordingProject {
     /// Recorded in camera-only mode: the video starts as a full-length Camera Only scene.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub camera_only: Option<bool>,
+    /// The recording's title, when it has one (otherwise the folder name is shown).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// The title was written from what was said, not typed: a better one may replace it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title_auto: Option<bool>,
+}
+
+impl RecordingProject {
+    /// The title if there is one, else `fallback` (the folder name).
+    pub fn display_name(&self, fallback: String) -> String {
+        self.title.clone().filter(|t| !t.trim().is_empty()).unwrap_or(fallback)
+    }
+
+    /// Takes a title from what was said, unless someone typed one.
+    pub fn suggest_title(&mut self, title: &str) -> bool {
+        let title = title.trim();
+        if title.is_empty() || (self.title.is_some() && self.title_auto != Some(true)) {
+            return false;
+        }
+        self.title = Some(title.to_string());
+        self.title_auto = Some(true);
+        true
+    }
+
+    /// A title someone typed; empty goes back to the folder name.
+    pub fn set_title(&mut self, title: &str) {
+        let title = title.trim();
+        self.title = (!title.is_empty()).then(|| title.chars().take(120).collect());
+        self.title_auto = None;
+    }
 }
 
 fn version_one() -> i64 {

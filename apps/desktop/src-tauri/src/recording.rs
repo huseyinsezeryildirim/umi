@@ -307,6 +307,7 @@ pub async fn record_stop(app: AppHandle) -> Result<PathBuf, String> {
         let recording = state.recorder.current.lock().take().ok_or("Not recording")?;
         let bundle = recording.stop().map_err(|e| e.to_string())?;
         let _ = app.emit("recording", "stopped");
+        auto_title(app.clone(), bundle.clone());
         Ok(bundle)
     })
     .await
@@ -341,4 +342,35 @@ pub fn copy_file_to_clipboard(path: PathBuf) -> Result<(), String> {
             .status()
     };
     status.map_err(|e| e.to_string()).and_then(|s| if s.success() { Ok(()) } else { Err("Couldn't copy".into()) })
+}
+
+/// Names a new recording from what was said, in the background, when the speech model is
+/// already on this computer (it isn't downloaded just for this). The library refreshes when done.
+fn auto_title(app: AppHandle, bundle: PathBuf) {
+    let model = umi_ai::models::Model::WhisperBase;
+    if !model.is_ready() {
+        return;
+    }
+    std::thread::spawn(move || {
+        let files = umi_project::Bundle::new(&bundle);
+        let Ok(mut project) = files.read_project() else { return };
+        let screen = files.screen();
+        let tracks = umi_media::audio_streams(&screen).map(|t| t.len()).unwrap_or(0);
+        if tracks == 0 {
+            return;
+        }
+        let track = project.audio.microphone_track.map(|t| t as usize).filter(|t| *t < tracks).unwrap_or(0);
+        let Ok(samples) = umi_ai::transcribe::read_mono_16k(&screen, track) else { return };
+        let Ok((words, _)) = umi_ai::transcribe::transcribe(&model.path(), &samples, None, |_| {}) else { return };
+        let words: Vec<umi_project::edit::CaptionWord> =
+            words.into_iter().map(|w| umi_project::edit::CaptionWord { id: uuid::Uuid::new_v4(), start: w.start, end: w.end, text: w.text }).collect();
+        let Some(found) = umi_project::insights::insights(&words) else { return };
+        // Re-read: the editor may have saved meanwhile.
+        if let Ok(latest) = files.read_project() {
+            project = latest;
+        }
+        if project.suggest_title(&found.title) && files.write_project(&project).is_ok() {
+            let _ = app.emit("library:changed", ());
+        }
+    });
 }

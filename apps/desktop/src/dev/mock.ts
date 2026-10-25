@@ -348,6 +348,9 @@ function apply(op: Record<string, unknown>): EditorState {
       e.moves.push({ id, start: time, end: time + 3, kind: op.kind as "glide" });
       return setEdit(e, { kind: "move", id });
     }
+    case "setTitle":
+      state = { ...state, name: String(op.title).trim() || "Dashboard walkthrough" };
+      return state;
     case "delete":
     case "deleteMany": {
       const list = (op.selections as Selection[]) ?? [op.selection as Selection];
@@ -384,6 +387,8 @@ mockIPC(
   (cmd, payload) => {
     const p = (payload ?? {}) as Record<string, unknown>;
     switch (cmd) {
+      case "recording_rename":
+        return String(p.title);
       case "list_recordings":
         return [
           { path: "/fixture/Product demo.umi", name: "Dashboard walkthrough", duration: 10.1, createdAt: "2026-10-24T21:33:09Z" },

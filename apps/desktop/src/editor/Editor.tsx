@@ -1,3 +1,4 @@
+import { EditableTitle } from "../EditableTitle";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
@@ -143,9 +144,7 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
           <IconButton label="All recordings" onClick={props.onBack}>
             <ArrowLeft size={17} />
           </IconButton>
-          <div class="ed-title" data-tauri-drag-region>
-            {ed.state().name}
-          </div>
+          <EditableTitle class="ed-title" value={ed.state().name} onRename={(title) => void ed.apply({ op: "setTitle", title })} />
         </div>
         <div class="ed-topbar__right">
           <IconButton label="Undo" shortcut="⌘Z" disabled={!ed.state().canUndo} onClick={() => void ed.undo()}>
