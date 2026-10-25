@@ -27,7 +27,7 @@ const screens: [number, string][] = [
 ];
 /** What the narrator of the sample recording says. */
 const SAMPLE_WORDS = (() => {
-  const text = "Good morning. This is the Northwind dashboard. Revenue is up twelve percent this week. To share it, click Share report and copy the link.";
+  const text = "Here’s the new dashboard. Open any card to see more. This week is our best one yet. To share it, click Share and copy the link.";
   const words = text.split(" ");
   const start = 0.3;
   const step = 9.2 / words.length;
@@ -95,7 +95,7 @@ let state: EditorState = {
   // The guided demo transcribes during the tour; screenshots start with captions.
   const touring = new URLSearchParams(location.search).has("tour");
   state.edit.captions = { ...state.edit.captions, enabled: !touring, words: touring ? [] : SAMPLE_WORDS, language: "en" };
-  state.name = "Northwind walkthrough";
+  state.name = "Dashboard walkthrough";
   state.recording.hasCamera = true;
   state.edit.camera = { ...state.edit.camera, visible: true, shape: "circle", position: [0.9, 0.82], mirrored: false };
 }
@@ -368,7 +368,7 @@ mockIPC(
     switch (cmd) {
       case "list_recordings":
         return [
-          { path: "/fixture/Product demo.umi", name: "Northwind walkthrough", duration: 10.1, createdAt: "2026-10-24T21:33:09Z" },
+          { path: "/fixture/Product demo.umi", name: "Dashboard walkthrough", duration: 10.1, createdAt: "2026-10-24T21:33:09Z" },
           { path: "/fixture/Onboarding walkthrough.umi", name: "Onboarding walkthrough", duration: 184.2, createdAt: "2026-10-23T10:12:00Z" },
           { path: "/fixture/Bug report.umi", name: "Bug report", duration: 42.7, createdAt: "2026-10-21T15:40:00Z" },
         ];
