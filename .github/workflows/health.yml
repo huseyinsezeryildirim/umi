@@ -1,13 +1,14 @@
 name: Health
 
-# Hourly: do staging and production answer {"ok":true} on /healthz? A failure opens an issue (or
+# Every three hours: do staging and production answer {"ok":true} on /healthz? A failure opens an issue (or
 # comments on the open one); recovery closes it. The URLs are the repository variables
 # STAGING_API_URL and PRODUCTION_API_URL (repository-level, so these runs never wait for the
-# production environment's reviewers); an unset one is skipped. One short job per hour keeps this
-# around 720 Actions minutes a month on a private repository (free on a public one).
+# production environment's reviewers); an unset one is skipped. One short job every three hours is
+# about 240 Actions minutes a month on a private repository (free on a public one); tighten the cron
+# once the repository is public.
 on:
   schedule:
-    - cron: "41 * * * *"
+    - cron: "41 */3 * * *"
   workflow_dispatch:
 
 permissions:
