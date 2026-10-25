@@ -469,7 +469,8 @@ mockIPC(
           missingPermission: null,
         };
       case "record_status":
-        return { recording: true, paused: false, elapsed: (performance.now() / 1000) % 600, level: Math.abs(Math.sin(performance.now() / 300)) * 0.5 };
+        // The desktop demo starts its recording at `__demoRecStart`.
+        return { recording: true, paused: false, elapsed: (performance.now() - ((window as unknown as { __demoRecStart?: number }).__demoRecStart ?? 0)) / 1000, level: Math.abs(Math.sin(performance.now() / 300)) * 0.5 };
       case "record_meter":
       case "record_camera_preview":
       case "window_show":

@@ -280,15 +280,17 @@ function RecordingCard(props: { recording: RecordingSummary; index: number; open
   );
 }
 
+/** Every distinct Loom share or embed link in a piece of text (pasted links or a CSV). */
+function loomLinks(text: string) {
+  return [...new Set(text.match(/https?:\/\/(?:www\.)?loom\.com\/(?:share|embed)\/[A-Za-z0-9]+/g) ?? [])];
+}
+
 /** Paste Loom share links; each video downloads into the library (free, no account needed). */
 function LoomImport(props: { open: boolean; onClose: () => void; onDone: () => void }) {
   const [links, setLinks] = createSignal("");
   const [progress, setProgress] = createSignal<{ index: number; total: number; value: number } | null>(null);
   const run = async () => {
-    const list = links()
-      .split(/\s+/)
-      .map((l) => l.trim())
-      .filter((l) => l.includes("loom.com/"));
+    const list = loomLinks(links());
     if (!list.length) return toast("Paste one or more loom.com/share/… links");
     let done = 0;
     for (const [index, link] of list.entries()) {
@@ -310,10 +312,22 @@ function LoomImport(props: { open: boolean; onClose: () => void; onDone: () => v
       props.onClose();
     }
   };
+  let csv: HTMLInputElement | undefined;
+  // Loom's library export is a CSV; any file with share links in it works.
+  const pickCsv = (e: Event & { currentTarget: HTMLInputElement }) => {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = "";
+    if (!file) return;
+    void file.text().then((text) => {
+      const found = loomLinks(text);
+      if (!found.length) return toast("No Loom links in that file");
+      setLinks([...new Set([...loomLinks(links()), ...found])].join("\n"));
+    });
+  };
   return (
     <Dialog open={props.open} title="Import from Loom" onClose={() => !progress() && props.onClose()} width={480}>
       <p class="umi-section__hint" style={{ "margin-top": "-6px" }}>
-        Paste share links, one per line. Videos must be viewable by anyone with the link. They're downloaded to this computer and become recordings you can edit.
+        Paste share links, one per line, or choose the CSV of your Loom library. Videos must be viewable by anyone with the link. They're downloaded to this computer and become recordings you can edit.
       </p>
       <textarea class="umi-input ed-script" style={{ "min-height": "110px", width: "100%" }} placeholder="https://www.loom.com/share/…" value={links()} onInput={(e) => setLinks(e.currentTarget.value)} />
       <Show when={progress()}>
@@ -327,6 +341,10 @@ function LoomImport(props: { open: boolean; onClose: () => void; onDone: () => v
         )}
       </Show>
       <div style={{ display: "flex", gap: "8px", "justify-content": "flex-end", "margin-top": "14px" }}>
+        <input ref={csv} type="file" accept=".csv,.txt,text/csv,text/plain" hidden onChange={pickCsv} />
+        <Button variant="ghost" style={{ "margin-right": "auto" }} onClick={() => csv?.click()} disabled={!!progress()}>
+          Choose CSV…
+        </Button>
         <Button variant="ghost" onClick={props.onClose} disabled={!!progress()}>
           Cancel
         </Button>

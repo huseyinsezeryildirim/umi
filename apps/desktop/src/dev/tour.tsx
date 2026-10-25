@@ -1,10 +1,11 @@
-// The website's guided demo: a short tour over the real editor (demo build, `?tour`).
+// The website's guided demo (demo build, `?tour`): first a recording on a Mac desktop
+// (`?view=desktop`), then the real editor (`?open&from=N` continues the tour there).
 // One thing is lit at a time with a numbered hint; clicking it moves on. Clicks elsewhere
 // are held back (the hint gives a little shake) so people can't get lost.
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import "./tour.css";
 
-type Chapter = "Look" | "Captions" | "Share";
+type Chapter = "Record" | "Look" | "Captions" | "Share";
 interface Step {
   chapter: Chapter;
   text: string;
@@ -18,6 +19,11 @@ const byText = (selector: string, text: string) => () => [...document.querySelec
 const sel = (selector: string) => () => document.querySelector(selector);
 
 const STEPS: Step[] = [
+  { chapter: "Record", text: "Click Umi in the menu bar.", target: sel("#demo-umi") },
+  { chapter: "Record", text: "Turn on your camera to be in the video too.", target: () => document.querySelectorAll(".rec-row")[1] ?? null },
+  { chapter: "Record", text: "Press Start recording.", target: sel(".rec-start") },
+  { chapter: "Record", text: "Umi records your screen, camera and voice. Clicks are kept for the edit.", target: null, wait: 7200 },
+  { chapter: "Record", text: "Click Stop. The editor opens with the recording.", target: sel(".controls__stop") },
   { chapter: "Look", text: "Pick a background. The whole video changes at once.", target: sel('.umi-swatch[aria-label="dusk"]') },
   { chapter: "Look", text: "Press play. Umi zooms in wherever the cursor clicks.", target: sel(".ed-play") },
   { chapter: "Look", text: "No keyframes: the zooms come from your clicks.", target: null, wait: 5200 },
@@ -29,13 +35,20 @@ const STEPS: Step[] = [
   { chapter: "Share", text: "Or export a file: MP4, MOV or GIF, up to 4K.", target: byText(".ed-topbar button", "Export") },
 ];
 const CHAPTERS: { name: Chapter; color: string; tint: string }[] = [
+  { name: "Record", color: "#d92d20", tint: "#fee4e2" },
   { name: "Look", color: "#116ff5", tint: "#dbeafe" },
   { name: "Captions", color: "#7c4dff", tint: "#ede7ff" },
   { name: "Share", color: "#e8590c", tint: "#ffe8d9" },
 ];
 
+/** The current step, for the desktop scene to follow. */
+const [index, setIndex] = createSignal(-1);
+export const tourIndex = index;
+const params = new URLSearchParams(location.search);
+const onDesktop = params.get("view") === "desktop";
+const FIRST_EDITOR_STEP = STEPS.findIndex((s) => s.chapter !== "Record");
+
 export function Tour() {
-  const [index, setIndex] = createSignal(-1);
   const [rect, setRect] = createSignal<DOMRect | null>(null);
   const [shake, setShake] = createSignal(0);
   const step = () => STEPS[index()];
@@ -54,6 +67,11 @@ export function Tour() {
   };
   const go = (i: number) => {
     clearTimeout(waiting);
+    // The recording is done: on to the editor, where the tour carries on.
+    if (onDesktop && i >= FIRST_EDITOR_STEP && i < STEPS.length) {
+      setTimeout(() => location.replace(`?demo&open&tour&from=${i}`), 250);
+      return;
+    }
     // Close the share window when the tour moves past it.
     const close = byText("[role=dialog] button", "Done")() as HTMLElement | null;
     if (STEPS[i]?.text.startsWith("Or export") && close) {
@@ -67,7 +85,7 @@ export function Tour() {
   };
 
   onMount(() => {
-    setTimeout(() => go(0), 900);
+    setTimeout(() => go(Number(params.get("from")) || 0), 900);
     frame = requestAnimationFrame(follow);
     // Only the lit thing (and the tour itself) can be clicked.
     const guard = (e: MouseEvent) => {
@@ -104,7 +122,7 @@ export function Tour() {
 
   const restart = () => {
     setIndex(-1);
-    location.reload();
+    location.replace("?view=desktop&demo&tour");
   };
 
   return (
