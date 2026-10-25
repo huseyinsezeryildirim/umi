@@ -80,15 +80,21 @@ export async function saveTake(account: string, take: Take): Promise<string> {
     audio: { microphoneTrack: 0 },
   };
   const db = await open(account);
-  await new Promise<void>((done, fail) => {
-    const tx = db.transaction(["recordings", "files"], "readwrite");
-    // The editor knows the videos by these names whatever their format (the blob keeps its type).
-    tx.objectStore("files").put(screen, `${id}/screen.webm`);
-    if (camera) tx.objectStore("files").put(camera, `${id}/camera.webm`);
-    tx.objectStore("recordings").put({ id, createdAt, project, mediaDuration: take.duration });
-    tx.oncomplete = () => done();
-    tx.onerror = () => fail(tx.error);
-  });
+  const files = [[screen, "screen.webm"], ...(camera ? [[camera, "camera.webm"]] : [])] as [Blob, string][];
+  const write = async (asBytes: boolean) => {
+    // Safari's private windows can't keep a Blob in IndexedDB: then the bytes go in as they are.
+    const values = await Promise.all(files.map(async ([b]) => (asBytes ? { type: b.type, bytes: await b.arrayBuffer() } : b)));
+    await new Promise<void>((done, fail) => {
+      const tx = db.transaction(["recordings", "files"], "readwrite");
+      // The editor knows the videos by these names whatever their format (the blob keeps its type).
+      files.forEach(([, name], i) => tx.objectStore("files").put(values[i], `${id}/${name}`));
+      tx.objectStore("recordings").put({ id, createdAt, project, mediaDuration: take.duration });
+      tx.oncomplete = () => done();
+      tx.onerror = () => fail(tx.error);
+      tx.onabort = () => fail(tx.error);
+    });
+  };
+  await write(false).catch(() => write(true));
   db.close();
   return id;
 }

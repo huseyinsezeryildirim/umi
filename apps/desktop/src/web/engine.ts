@@ -66,6 +66,31 @@ class Player {
       v.currentTime = t;
       await this.seeked();
     }
+    // Just opened: the first frame may not be decoded yet (slow disks, Safari).
+    if (!this.ready) await this.loaded();
+    // Safari can call a video ready before its frame can be copied: wait (once) until the
+    // browser has actually shown one.
+    if (!this.shownOnce) {
+      this.shownOnce = true;
+      const rvfc = (v as HTMLVideoElement & { requestVideoFrameCallback?: (f: () => void) => number }).requestVideoFrameCallback;
+      if (rvfc) await Promise.race([new Promise<void>((done) => rvfc.call(v, () => done())), new Promise((r) => setTimeout(r, 500))]);
+    }
+  }
+  private shownOnce = false;
+  private loaded() {
+    const v = this.video;
+    return new Promise<void>((done) => {
+      const finish = () => {
+        v.removeEventListener("loadeddata", finish);
+        v.removeEventListener("canplay", finish);
+        clearTimeout(timer);
+        done();
+      };
+      const timer = setTimeout(finish, 4000);
+      v.addEventListener("loadeddata", finish);
+      v.addEventListener("canplay", finish);
+      if (this.ready) finish();
+    });
   }
   pause() {
     if (!this.video.paused) this.video.pause();
