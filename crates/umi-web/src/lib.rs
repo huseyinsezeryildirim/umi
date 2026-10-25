@@ -3,6 +3,9 @@
 //! web looks exactly like it does on the Mac. The page decodes the videos (it has the
 //! browser's decoders) and hands each frame over as a video element, `VideoFrame` or bitmap;
 //! the frame is copied on the GPU and drawn into an `OffscreenCanvas`.
+//!
+//! Browser-only: on other targets (`cargo build --workspace`) the crate is empty.
+#![cfg(target_arch = "wasm32")]
 #![allow(unsafe_code)]
 
 use serde::Deserialize;
