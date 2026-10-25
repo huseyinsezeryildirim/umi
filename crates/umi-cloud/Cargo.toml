@@ -1,0 +1,15 @@
+[package]
+name = "umi-cloud"
+description = "Umi Cloud client: create a link, upload a video (parts in parallel, retried), poster and GIF preview, link settings."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+ureq = { version = "3", features = ["json"] }
+
+[lints]
+workspace = true

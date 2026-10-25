@@ -207,6 +207,13 @@ mockIPC(
         return [];
       case "image_thumbnail":
         return wallpaper("#ddd", "#999");
+      case "cloud_status":
+        return { connected: true, server: "https://umi.cam" };
+      case "share_state":
+      case "share_update":
+        return { id: "s2Zty2QoHiLz", url: "https://umi.cam/v/s2Zty2QoHiLz", title: "Product demo", status: "ready", allowDownload: true, hasPassword: false, allowComments: true, expiresAt: null };
+      case "copy_text_to_clipboard":
+        return null;
       case "record_settings":
         return recordSettings;
       case "record_settings_save":
