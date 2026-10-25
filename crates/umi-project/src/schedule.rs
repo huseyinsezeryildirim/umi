@@ -2,9 +2,9 @@
 //! times, dissolving across crossfades) and which Media/Video 2 items (and their media
 //! times). Pure; shared by the player and the exporter.
 
-use umi_project::Placement;
-use umi_project::edit::{EditSettings, MediaKind};
-use umi_project::timeline::{effective_crossfade, kept_clips, layout};
+use crate::Placement;
+use crate::edit::{EditSettings, MediaKind};
+use crate::timeline::{effective_crossfade, kept_clips, layout};
 use uuid::Uuid;
 
 /// One clip's contribution to a frame.
@@ -75,7 +75,7 @@ impl Schedule {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use umi_project::edit::Clip;
+    use crate::edit::Clip;
 
     #[test]
     fn maps_cuts_speed_and_dissolves() {

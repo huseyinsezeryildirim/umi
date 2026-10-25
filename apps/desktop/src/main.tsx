@@ -9,7 +9,12 @@ const view = new URLSearchParams(location.search).get("view") ?? "main";
 
 // In a plain browser (design reviews, UI tests) a stand-in answers for the Rust side.
 // The website's interactive demo is a build of this UI with the same stand-in (VITE_DEMO).
-const ready = (import.meta.env.DEV || import.meta.env.VITE_DEMO) && !("__TAURI_INTERNALS__" in window) ? import("./dev/mock") : Promise.resolve();
+// The web app (umi.cam/editor) is this UI on a browser backend with the same Rust inside.
+const ready = import.meta.env.VITE_WEB
+  ? import("./web/backend").then((m) => m.installWebBackend())
+  : (import.meta.env.DEV || import.meta.env.VITE_DEMO) && !("__TAURI_INTERNALS__" in window)
+    ? import("./dev/mock")
+    : Promise.resolve();
 
 void ready.then(async () => {
   const root = document.getElementById("root")!;

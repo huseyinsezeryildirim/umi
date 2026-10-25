@@ -3,14 +3,14 @@
 // Umi in the browser, recorded the way Loom does it on the web: camera and microphone are allowed
 // once, your camera bubble and the recorder card appear on the page, Start asks what to share,
 // a countdown runs, and a control bar stays on the left while recording. Screen and camera are
-// recorded as two videos, so the editor (WebEditor) can still move and restyle the camera.
+// recorded as two videos, so the editor (the Mac app's, at /editor) can still move and restyle
+// the camera.
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type BrowserInfo, browserInfo } from "@/lib/browser";
-import type { CameraShape, Corner } from "@/lib/look";
+import type { CameraShape, Corner, Take } from "@/lib/library";
 import { type CameraBackground, cameraWithBackground, loadSegmenter } from "@/lib/segment";
 import { Mark, copyText } from "./ui";
-import { Editor, type Take } from "./WebEditor";
 
 const EASE = [0.25, 1, 0.5, 1] as const;
 
@@ -40,7 +40,8 @@ type Session = {
   discard: () => void;
 };
 
-export function Recorder({ account }: { account?: React.ReactNode }) {
+/** `onTake` gets the finished recording (the page saves it and opens the editor). */
+export function Recorder({ account, onTake, onCancel }: { account?: React.ReactNode; onTake: (take: Take) => void; onCancel?: () => void }) {
   const [stage, setStage] = useState<"setup" | "countdown" | "recording" | "edit">("setup");
   const [supported, setSupported] = useState(true);
   const [browser, setBrowser] = useState<BrowserInfo | null>(null);
@@ -58,26 +59,12 @@ export function Recorder({ account }: { account?: React.ReactNode }) {
   const [count, setCount] = useState(3);
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [take, setTake] = useState<Take | null>(null);
   const session = useRef<Session | null>(null);
   const skipCountdown = useRef<() => void>(() => {});
 
   useEffect(() => {
     setSupported(!!navigator.mediaDevices?.getDisplayMedia && typeof MediaRecorder !== "undefined");
     setBrowser(browserInfo());
-    // Development only: `?take=/__test__/take.mp4` opens the editor on a ready-made recording.
-    const test = process.env.NODE_ENV !== "production" ? new URLSearchParams(location.search).get("take") : null;
-    if (test)
-      void fetch(test)
-        .then((r) => r.blob())
-        .then((blob) => {
-          const v = document.createElement("video");
-          v.src = URL.createObjectURL(blob);
-          v.onloadedmetadata = () => {
-            setTake({ screen: blob, camera: null, duration: v.duration, width: v.videoWidth, height: v.videoHeight, hasSound: true });
-            setStage("edit");
-          };
-        });
   }, []);
 
   // Camera and microphone: asked for up front, like Loom, then kept live for the bubble and the meter.
@@ -216,13 +203,12 @@ export function Recorder({ account }: { account?: React.ReactNode }) {
       const d = SIZES[b.size];
       const top = b.y >= 0 && b.y + d / 2 < innerHeight / 2;
       const left = b.x + d / 2 < innerWidth / 2;
-      setTake({
+      onTake({
         screen,
         camera: camBlob ?? null,
         duration,
         width: settings.width ?? 1920,
         height: settings.height ?? 1080,
-        hasSound: screenStream.getAudioTracks().length > 0,
         corner: `${top ? "t" : "b"}${left ? "l" : "r"}` as Corner,
         camSize: b.size === "S" ? 0.18 : b.size === "M" ? 0.24 : 0.32,
         camShape: b.shape,
@@ -258,14 +244,20 @@ export function Recorder({ account }: { account?: React.ReactNode }) {
   const bubbleRef = useRef(bubble);
   bubbleRef.current = bubble;
 
-  if (stage === "edit" && take) return <Editor take={take} account={account} onRestart={() => (setTake(null), setStage("setup"))} />;
 
   return (
     <div className="relative min-h-[100svh] overflow-hidden bg-[radial-gradient(120%_80%_at_50%_0%,#dcebfc_0%,#fff_60%)]">
       <header className="flex h-16 items-center justify-between px-5">
-        <a href="/" className="flex items-center gap-2 text-[17px] font-semibold">
-          <Mark className="size-6" /> Umi
-        </a>
+        <div className="flex items-center gap-4">
+          <a href="/" className="flex items-center gap-2 text-[17px] font-semibold">
+            <Mark className="size-6" /> Umi
+          </a>
+          {onCancel && stage === "setup" && (
+            <button type="button" onClick={onCancel} className="text-[14px] text-muted hover:text-ink">
+              ← Your recordings
+            </button>
+          )}
+        </div>
         {account}
       </header>
 

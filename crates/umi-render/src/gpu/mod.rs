@@ -3,7 +3,7 @@
 mod executor;
 mod pipelines;
 
-pub use executor::Executor;
+pub use executor::{Executor, Readback};
 
 /// Video frame types, re-exported at the crate root.
 pub mod executor_types {

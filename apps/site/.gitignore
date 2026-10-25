@@ -3,3 +3,5 @@ out/
 next-env.d.ts
 *.tsbuildinfo
 /public/__test__/
+# The editor, built from apps/desktop (pnpm build:web).
+/public/editor/

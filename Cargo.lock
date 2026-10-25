@@ -6674,15 +6674,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "umi-wasm"
+name = "umi-web"
 version = "0.2.0"
 dependencies = [
  "getrandom 0.4.3",
+ "js-sys",
  "serde",
  "serde_json",
  "umi-editor",
  "umi-project",
+ "umi-render",
  "uuid",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "wgpu",
 ]
 
 [[package]]

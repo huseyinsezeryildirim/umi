@@ -10,6 +10,12 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@huggingface/transformers':
+        specifier: ^4.3.1
+        version: 4.3.1(@types/node@24.19.2)
+      '@mediapipe/tasks-vision':
+        specifier: ^1.1.1
+        version: 1.1.1
       '@tauri-apps/api':
         specifier: ^2.12.4
         version: 2.12.4
@@ -25,6 +31,9 @@ importers:
       lucide-solid:
         specifier: ^1.61.0
         version: 1.61.0(solid-js@1.9.17)
+      mediabunny:
+        specifier: ^1.62.1
+        version: 1.62.1
       solid-js:
         specifier: ^1.9.17
         version: 1.9.17
@@ -44,9 +53,6 @@ importers:
 
   apps/site:
     dependencies:
-      '@huggingface/transformers':
-        specifier: ^4.3.1
-        version: 4.3.1(@types/node@24.19.2)
       '@mediapipe/tasks-vision':
         specifier: ^1.1.1
         version: 1.1.1

@@ -1,0 +1,3 @@
+/public/__test__/
+# Built from crates/umi-web (pnpm wasm).
+/src/web/pkg/

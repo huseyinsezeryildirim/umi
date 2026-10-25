@@ -140,9 +140,81 @@ impl Renderer {
         self.exec.read_output()
     }
 
+    /// Starts reading the last rendered frame back without waiting (the browser's way).
+    pub fn copy_output(&mut self) -> gpu::Readback {
+        self.exec.copy_output()
+    }
+
     /// The last rendered frame's texture (Rgba8UnormSrgb), for zero-copy use.
     pub fn output_texture(&self) -> Option<&wgpu::Texture> {
         self.exec.output_texture()
+    }
+
+    /// The browser's path: frames are copied straight into the slots with
+    /// [`Renderer::upload_external`], then drawn with this into `target`
+    /// (`None` = the output; 0 or 1 = the two sides of a dissolve, see [`Renderer::dissolve`]).
+    pub fn render_uploaded(&mut self, size: (u32, u32), inputs: FrameInputs, target: Option<u8>) {
+        let mut ops = std::mem::take(&mut self.ops);
+        ops.clear();
+        {
+            let mut assets = self.assets();
+            let target = match target {
+                None => Target::Output,
+                Some(i) => Target::Frame(i),
+            };
+            self.planner.plan(&inputs, size, &mut assets, target, &mut ops);
+        }
+        self.exec.run(&ops, size, &self.rasters);
+        self.ops = ops;
+    }
+
+    /// Blends the two dissolve sides drawn with [`Renderer::render_uploaded`] into the output.
+    pub fn dissolve(&mut self, size: (u32, u32), progress: f64) {
+        let mut ops = std::mem::take(&mut self.ops);
+        ops.clear();
+        let canvas = Rect::new(0.0, 0.0, size.0 as f64, size.1 as f64);
+        let full = |tex: Target, alpha: f64| Draw {
+            size: (canvas.width(), canvas.height()),
+            transform: Homography::rect(canvas),
+            fill: Fill::Texture { tint: [1.0; 4], mirror: false },
+            texture: TexRef::Target(tex),
+            uv: Rect::UNIT,
+            mask: Mask::NONE,
+            alpha,
+        };
+        ops.push(Op::Clear { target: Target::Output, color: [0.0, 0.0, 0.0, 1.0] });
+        ops.push(Op::Draw { target: Target::Output, draw: full(Target::Frame(0), 1.0) });
+        ops.push(Op::Draw { target: Target::Output, draw: full(Target::Frame(1), progress.clamp(0.0, 1.0)) });
+        self.exec.run(&ops, size, &self.rasters);
+        self.ops = ops;
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn upload_external(&mut self, slot: TexRef, source: wgpu::CopyExternalImageSourceInfo, size: (u32, u32)) {
+        self.exec.upload_external(slot, source, size);
+    }
+
+    /// Forgets a video slot (the camera or an overlay that isn't shown any more).
+    pub fn drop_video(&mut self, slot: &TexRef) {
+        self.exec.drop_video(slot);
+    }
+
+    /// An image the planner can't read from disk (the browser has no files): `path` is the
+    /// edit's name for it, `rgba` straight (not premultiplied) pixels.
+    pub fn add_image(&self, path: &str, width: u32, height: u32, mut rgba: Vec<u8>) {
+        for px in rgba.chunks_exact_mut(4) {
+            let a = px[3] as u16;
+            if a < 255 {
+                for c in &mut px[..3] {
+                    *c = ((*c as u16 * a + 127) / 255) as u8;
+                }
+            }
+        }
+        let full = match &self.bundle {
+            Some(b) if !std::path::Path::new(path).is_absolute() => b.join(path),
+            _ => PathBuf::from(path),
+        };
+        self.rasters.insert(format!("img:{}", full.display()), raster::RasterImage { width, height, pixels: rgba });
     }
 
     fn upload(&mut self, frame: &FrameRequest) -> FrameInputs {

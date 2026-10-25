@@ -85,9 +85,11 @@ html.lenis body {
     transition:
       transform 0.4s var(--ease-soft),
       box-shadow 0.4s var(--ease-soft);
-    animation: glass-turn 6s linear infinite;
+    /* The light runs round the edge on hover only: animating it all the time restyles every frame. */
+    animation: glass-turn 6s linear infinite paused;
   }
   .btn-glass:hover {
+    animation-play-state: running;
     transform: translateY(-1px);
     box-shadow:
       0 1px 2px rgb(17 24 39 / 0.06),
