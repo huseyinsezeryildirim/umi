@@ -40,5 +40,67 @@
     }
   ],
   // Hourly cleanup: purge expired/revoked videos and abandoned uploads.
-  "triggers": { "crons": ["17 * * * *"] }
+  "triggers": { "crons": ["17 * * * *"] },
+
+  // Deployed environments (.github/workflows/deploy-cloud.yml): `--env staging` on every push to main,
+  // `--env production` on a version tag. The top level above is local development (`wrangler dev`).
+  // vars and bindings aren't inherited, so each environment lists all of them. Secrets are per
+  // environment too: `npx wrangler secret put SIGNING_SECRET --env staging` (see docs/DEVOPS.md).
+  "env": {
+    "staging": {
+      "name": "umi-web-staging",
+      "vars": {
+        "PUBLIC_BASE_URL": "",
+        "PART_SIZE_BYTES": "10485760",
+        "MAX_UPLOAD_BYTES": "5368709120",
+        "R2_S3_ENDPOINT": "",
+        "R2_BUCKET_NAME": "umi-videos-staging",
+        "SITE_ORIGINS": "https://staging.umi-site.pages.dev",
+        "SITE_URL": "https://staging.umi-site.pages.dev",
+        "EMAIL_PROVIDER": "log",
+        "EMAIL_FROM": "Umi <hello@umi.cam>"
+      },
+      "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "umi-videos-staging" }],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "umi-staging",
+          // Replace with the id printed by `wrangler d1 create umi-staging`.
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations"
+        }
+      ]
+    },
+    "production": {
+      "name": "umi-web",
+      "routes": [
+        { "pattern": "umi.cam/v/*", "zone_name": "umi.cam" },
+        { "pattern": "umi.cam/e/*", "zone_name": "umi.cam" },
+        { "pattern": "umi.cam/api/*", "zone_name": "umi.cam" },
+        { "pattern": "umi.cam/oembed*", "zone_name": "umi.cam" },
+        { "pattern": "umi.cam/healthz", "zone_name": "umi.cam" }
+      ],
+      "vars": {
+        "PUBLIC_BASE_URL": "https://umi.cam",
+        "PART_SIZE_BYTES": "10485760",
+        "MAX_UPLOAD_BYTES": "5368709120",
+        "R2_S3_ENDPOINT": "",
+        "R2_BUCKET_NAME": "umi-videos",
+        "SITE_ORIGINS": "https://umi.cam",
+        "SITE_URL": "https://umi.cam",
+        "EMAIL_PROVIDER": "resend",
+        "EMAIL_FROM": "Umi <hello@umi.cam>"
+      },
+      "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "umi-videos" }],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "umi",
+          // Replace with the id printed by `wrangler d1 create umi`.
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations"
+        }
+      ]
+    }
+  }
 }
