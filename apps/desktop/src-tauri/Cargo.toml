@@ -27,7 +27,7 @@ parking_lot = "0.12"
 crossbeam-channel = "0.5"
 dirs = "6"
 image = { version = "0.25", default-features = false, features = ["jpeg"] }
-base64 = "0.22"
+base64 = "0.23"
 trash = "5"
 ureq = { version = "3", features = ["json"] }
 chrono.workspace = true

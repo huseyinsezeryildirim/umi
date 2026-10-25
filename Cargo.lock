@@ -6754,7 +6754,7 @@ name = "umi-desktop"
 version = "0.2.0"
 dependencies = [
  "arboard",
- "base64 0.22.1",
+ "base64 0.23.1",
  "chrono",
  "crossbeam-channel",
  "dirs 6.0.0",
