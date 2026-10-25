@@ -475,7 +475,7 @@ function DeviceRow({
   const label = kind === "camera" ? "Camera" : "Microphone";
   const level = useLevel(on ? stream : null);
   return (
-    <div className="flex h-12 items-center gap-2.5 rounded-xl bg-[#f6f7f9] px-3">
+    <div className="flex h-12 min-w-0 items-center gap-2.5 rounded-xl bg-[#f6f7f9] px-3">
       <span className="grid size-6 shrink-0 place-items-center text-muted">
         {kind === "camera" ? (
           <svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -490,13 +490,19 @@ function DeviceRow({
         )}
       </span>
       {on && devices.some((d) => d.label) ? (
-        <select value={value} onChange={(e) => onPick(e.currentTarget.value)} className="min-w-0 flex-1 truncate bg-transparent text-[14px] font-medium outline-none" aria-label={label}>
-          {devices.map((d, i) => (
-            <option key={d.deviceId} value={d.deviceId}>
-              {d.label || `${label} ${i + 1}`}
-            </option>
-          ))}
-        </select>
+        // A select is as wide as its longest option unless its box says otherwise.
+        <span className="relative min-w-0 flex-1">
+          <select value={value} onChange={(e) => onPick(e.currentTarget.value)} className="w-full min-w-0 cursor-pointer appearance-none truncate bg-transparent pr-5 text-[14px] font-medium outline-none" aria-label={label}>
+            {devices.map((d, i) => (
+              <option key={d.deviceId} value={d.deviceId}>
+                {(d.label || `${label} ${i + 1}`).replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)$/i, "")}
+              </option>
+            ))}
+          </select>
+          <svg viewBox="0 0 24 24" className="pointer-events-none absolute top-1/2 right-0 size-3.5 -translate-y-1/2 text-muted" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </span>
       ) : (
         <span className="flex-1 text-[14px] font-medium text-muted">{on ? label : `No ${label.toLowerCase()}`}</span>
       )}

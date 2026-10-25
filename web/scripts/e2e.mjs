@@ -113,8 +113,8 @@ async function main() {
 
   console.log("\nAuth & billing hook");
   check((await api("POST", "/api/videos", { sizeBytes: 1 }, "nope")).status === 401, "bad token → 401");
-  // Plans (src/plans.ts): Free shares videos of any length; only storage is limited.
-  check((await api("POST", "/api/videos", { sizeBytes: 1, durationMs: 45 * 60_000 }, args["free-token"])).status === 201, "free plan shares a 45-minute video");
+  // Plans (src/plans.ts): share links are a paid feature; Free exports or self-hosts.
+  check((await api("POST", "/api/videos", { sizeBytes: 1 }, args["free-token"])).status === 402, "free plan has no cloud links → 402");
 
   console.log("\nUpload");
   const { video, plan } = await upload(bytes, thumbBytes, {

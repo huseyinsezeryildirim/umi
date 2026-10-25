@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { type Account, type Plan, me, resendVerification, setPlanForTesting, signOut } from "@/lib/account";
+import { type Account, type Plan, deleteAccount, me, resendVerification, setPlanForTesting, signOut } from "@/lib/account";
 import { Recorder } from "./Recorder";
 import { Mark } from "./ui";
 
@@ -99,11 +99,51 @@ function AccountMenu({ account, onChange }: { account: Account; onChange: (a: Ac
           <a href="/" className="block rounded-xl px-3 py-2 text-[14px] hover:bg-ink/5">
             Umi website
           </a>
-          <button type="button" onClick={() => void signOut().then(() => location.assign("/"))} className="w-full rounded-xl px-3 py-2 text-left text-[14px] text-[#b42318] hover:bg-[#fef3f2]">
+          <button type="button" onClick={() => void signOut().then(() => location.assign("/"))} className="w-full rounded-xl px-3 py-2 text-left text-[14px] hover:bg-ink/5">
             Sign out
           </button>
+          <DeleteAccount />
         </div>
       )}
     </div>
+  );
+}
+
+/** Deleting the account: asks for the password, then removes everything on Umi Cloud. */
+function DeleteAccount() {
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!open)
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="w-full rounded-xl px-3 py-2 text-left text-[14px] text-[#b42318] hover:bg-[#fef3f2]">
+        Delete account…
+      </button>
+    );
+  return (
+    <form
+      className="m-1 rounded-xl bg-[#fef3f2] p-2.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        setBusy(true);
+        setError("");
+        deleteAccount(password)
+          .then(() => location.assign("/"))
+          .catch((err) => (setError((err as Error).message), setBusy(false)));
+      }}
+    >
+      <p className="text-[12px] text-[#7a271a]">Your account, links, videos on Umi Cloud and their stats are deleted for good. Recordings on your computer stay.</p>
+      <input type="password" required placeholder="Your password" value={password} onChange={(e) => setPassword(e.currentTarget.value)} autoComplete="current-password" className="mt-2 h-9 w-full rounded-lg bg-white px-2.5 text-[13px] shadow-[0_0_0_1px_rgb(180_35_24/0.25)] outline-none" />
+      {error && <p className="mt-1.5 text-[12px] text-[#b42318]">{error}</p>}
+      <div className="mt-2 flex gap-1.5">
+        <button type="submit" disabled={busy} className="h-8 flex-1 rounded-lg bg-[#d92d20] text-[12px] font-medium text-white disabled:opacity-60">
+          {busy ? "Deleting…" : "Delete everything"}
+        </button>
+        <button type="button" onClick={() => setOpen(false)} className="h-8 flex-1 rounded-lg bg-white text-[12px] font-medium">
+          Keep
+        </button>
+      </div>
+    </form>
   );
 }

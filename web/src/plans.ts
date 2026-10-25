@@ -23,8 +23,9 @@ export interface Entitlements {
 }
 
 export const PLANS: Record<Plan, Entitlements> = {
-  // Storage is the only real cost (see docs/business-model.md), so Free limits storage, not length.
-  free: { cloudLinks: true, maxVideoMinutes: null, storageGB: 10, umiBadge: true, insights: false, linkControls: true, workspaces: false, customDomain: false },
+  // Free keeps videos on the computer: export the file, or share from your own self-hosted cloud.
+  // Umi Cloud holds no free users' videos, so it holds no personal data it doesn't need.
+  free: { cloudLinks: false, maxVideoMinutes: null, storageGB: 0, umiBadge: true, insights: false, linkControls: false, workspaces: false, customDomain: false },
   pro: { cloudLinks: true, maxVideoMinutes: null, storageGB: 1000, umiBadge: false, insights: true, linkControls: true, workspaces: false, customDomain: true },
   team: { cloudLinks: true, maxVideoMinutes: null, storageGB: null, umiBadge: false, insights: true, linkControls: true, workspaces: true, customDomain: true },
 };

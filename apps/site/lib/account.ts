@@ -100,3 +100,9 @@ export async function resetPassword(token: string, password: string): Promise<Ac
 export async function setPlanForTesting(plan: Plan): Promise<Account> {
   return (await call<{ account: Account }>("/api/auth/dev-plan", { method: "POST", body: JSON.stringify({ plan }) })).account;
 }
+
+/** Deletes the account and everything it holds on Umi Cloud. */
+export async function deleteAccount(password: string) {
+  await call("/api/auth/account", { method: "DELETE", body: JSON.stringify({ password }) });
+  setToken(null);
+}

@@ -1,6 +1,7 @@
 import type { AppEnv } from "./env";
 import { handleApi } from "./api";
 import { handleAuth } from "./auth";
+import { deleteAccount } from "./account";
 import { cleanup } from "./cleanup";
 import { HttpError, errorResponse, json } from "./http";
 import { handleEmbed, handleOembed } from "./embed";
@@ -50,6 +51,7 @@ async function route(request: Request, env: AppEnv): Promise<Response> {
   if ((m = /^\/api\/uploads\/([0-9A-Za-z]+)\/(thumbnail|gif)$/.exec(pathname)) && method === "PUT") {
     return handleAssetUpload(request, env, m[1]!, m[2] as "thumbnail" | "gif");
   }
+  if (pathname === "/api/auth/account" && method === "DELETE") return deleteAccount(request, env);
   if (pathname.startsWith("/api/auth/")) {
     const response = await handleAuth(request, env, pathname);
     if (response) return response;
