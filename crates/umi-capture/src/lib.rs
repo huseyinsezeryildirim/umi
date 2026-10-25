@@ -91,4 +91,6 @@ pub enum Target {
     Window { id: u32 },
     /// Part of a display, in that display's points (top-left origin).
     Area { display: u32, x: f64, y: f64, width: f64, height: f64 },
+    /// A phone or tablet connected by cable (macOS), by name.
+    Device { name: String },
 }

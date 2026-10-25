@@ -96,7 +96,7 @@ fn size_of(image: &RasterImage) -> (u32, u32) {
 
 impl Assets for FrameAssets<'_> {
     fn chrome(&mut self, frame: DeviceFrame, width: u32, height: u32) -> Option<ChromeRaster> {
-        let radius = chrome::content_radius(frame, width as f64)?;
+        let radius = chrome::content_radius(frame, width as f64, height as f64)?;
         let key = format!("chrome:{frame:?}:{width}x{height}");
         self.cache.get_or_insert(&key, || chrome::draw(frame, width, height))?;
         Some(ChromeRaster { key, content_radius: radius })

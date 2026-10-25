@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createResource, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { IconButton, Kbd, Menu, Segmented, Toaster, toast, type MenuEntry } from "@umi/ui";
-import { AppWindow, Camera, CameraOff, ChevronDown, Crop, Film, Maximize2, Mic, MicOff, Monitor, MoreHorizontal, ScrollText, ShieldAlert, UserSquare2, Volume2, VolumeX } from "lucide-solid";
+import { AppWindow, Smartphone, Camera, CameraOff, ChevronDown, Crop, Film, Maximize2, Mic, MicOff, Monitor, MoreHorizontal, ScrollText, ShieldAlert, UserSquare2, Volume2, VolumeX } from "lucide-solid";
 import { recorder, type RecordSettings, type Sources, type Target } from "./api";
 
 /** The recorder: what to record, camera, microphone, sound, and Start. */
@@ -45,13 +45,14 @@ export function Launcher() {
     const t = target();
     const list = sources();
     if (!t || t.kind === "display") return list?.displays.find((d) => !t || d.id === (t as { id: number }).id)?.name ?? "Full screen";
+    if (t.kind === "device") return t.name;
     if (t.kind === "window") {
       const w = list?.windows.find((x) => x.id === t.id);
       return w ? `${w.app}${w.title ? ` — ${w.title}` : ""}` : "A window";
     }
     return `Area ${Math.round(t.width)}×${Math.round(t.height)}`;
   };
-  const sourceIcon = () => (settings()?.cameraOnly ? <UserSquare2 size={18} /> : target()?.kind === "window" ? <AppWindow size={18} /> : target()?.kind === "area" ? <Crop size={18} /> : <Monitor size={18} />);
+  const sourceIcon = () => (settings()?.cameraOnly ? <UserSquare2 size={18} /> : target()?.kind === "device" ? <Smartphone size={18} /> : target()?.kind === "window" ? <AppWindow size={18} /> : target()?.kind === "area" ? <Crop size={18} /> : <Monitor size={18} />);
 
   const pick = (t: Target | null, cameraOnly = false) =>
     update((s) => {
@@ -66,6 +67,9 @@ export function Launcher() {
     for (const d of list?.displays ?? []) entries.push({ label: d.name, icon: <Monitor size={15} />, checked: !settings()?.cameraOnly && (target()?.kind ?? "display") === "display" && (!target() || (target() as { id: number }).id === d.id), onSelect: () => pick({ kind: "display", id: d.id }) });
     entries.push({ label: "Select an area…", icon: <Crop size={15} />, onSelect: () => void invoke("area_pick", { mode: "record" }) });
     entries.push({ label: "Camera only", icon: <UserSquare2 size={15} />, checked: settings()?.cameraOnly, onSelect: () => pick(null, true) });
+    for (const phone of list?.phones ?? []) {
+      entries.push({ label: `${phone.name} (by cable)`, icon: <Smartphone size={15} />, checked: target()?.kind === "device" && (target() as { name: string }).name === phone.name, onSelect: () => pick({ kind: "device", name: phone.name }) });
+    }
     const chosen = target()?.kind === "window" ? list?.windows.find((w) => w.id === (target() as { id: number }).id) : undefined;
     if (chosen) {
       entries.push({ kind: "separator" }, { kind: "label", label: `Size of ${chosen.app}` });

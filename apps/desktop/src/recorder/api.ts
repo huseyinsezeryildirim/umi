@@ -4,6 +4,7 @@ import { emit } from "@tauri-apps/api/event";
 export type Target =
   | { kind: "display"; id: number }
   | { kind: "window"; id: number }
+  | { kind: "device"; name: string }
   | { kind: "area"; display: number; x: number; y: number; width: number; height: number };
 
 export interface CameraStyle {
@@ -55,6 +56,7 @@ export interface Sources {
   windows: Window[];
   microphones: { id: string; name: string; isDefault: boolean }[];
   cameras: { id: string; name: string }[];
+  phones: { name: string }[];
   missingPermission: string | null;
 }
 export interface Status {

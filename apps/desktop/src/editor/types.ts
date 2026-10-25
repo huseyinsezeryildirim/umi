@@ -12,7 +12,7 @@ export type Background =
   | { blurredScreen: Record<string, never> };
 
 export type AspectRatio = "auto" | "wide" | "vertical" | "square" | "classic" | "portrait";
-export type DeviceFrame = "none" | "macOS" | "windows" | "browser" | "macBook";
+export type DeviceFrame = "none" | "macOS" | "windows" | "browser" | "macBook" | "phone";
 export type CornerStyle = "rounded" | "squircle";
 export type Smoothing = "off" | "slow" | "smooth" | "fast";
 export type CameraShape = "circle" | "squircle" | "square";

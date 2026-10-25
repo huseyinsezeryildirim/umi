@@ -182,6 +182,8 @@ impl DeviceFrameGeometry {
             DeviceFrame::Browser => Insets { top: 0.062, left: 0.0, right: 0.0, bottom: 0.0 },
             // Bezel all around, plus the wider base below.
             DeviceFrame::MacBook => Insets { top: 0.032, left: 0.09, right: 0.09, bottom: 0.068 },
+            // An even bezel all around.
+            DeviceFrame::Phone => Insets { top: 0.05, left: 0.05, right: 0.05, bottom: 0.05 },
         }
     }
 

@@ -11,13 +11,15 @@ use umi_project::Rect;
 use umi_project::edit::DeviceFrame;
 
 /// Corner radius of the screen inside the chrome (`None` for no chrome).
-pub fn content_radius(frame: DeviceFrame, outer_width: f64) -> Option<f64> {
+pub fn content_radius(frame: DeviceFrame, outer_width: f64, outer_height: f64) -> Option<f64> {
     let insets = DeviceFrameGeometry::insets(frame);
     let cw = outer_width / (1.0 + insets.left + insets.right);
+    let content = DeviceFrameGeometry::content_rect(frame, Rect::new(0.0, 0.0, outer_width, outer_height));
     match frame {
         DeviceFrame::None => None,
         DeviceFrame::MacOs | DeviceFrame::Browser => Some(cw * 0.012),
         DeviceFrame::Windows | DeviceFrame::MacBook => Some(cw * 0.004),
+        DeviceFrame::Phone => Some(content.width().min(content.height()) * 0.12),
     }
 }
 
@@ -69,6 +71,8 @@ pub fn draw(frame: DeviceFrame, width: u32, height: u32) -> Option<RasterImage> 
 
     match frame {
         DeviceFrame::None => return None,
+        // Drawn below, with a rounded opening.
+        DeviceFrame::Phone => {}
         DeviceFrame::MacOs | DeviceFrame::Browser => {
             pm.fill_path(&rounded(bounds, cw * 0.012)?, &paint(gray(0.96, 1.0)), FillRule::Winding, t, None);
             // Title bar separator.
@@ -180,6 +184,29 @@ pub fn draw(frame: DeviceFrame, width: u32, height: u32) -> Option<RasterImage> 
             let notch = Rect::new(bounds.mid_x() - cw * 0.08, base_top, cw * 0.16, notch_h);
             pm.fill_path(&rounded(notch, notch_h * 0.5)?, &paint(gray(0.6, 1.0)), FillRule::Winding, t, None);
         }
+    }
+
+    if frame == DeviceFrame::Phone {
+        // Body: titanium edge, black glass, the screen's rounded opening, the island on top.
+        // Proportions follow the screen's short side (portrait or landscape).
+        let short = content.width().min(content.height());
+        let radius = short * 0.17;
+        pm.fill_path(&rounded(bounds, radius)?, &paint(Color::from_rgba8(58, 60, 66, 255)), FillRule::Winding, t, None);
+        let edge = (cw * 0.012).max(1.0);
+        let glass = Rect::new(bounds.min_x() + edge, bounds.min_y() + edge, bounds.width() - edge * 2.0, bounds.height() - edge * 2.0);
+        pm.fill_path(&rounded(glass, radius - edge)?, &paint(gray(0.02, 1.0)), FillRule::Winding, t, None);
+        let mut clear = Paint::default();
+        clear.set_color(Color::TRANSPARENT);
+        clear.blend_mode = tiny_skia::BlendMode::Clear;
+        clear.anti_alias = true;
+        pm.fill_path(&rounded(content, short * 0.12)?, &clear, FillRule::Winding, t, None);
+        let island = if content.height() >= content.width() {
+            Rect::new(content.mid_x() - short * 0.16, content.min_y() + short * 0.03, short * 0.32, short * 0.09)
+        } else {
+            Rect::new(content.min_x() + short * 0.03, content.mid_y() - short * 0.16, short * 0.09, short * 0.32)
+        };
+        pm.fill_path(&rounded(island, island.height() / 2.0)?, &paint(gray(0.0, 1.0)), FillRule::Winding, t, None);
+        return Some(from_pixmap(pm));
     }
 
     // Leave the content area empty; the screen is composited there.

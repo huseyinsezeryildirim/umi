@@ -141,7 +141,7 @@ export function Inspector(props: { editor: Editor }) {
           <Match when={tab() === "screen"}>
             <Section title="Frame" icon={<Monitor size={15} />}>
               <div class="ed-chips">
-                <For each={[["none", "None"], ["macOS", "macOS"], ["windows", "Windows"], ["browser", "Browser"], ["macBook", "MacBook"]] as [DeviceFrame, string][]}>
+                <For each={[["none", "None"], ["macOS", "macOS"], ["windows", "Windows"], ["browser", "Browser"], ["macBook", "MacBook"], ["phone", "Phone"]] as [DeviceFrame, string][]}>
                   {([value, label]) => (
                     <button type="button" class="ed-chip" data-selected={edit().frame === value ? "true" : "false"} onClick={() => set((e) => (e.frame = value))}>
                       {label}

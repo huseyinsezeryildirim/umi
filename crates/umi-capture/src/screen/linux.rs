@@ -82,6 +82,7 @@ pub fn start(target: &Target, options: &ScreenOptions, clock: Clock, video: Arc<
     let display_id = match target {
         Target::Display { id } | Target::Area { display: id, .. } => *id,
         // Windows: the display they're on, cropped to the window.
+        Target::Device { .. } => return Err(CaptureError::Unsupported),
         Target::Window { id } => xcap::Window::all().map_err(err)?.into_iter().find(|w| w.id().is_ok_and(|x| x == *id)).and_then(|w| w.current_monitor().ok()).and_then(|m| m.id().ok()).unwrap_or(0),
     };
     let monitor = xcap::Monitor::all().map_err(err)?.into_iter().find(|m| m.id().is_ok_and(|x| x == display_id)).ok_or_else(|| CaptureError::NotFound("That display".into()))?;
@@ -92,7 +93,7 @@ pub fn start(target: &Target, options: &ScreenOptions, clock: Clock, video: Arc<
             let ((x, y, w, h), _) = super::geometry(target)?;
             Some(((x - mx).max(0.0) as u32, (y - my).max(0.0) as u32, w as u32, h as u32))
         }
-        Target::Display { .. } => None,
+        Target::Display { .. } | Target::Device { .. } => None,
     };
     let size = match crop {
         Some((_, _, w, h)) => fit(w as f64, h as f64, options.max_size),

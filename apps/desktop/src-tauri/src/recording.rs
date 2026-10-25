@@ -96,6 +96,8 @@ pub struct Sources {
     windows: Vec<umi_capture::Window>,
     microphones: Vec<umi_capture::audio::Microphone>,
     cameras: Vec<umi_capture::camera::CameraDevice>,
+    /// iPhones/iPads connected by cable (macOS).
+    phones: Vec<umi_media::device::ScreenDevice>,
     /// Empty when everything's allowed; otherwise what's missing ("screen").
     missing_permission: Option<String>,
 }
@@ -108,7 +110,7 @@ pub async fn record_sources() -> Result<Sources, String> {
             (Err(umi_capture::CaptureError::ScreenPermission), _) | (_, Err(umi_capture::CaptureError::ScreenPermission)) => (vec![], vec![], Some("screen".to_string())),
             (d, w) => (d.unwrap_or_default(), w.unwrap_or_default(), None),
         };
-        Sources { displays, windows, microphones: umi_capture::audio::microphones(), cameras: umi_capture::camera::cameras(), missing_permission: missing }
+        Sources { displays, windows, microphones: umi_capture::audio::microphones(), cameras: umi_capture::camera::cameras(), phones: umi_media::device::screen_devices(), missing_permission: missing }
     })
     .await
     .map_err(|e| e.to_string())

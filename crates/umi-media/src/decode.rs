@@ -66,7 +66,15 @@ impl VideoDecoder {
     pub fn open(path: &Path, hardware: bool) -> Result<Self, MediaError> {
         crate::init();
         let input = ff::format::input(path).map_err(|e| MediaError::open(path, e))?;
-        let stream = input.streams().best(ff::media::Type::Video).ok_or_else(|| MediaError::NoVideo(path.into()))?;
+        Self::from_input(input, hardware).map_err(|e| match e {
+            MediaError::NoVideo(_) => MediaError::NoVideo(path.into()),
+            e => e,
+        })
+    }
+
+    /// A decoder over an already opened input (a file or a live device).
+    pub(crate) fn from_input(input: ff::format::context::Input, hardware: bool) -> Result<Self, MediaError> {
+        let stream = input.streams().best(ff::media::Type::Video).ok_or_else(|| MediaError::NoVideo(Path::new("input").into()))?;
         let index = stream.index();
         let tb = stream.time_base();
         let time_base = tb.numerator() as f64 / tb.denominator().max(1) as f64;

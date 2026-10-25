@@ -201,6 +201,8 @@ pub struct Recording {
     mic: Option<umi_capture::audio::MicSession>,
     camera: Option<umi_capture::camera::CameraSession>,
     input: parking_lot::Mutex<Option<InputRecorder>>,
+    /// A phone's screen being read (instead of `screen`).
+    device: Option<(Arc<std::sync::atomic::AtomicBool>, JoinHandle<()>)>,
     screen_feed: Option<Arc<Feed>>,
     camera_feed: Option<Arc<Feed>>,
     writers: Vec<JoinHandle<Result<u64, String>>>,
@@ -238,7 +240,15 @@ impl Recording {
     /// is opened once.
     pub fn prepare(library: &Path, options: Options, camera_preview: Option<Arc<dyn VideoSink>>) -> Result<Recording, RecordError> {
         let screen_options = ScreenOptions { fps: options.fps, max_size: options.max_size, show_cursor: false, system_audio: options.system_audio, exclude_own_windows: true };
-        let (rect, scale) = screen::geometry(&options.target)?;
+        // A phone: its picture comes through FFmpeg; size from the device itself.
+        let device = match &options.target {
+            Target::Device { name } => Some(umi_media::VideoDecoder::open_device(name, options.fps)?),
+            _ => None,
+        };
+        let (rect, scale) = match &device {
+            Some(d) => ((0.0, 0.0, d.info().width as f64, d.info().height as f64), 1.0),
+            None => screen::geometry(&options.target)?,
+        };
         let size = screen::fit(rect.2 * scale, rect.3 * scale, options.max_size);
         let bundle_path = new_bundle(library)?;
         let bundle = Bundle::new(&bundle_path);
@@ -270,6 +280,7 @@ impl Recording {
             mic: None,
             camera: None,
             input: parking_lot::Mutex::new(None),
+            device: None,
             screen_feed: Some(screen_feed.clone()),
             camera_feed: None,
             writers: vec![],
@@ -280,7 +291,10 @@ impl Recording {
 
         let result = (|| -> Result<(), RecordError> {
             let system: Option<Arc<dyn AudioSink>> = audio.system_track.map(|t| Arc::new(Track(screen_feed.clone(), t as usize)) as Arc<dyn AudioSink>);
-            recording.screen = Some(screen::start(&options.target, &screen_options, clock.clone(), screen_feed.clone(), system)?);
+            match device {
+                Some(decoder) => recording.device = Some(device_thread(decoder, clock.clone(), screen_feed.clone())),
+                None => recording.screen = Some(screen::start(&options.target, &screen_options, clock.clone(), screen_feed.clone(), system)?),
+            }
             if let (Some(id), Some(track)) = (&options.microphone, audio.microphone_track) {
                 let sink: Arc<dyn AudioSink> = Arc::new(Track(screen_feed.clone(), track as usize));
                 recording.mic = Some(umi_capture::audio::start(Some(id.as_str()).filter(|s| !s.is_empty()), clock.clone(), Some(sink))?);
@@ -319,8 +333,11 @@ impl Recording {
         for f in &feeds {
             f.open.store(true, Relaxed);
         }
-        let r = self.capture_rect;
-        *self.input.lock() = Some(InputRecorder::start(self.clock.clone(), Area { x: r.0, y: r.1, width: r.2, height: r.3 }));
+        // A phone has no pointer to follow.
+        if self.device.is_none() {
+            let r = self.capture_rect;
+            *self.input.lock() = Some(InputRecorder::start(self.clock.clone(), Area { x: r.0, y: r.1, width: r.2, height: r.3 }));
+        }
     }
 
     pub fn elapsed(&self) -> f64 {
@@ -352,6 +369,10 @@ impl Recording {
     fn stop_sources(&mut self) -> umi_project::CursorData {
         if let Some(mut s) = self.screen.take() {
             let _ = s.stop();
+        }
+        if let Some((stop, thread)) = self.device.take() {
+            stop.store(true, std::sync::atomic::Ordering::Relaxed);
+            let _ = thread.join();
         }
         self.mic = None;
         if let Some(mut c) = self.camera.take() {
@@ -389,6 +410,14 @@ impl Recording {
             edit: None,
             camera_only: self.options.camera_only.then_some(true),
         };
+        let mut project = project;
+        if self.device.is_some() || matches!(self.options.target, Target::Device { .. }) {
+            // A phone recording starts in a phone frame, upright.
+            let mut edit = project.default_edit(None);
+            edit.frame = umi_project::edit::DeviceFrame::Phone;
+            edit.aspect = if self.size.1 >= self.size.0 { umi_project::edit::AspectRatio::Vertical } else { umi_project::edit::AspectRatio::Wide };
+            project.edit = Some(edit);
+        }
         bundle.write_project(&project).map_err(|e| RecordError::Write(e.to_string()))?;
         Ok(self.bundle.clone())
     }
@@ -402,6 +431,27 @@ impl Recording {
         }
         let _ = std::fs::remove_dir_all(&self.bundle);
     }
+}
+
+/// Reads a live device (a phone's screen) into a feed until stopped.
+fn device_thread(mut decoder: umi_media::VideoDecoder, clock: Clock, feed: Arc<Feed>) -> (Arc<std::sync::atomic::AtomicBool>, JoinHandle<()>) {
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let flag = stop.clone();
+    let thread = std::thread::Builder::new()
+        .name("umi-device".into())
+        .spawn(move || {
+            while !flag.load(std::sync::atomic::Ordering::Relaxed) {
+                let Ok(Some(frame)) = decoder.next() else { break };
+                let Some(t) = clock.now() else { continue };
+                let (w, h) = (frame.width, frame.height);
+                match frame.format {
+                    umi_media::FrameFormat::Nv12 => feed.frame(Frame::Nv12 { width: w, height: h, y: &frame.planes[0], y_stride: frame.strides[0] as usize, uv: &frame.planes[1], uv_stride: frame.strides[1] as usize }, t),
+                    umi_media::FrameFormat::Rgba => feed.frame(Frame::Rgba { width: w, height: h, data: &frame.planes[0], stride: frame.strides[0] as usize }, t),
+                }
+            }
+        })
+        .expect("spawn device reader");
+    (stop, thread)
 }
 
 /// Bundles left without a project.json (the app quit while recording): finished from what
