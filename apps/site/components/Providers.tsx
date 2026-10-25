@@ -10,12 +10,25 @@ export function Providers({ children }: { children: React.ReactNode }) {
     // Smooth scrolling is for the marketing pages; the app pages scroll natively (nested panels too).
     if (matchMedia("(prefers-reduced-motion: reduce)").matches || /^\/(app|login|signup|forgot|reset|verify)/.test(location.pathname)) return;
     const lenis = new Lenis({ duration: 1.1, easing: (t) => 1 - Math.pow(1 - t, 4), anchors: { offset: -80 } });
-    let frame = requestAnimationFrame(function loop(time) {
+    // Lenis needs a tick every frame, but only while something moves: the loop runs from the
+    // first wheel, touch, key or click until scrolling has been still for half a second.
+    let frame = 0;
+    let busy = performance.now();
+    const loop = (time: number) => {
       lenis.raf(time);
-      frame = requestAnimationFrame(loop);
-    });
+      if (lenis.isScrolling) busy = time;
+      frame = time - busy < 500 ? requestAnimationFrame(loop) : 0;
+    };
+    const wake = () => {
+      busy = performance.now();
+      if (!frame) frame = requestAnimationFrame(loop);
+    };
+    const events = ["wheel", "touchstart", "touchmove", "keydown", "pointerdown", "scroll"] as const;
+    events.forEach((e) => addEventListener(e, wake, { passive: true }));
+    wake();
     return () => {
       cancelAnimationFrame(frame);
+      events.forEach((e) => removeEventListener(e, wake));
       lenis.destroy();
     };
   }, []);

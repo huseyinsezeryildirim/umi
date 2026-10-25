@@ -449,7 +449,10 @@ function ZoomScene() {
       </div>
       <div className="relative mt-2.5 h-5 rounded-md bg-white shadow-[0_0_0_1px_rgb(17_24_39/0.08)]">
         <span className="absolute inset-y-1 left-[30%] w-[38%] rounded bg-accent/15 text-center text-[9px] leading-3 font-semibold text-accent">1.6× zoom</span>
-        <motion.span className="absolute top-0 bottom-0 w-0.5 rounded bg-record" animate={{ left: ["8%", "92%"] }} transition={{ duration: 4.6, repeat: Infinity, ease: "linear" }} />
+        {/* Moved with a transform (no layout work each frame); the track is as wide as the strip. */}
+        <span className="clips-playhead pointer-events-none absolute inset-0">
+          <span className="absolute top-0 bottom-0 left-0 w-0.5 rounded bg-record" />
+        </span>
       </div>
     </div>
   );
@@ -612,16 +615,16 @@ export function Storage() {
             {spots.map((_, k) => (
               <path key={k} d={path(k)} fill="none" stroke={k === active ? PLACES[k].tint : "#e3e8ef"} strokeWidth={k === active ? 2 : 1.5} strokeDasharray={k === active ? "0" : "4 5"} style={{ transition: "stroke 0.4s" }} />
             ))}
-            {/* Animated in script every frame, so only while it can be seen. */}
-            {inView && <motion.circle
-              key={active}
-              r="6"
-              fill={PLACES[active].tint}
-              initial={{ offsetDistance: "0%" } as never}
-              animate={{ offsetDistance: "100%" } as never}
-              transition={{ duration: 1.3, ease: EASE, repeat: Infinity, repeatDelay: 0.6 }}
-              style={{ offsetPath: `path("${path(active)}")` } as never}
-            />}
+            {/* A CSS animation (runs without script work each frame), only while on screen. */}
+            {inView && (
+              <circle
+                key={active}
+                r="6"
+                fill={PLACES[active].tint}
+                className="storage-dot"
+                style={{ offsetPath: `path("${path(active)}")` } as React.CSSProperties}
+              />
+            )}
           </svg>
           {/* The recording */}
           <div className="absolute top-1/2 left-1/2 w-[30%] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-[1.6%] shadow-[0_0_0_1px_rgb(17_24_39/0.06),0_18px_40px_-16px_rgb(20_40_90/0.35)]">

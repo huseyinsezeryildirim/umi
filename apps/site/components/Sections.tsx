@@ -178,11 +178,10 @@ export function Ai() {
     if (!v) return;
     if (!inView) return void v.pause();
     void v.play().catch(() => {});
-    let frame = requestAnimationFrame(function tick() {
-      setT(v.currentTime);
-      frame = requestAnimationFrame(tick);
-    });
-    return () => cancelAnimationFrame(frame);
+    // Ten times a second is enough for word highlights and the progress bar; every frame
+    // re-rendered the whole section 60 times a second.
+    const id = setInterval(() => setT(v.currentTime), 100);
+    return () => clearInterval(id);
   }, [inView]);
   const seek = (to: number) => {
     if (video.current) video.current.currentTime = to;

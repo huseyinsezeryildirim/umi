@@ -241,3 +241,30 @@ video::-webkit-media-controls-overlay-play-button {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* The dot that runs from the recording to where it's kept (Storage section). */
+.storage-dot {
+  animation: storage-dot 1.9s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+}
+@keyframes storage-dot {
+  0% {
+    offset-distance: 0%;
+  }
+  68%,
+  100% {
+    offset-distance: 100%;
+  }
+}
+
+/* The playhead running across the clips card. */
+.clips-playhead {
+  animation: clips-playhead 4.6s linear infinite;
+}
+@keyframes clips-playhead {
+  from {
+    transform: translateX(8%);
+  }
+  to {
+    transform: translateX(92%);
+  }
+}
