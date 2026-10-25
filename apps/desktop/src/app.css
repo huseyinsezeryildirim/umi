@@ -465,3 +465,12 @@
   font: inherit;
   outline: none;
 }
+
+/* "A new version is available" (UpdatePrompt), bottom right above everything. */
+.update-prompt {
+  position: fixed;
+  z-index: 1200;
+  right: 24px;
+  bottom: 24px;
+  padding: 8px 8px 8px 14px;
+}

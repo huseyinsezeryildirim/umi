@@ -9,6 +9,7 @@ import { Editor } from "./editor/Editor";
 import { installRecordingFlow } from "./recorder/flow";
 import { ShortcutsDialog } from "./ShortcutsDialog";
 import { TeamView } from "./TeamView";
+import { UpdatePrompt } from "./UpdatePrompt";
 import { shouldTour, Tour } from "./Tour";
 import { listen } from "@tauri-apps/api/event";
 import { createEditor, formatTime, type Editor as EditorModel } from "./editor/store";
@@ -70,6 +71,7 @@ export function App() {
   return (
     <>
     <ShortcutsDialog open={shortcuts()} onClose={() => setShortcuts(false)} />
+    <UpdatePrompt />
     <Tour
       open={touring()}
       onClose={() => {
