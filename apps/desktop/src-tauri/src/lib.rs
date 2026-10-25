@@ -183,11 +183,11 @@ async fn editor_layout(state: State<'_, AppState>, id: String, time: f64) -> Res
 
 /// Tracks a mask's area; progress is streamed on `progress` (0…1).
 #[tauri::command]
-async fn editor_track_mask(state: State<'_, AppState>, id: String, mask: uuid::Uuid, progress: tauri::ipc::Channel<f64>) -> Result<EditorState, String> {
+async fn editor_track_mask(state: State<'_, AppState>, id: String, mask: uuid::Uuid, anchor: Option<f64>, progress: tauri::ipc::Channel<f64>) -> Result<EditorState, String> {
     let editor = state.editor(&id)?;
     tauri::async_runtime::spawn_blocking(move || {
         let last = std::sync::atomic::AtomicU32::new(0);
-        editor.track_mask(mask, &|p| {
+        editor.track_mask(mask, anchor, &|p| {
             // About 50 updates over the whole run.
             let step = (p * 50.0) as u32;
             if step != last.swap(step, std::sync::atomic::Ordering::Relaxed) {

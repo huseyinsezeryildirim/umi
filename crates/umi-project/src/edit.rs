@@ -481,6 +481,10 @@ pub struct PrivacyMask {
     /// Where the mask is over time (moved by hand or by tracking). Empty = always `rect`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub keyframes: Vec<MaskKeyframe>,
+    /// Stuck to the content under it: the keyframes come from tracking and are redone when
+    /// the mask is moved.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub follow: bool,
 }
 
 /// The mask's rect at a recording time.

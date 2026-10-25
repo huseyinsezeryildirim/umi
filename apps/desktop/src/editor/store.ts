@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { batch, createSignal } from "solid-js";
 import type { EditorState, EditSettings, Selection } from "./types";
 import { placementEnd } from "./types";
@@ -51,6 +51,8 @@ export function createEditor(initial: EditorState) {
   const [timelineZoom, setTimelineZoom] = createSignal(1);
   const [blade, setBlade] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
+  /** Mask being stuck to content, and how far along (0…1). */
+  const [tracking, setTracking] = createSignal<{ mask: string; progress: number } | null>(null);
   /** Filmstrip pictures evenly over the recording, and voice peaks at 50/s. */
   const [thumbnails, setThumbnails] = createSignal<string[]>([]);
   const [waveform, setWaveform] = createSignal<number[]>([]);
@@ -106,6 +108,23 @@ export function createEditor(initial: EditorState) {
     waveform,
     setTime: (t: number) => setTime(Math.min(Math.max(t, 0), state().outputDuration)),
     setPlaying,
+    tracking,
+    /**
+     * Sticks a mask to the content under it at recording time `anchor`: follows it forward
+     * and backward across the mask's span (Rust), then shows the result.
+     */
+    trackMask: async (mask: string, anchor: number) => {
+      if (tracking()) return;
+      setTracking({ mask, progress: 0 });
+      try {
+        const channel = new Channel<number>();
+        channel.onmessage = (p) => setTracking({ mask, progress: p });
+        const next = await invoke<EditorState>("editor_track_mask", { id: state().id, mask, anchor, progress: channel });
+        setState(next);
+      } finally {
+        setTracking(null);
+      }
+    },
     /** Takes a state computed by a longer Rust job (tracking, imports). */
     replaceState: (next: EditorState) => setState(next),
     /** Play/pause; at the end, playing starts over from the beginning. */
