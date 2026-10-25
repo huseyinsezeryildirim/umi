@@ -28,6 +28,7 @@ import {
 } from "lucide-solid";
 import { CropDialog } from "./CropDialog";
 import { BackgroundSection } from "./panels/Background";
+import { CameraFxSection } from "./panels/CameraFx";
 import { CaptionsSection } from "./panels/Captions";
 import { BrandSection } from "./panels/Brand";
 import { MusicSection } from "./panels/Music";
@@ -221,6 +222,9 @@ export function Inspector(props: { editor: Editor }) {
               <SliderField label="Size" value={edit().camera.size} min={0.1} max={0.5} format={pct} onInput={(v) => set((e) => (e.camera.size = v))} {...gesture} />
               <SwitchRow label="Mirror" checked={edit().camera.mirrored} onChange={(v) => set((e) => (e.camera.mirrored = v))} />
             </Section>
+            <Show when={ed.state().recording.hasCamera}>
+              <CameraFxSection editor={ed} />
+            </Show>
           </Match>
 
           <Match when={tab() === "zoom"}>

@@ -475,11 +475,39 @@ pub struct Camera {
     /// Center, normalized to the canvas (top-left origin).
     pub position: Point,
     pub mirrored: bool,
+    /// Background behind the person (made once, on this computer).
+    #[serde(skip_serializing_if = "is_default")]
+    pub background: CameraBackground,
+    /// Keep the face centered and framed inside the bubble.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub follow_face: bool,
+    /// Move the bubble to the other side when the cursor comes near it.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub avoid_cursor: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CameraBackground {
+    #[default]
+    Original,
+    Blur,
+    /// The person alone, over the video (no bubble).
+    Remove,
 }
 
 impl Default for Camera {
     fn default() -> Self {
-        Self { visible: true, shape: CameraShape::Circle, size: 0.24, position: Point::new(0.14, 0.80), mirrored: true }
+        Self {
+            visible: true,
+            shape: CameraShape::Circle,
+            size: 0.24,
+            position: Point::new(0.14, 0.80),
+            mirrored: true,
+            background: CameraBackground::Original,
+            follow_face: false,
+            avoid_cursor: false,
+        }
     }
 }
 

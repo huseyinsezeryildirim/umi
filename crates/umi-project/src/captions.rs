@@ -110,7 +110,46 @@ pub fn typing_runs(keys: &[crate::project::KeyPress], min: f64) -> Vec<(f64, f64
     runs.into_iter().filter(|r| r.1 - r.0 >= min).map(|(a, b)| (a + 0.4, b - 0.2)).collect()
 }
 
+/// Quiet stretches (recording time) at least `min` long, from voice loudness sampled
+/// `per_second` times a second (0…1).
+pub fn silences(levels: &[f32], per_second: f64, min: f64) -> Vec<(f64, f64)> {
+    const QUIET: f32 = 0.06;
+    let mut out = Vec::new();
+    let mut start: Option<usize> = None;
+    for (i, level) in levels.iter().chain(std::iter::once(&1.0)).enumerate() {
+        match (start, *level < QUIET) {
+            (None, true) => start = Some(i),
+            (Some(s), false) => {
+                let (a, b) = (s as f64 / per_second, i as f64 / per_second);
+                if b - a >= min {
+                    out.push((a, b));
+                }
+                start = None;
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
 impl Document {
+    /// Hides the camera while nobody speaks for a while (as "hide camera" scenes, so they
+    /// show on the timeline and can be changed). Returns how many were added.
+    pub fn hide_camera_in_silences(&mut self, quiet: &[(f64, f64)]) -> usize {
+        let mut added = 0;
+        for &(a, b) in quiet {
+            // A little after the last word, back a little before the next.
+            let (start, end) = (a + 0.6, b - 0.4);
+            if end - start < 1.5 || self.edit.scenes.iter().any(|s| s.start < end && s.end > start) {
+                continue;
+            }
+            self.edit.scenes.push(crate::edit::SceneSegment { id: crate::serde_util::new_id(), start, end, layout: crate::edit::SceneLayout::HideCamera, transition: 0.4 });
+            added += 1;
+        }
+        self.edit.scenes.sort_by(|a, b| a.start.total_cmp(&b.start));
+        added
+    }
+
     /// Plays recording-time ranges at `speed` (splitting clips at their edges); ranges in
     /// clips already sped up or slowed down are left alone.
     pub fn speed_up_source_ranges(&mut self, ranges: &[(f64, f64)], speed: f64) {
@@ -257,5 +296,22 @@ mod tests {
         assert!((clips[1].speed - 3.0).abs() < 1e-9 && (clips[1].start - 2.4).abs() < 1e-9);
         // 3.75 s of typing at 3× saves 2.5 s.
         assert!((d.output_duration() - 7.5).abs() < 0.01, "{}", d.output_duration());
+    }
+
+    #[test]
+    fn hides_the_camera_in_long_silences() {
+        // 50 values a second: speech 0–2 s, silence 2–7 s, speech 7–8 s, a short gap.
+        let mut levels = vec![0.5f32; 100];
+        levels.extend(vec![0.01; 250]);
+        levels.extend(vec![0.4; 50]);
+        levels.extend(vec![0.0; 40]);
+        let quiet = silences(&levels, 50.0, 3.0);
+        assert_eq!(quiet, vec![(2.0, 7.0)]);
+        let mut d = doc(vec![]);
+        assert_eq!(d.hide_camera_in_silences(&quiet), 1);
+        let s = &d.edit.scenes[0];
+        assert!((s.start - 2.6).abs() < 1e-9 && (s.end - 6.6).abs() < 1e-9);
+        // Running it again doesn't stack scenes.
+        assert_eq!(d.hide_camera_in_silences(&quiet), 0);
     }
 }
