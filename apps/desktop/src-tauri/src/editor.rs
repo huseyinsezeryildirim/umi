@@ -277,17 +277,21 @@ impl EditorSession {
     }
 
     /// Tracks a mask's area across its time span and stores the path as keyframes.
-    pub fn track_mask(&self, mask: uuid::Uuid, progress: &dyn Fn(f64)) -> Result<EditorState, String> {
-        let (rect, start, end) = {
+    /// Sticks a mask to the content under it at recording time `anchor` (where the user
+    /// placed it), following it forward and backward across the mask's span.
+    pub fn track_mask(&self, mask: uuid::Uuid, anchor: Option<f64>, progress: &dyn Fn(f64)) -> Result<EditorState, String> {
+        let (rect, anchor, start, end) = {
             let doc = self.doc.lock();
             let m = doc.edit.masks.iter().find(|m| m.id == mask).ok_or("mask not found")?;
-            (m.rect_at(m.start), m.start, m.end)
+            let anchor = anchor.unwrap_or(m.start).clamp(m.start, m.end);
+            (m.rect_at(anchor), anchor, m.start, m.end)
         };
-        let keys = umi_engine::track::track_region(&Bundle::new(&self.bundle).screen(), rect, start, end, progress).map_err(|e| e.to_string())?;
+        let keys = umi_engine::track::track_region(&Bundle::new(&self.bundle).screen(), rect, anchor, start, end, progress).map_err(|e| e.to_string())?;
         let mut edit = self.doc.lock().edit.clone();
         if let Some(m) = edit.masks.iter_mut().find(|m| m.id == mask) {
             m.rect = rect;
             m.keyframes = keys;
+            m.follow = true;
         }
         Ok(self.apply(Op::SetEdit { edit: Box::new(edit) }))
     }

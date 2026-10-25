@@ -1,6 +1,5 @@
 import { createSignal, For, Match, Show, Switch as SolidSwitch } from "solid-js";
 import { Button, Progress, Section, Segmented, SliderField, Swatch, SwitchRow, Tabs, TextField, toast } from "@umi/ui";
-import { Channel, invoke } from "@tauri-apps/api/core";
 import {
   AudioLines,
   Camera,
@@ -22,7 +21,7 @@ import {
   ZoomIn,
 } from "lucide-solid";
 import type { Editor } from "./store";
-import type { AspectRatio, Background, DeviceFrame, EditorState, EditSettings, GradePreset, GradientPreset, Selection } from "./types";
+import { maskRectAt, sourceTimeAt, type AspectRatio, type Background, type DeviceFrame, type EditSettings, type GradePreset, type GradientPreset, type Selection } from "./types";
 
 type Tab = "background" | "screen" | "cursor" | "camera" | "zoom" | "color" | "audio";
 
@@ -441,60 +440,68 @@ function colorHex(b: Background) {
   return `#${h(c.r)}${h(c.g)}${h(c.b)}`;
 }
 
-/** Fixed or moving mask, and automatic tracking of the area under it. */
+/**
+ * How the mask moves: fixed, stuck to the content under it (tracked, redone when moved), or
+ * placed by hand at different moments (keyframes).
+ */
 function MaskMotion(props: { editor: Editor; maskId: string }) {
   const ed = props.editor;
-  const [progress, setProgress] = createSignal<number | null>(null);
   const mask = () => ed.state().edit.masks.find((m) => m.id === props.maskId);
-  const moving = () => (mask()?.keyframes?.length ?? 0) > 0;
+  const mode = () => (mask()?.follow ? "stick" : (mask()?.keyframes?.length ?? 0) > 0 ? "keys" : "fixed");
+  const job = () => (ed.tracking()?.mask === props.maskId ? ed.tracking() : null);
+  const anchor = () => {
+    const m = mask();
+    const t = sourceTimeAt(ed.state().placements, ed.time());
+    return m ? Math.min(Math.max(t, m.start), m.end) : t;
+  };
 
-  const setMoving = (on: boolean) =>
-    void ed.update((e) => {
-      const m = e.masks.find((x) => x.id === props.maskId);
-      if (!m) return;
-      // Turning motion on starts with one keyframe at the mask's start (its current place).
-      m.keyframes = on ? [{ t: m.start, rect: m.rect }] : [];
-    });
-
-  const track = async () => {
-    setProgress(0);
-    try {
-      const channel = new Channel<number>();
-      channel.onmessage = (p) => setProgress(p);
-      const next = await invoke<EditorState>("editor_track_mask", { id: ed.state().id, mask: props.maskId, progress: channel });
-      ed.replaceState(next);
-      toast("The mask now follows that area");
-    } catch (e) {
-      toast(`Tracking failed: ${e}`);
-    } finally {
-      setProgress(null);
+  const setMode = (next: string) => {
+    const m = mask();
+    if (!m) return;
+    if (next === "stick") {
+      void ed.trackMask(props.maskId, anchor()).then(
+        () => toast("Stuck to the content: it moves when the screen moves"),
+        (e) => toast(`Couldn't follow that area: ${e}`),
+      );
+      return;
     }
+    // Leaving "stick" keeps the place it has at the playhead.
+    const here = maskRectAt(m, anchor());
+    void ed.update((e) => {
+      const x = e.masks.find((k) => k.id === props.maskId);
+      if (!x) return;
+      x.follow = false;
+      x.rect = here;
+      x.keyframes = next === "keys" ? [{ t: anchor(), rect: here }] : [];
+    });
   };
 
   return (
     <>
       <Segmented
-        value={moving() ? "moving" : "fixed"}
-        onChange={(v) => setMoving(v === "moving")}
+        value={mode()}
+        onChange={setMode}
         options={[
           { value: "fixed", label: "Fixed" },
-          { value: "moving", label: "Moving" },
+          { value: "stick", label: "Stick to content" },
+          { value: "keys", label: "Keyframes" },
         ]}
       />
-      <Show
-        when={progress() === null}
-        fallback={
+      <Show when={job()}>
+        {(j) => (
           <div style={{ display: "flex", "flex-direction": "column", gap: "6px" }}>
-            <div class="umi-section__hint">Following the area… {Math.round((progress() ?? 0) * 100)}%</div>
-            <Progress value={progress() ?? 0} />
+            <div class="umi-section__hint">Following the content… {Math.round(j().progress * 100)}%</div>
+            <Progress value={j().progress} />
           </div>
-        }
-      >
-        <Button size="sm" onClick={() => void track()} tip="Place the mask on something, then let Umi follow it as it moves">
-          <Crosshair size={14} /> Track this area
-        </Button>
+        )}
       </Show>
-      <div class="umi-section__hint">{moving() ? "Move the mask on the preview at different moments; it glides between them." : "Pick Moving to place the mask at different moments, or track an area."}</div>
+      <div class="umi-section__hint">
+        {mode() === "stick"
+          ? "The mask moves with what's under it as the screen scrolls. Move it on the preview to stick it somewhere else."
+          : mode() === "keys"
+            ? "Move the mask on the preview at different moments; it glides between them."
+            : "The mask stays in one place. Pick Stick to content to make it follow a scrolling message or a moving window."}
+      </div>
     </>
   );
 }

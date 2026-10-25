@@ -46,6 +46,8 @@ export interface PrivacyMask {
   amount: number;
   /** Where the mask is over time (hand-placed or tracked). */
   keyframes?: { t: number; rect: Rect }[];
+  /** Stuck to the content under it (keyframes come from tracking). */
+  follow?: boolean;
 }
 
 /** Recording time shown at output time `t`. */

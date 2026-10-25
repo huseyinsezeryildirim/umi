@@ -374,6 +374,7 @@ impl Document {
             style,
             amount: 0.6,
             keyframes: vec![],
+            follow: false,
         };
         let id = mask.id;
         self.edit.masks.push(mask);
