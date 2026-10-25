@@ -670,9 +670,11 @@ export function Loom() {
         </div>
         <div className="flex w-full max-w-md flex-col items-center gap-3 md:items-end">
           <div className="flex w-full items-center gap-2 rounded-full bg-white p-1.5 pl-5 shadow-[0_0_0_1px_rgb(17_24_39/0.06)]">
-            <span className="flex-1 truncate text-left text-[15px] text-faint">loom.com/share/… or library.csv</span>
+            <span className="flex-1 truncate text-left text-[15px] text-faint">
+              loom.com/share/…<span className="hidden sm:inline"> or library.csv</span>
+            </span>
             <a href="#download" className="btn-dark h-10">
-              Import in Umi
+              Import
               <span aria-hidden>→</span>
             </a>
           </div>

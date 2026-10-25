@@ -566,9 +566,21 @@ export function Storage() {
     const id = setTimeout(() => setActive((v) => (v + 1) % PLACES.length), 3600);
     return () => clearTimeout(id);
   }, [active, inView, held]);
-  // Curves from the recording (left) to each place (right), in a 600×400 box.
-  const ys = [70, 160, 250, 340];
-  const path = (y: number) => `M 205 205 C 300 205 300 ${y} 395 ${y}`;
+  // The recording sits in the middle of a 600×380 box; two places on each side, as logos.
+  const spots = [
+    [70, 105],
+    [70, 275],
+    [530, 105],
+    [530, 275],
+  ];
+  const path = (k: number) => {
+    const [x, y] = spots[k];
+    const left = x < 300;
+    const from = left ? 205 : 395;
+    const to = left ? x + 34 : x - 34;
+    const mid = (from + to) / 2;
+    return `M ${from} 190 C ${mid} 190 ${mid} ${y} ${to} ${y}`;
+  };
 
   return (
     <section className="px-4 pt-40">
@@ -578,10 +590,10 @@ export function Storage() {
         <p className="lead mx-auto mt-4 max-w-xl">They live on your computer. Share them through Umi Cloud, or run the cloud yourself.</p>
       </Rise>
       <div ref={ref} className="mx-auto mt-14 grid max-w-6xl gap-3 rounded-[32px] bg-panel p-3 lg:grid-cols-[1.25fr_1fr]">
-        <Rise className="relative overflow-hidden rounded-[24px] bg-white">
-          <svg viewBox="0 0 600 410" className="block w-full" aria-hidden>
-            {ys.map((y, k) => (
-              <path key={k} d={path(y)} fill="none" stroke={k === active ? PLACES[k].tint : "#e3e8ef"} strokeWidth={k === active ? 2 : 1.5} strokeDasharray={k === active ? "0" : "4 5"} style={{ transition: "stroke 0.4s" }} />
+        <Rise className="relative self-center overflow-hidden rounded-[24px] bg-white">
+          <svg viewBox="0 0 600 380" className="block w-full" aria-hidden>
+            {spots.map((_, k) => (
+              <path key={k} d={path(k)} fill="none" stroke={k === active ? PLACES[k].tint : "#e3e8ef"} strokeWidth={k === active ? 2 : 1.5} strokeDasharray={k === active ? "0" : "4 5"} style={{ transition: "stroke 0.4s" }} />
             ))}
             <motion.circle
               key={active}
@@ -589,13 +601,12 @@ export function Storage() {
               fill={PLACES[active].tint}
               initial={{ offsetDistance: "0%" } as never}
               animate={{ offsetDistance: "100%" } as never}
-              transition={{ duration: 1.4, ease: EASE, repeat: Infinity, repeatDelay: 0.6 }}
-              style={{ offsetPath: `path("${path(ys[active])}")` } as never}
+              transition={{ duration: 1.3, ease: EASE, repeat: Infinity, repeatDelay: 0.6 }}
+              style={{ offsetPath: `path("${path(active)}")` } as never}
             />
-            <circle cx="205" cy="205" r="5" fill="#fff" stroke="#c9d3e1" strokeWidth="2" />
           </svg>
           {/* The recording */}
-          <div className="absolute top-1/2 left-[5%] w-[28%] -translate-y-1/2 rounded-2xl bg-white p-2.5 shadow-[0_0_0_1px_rgb(17_24_39/0.06),0_18px_40px_-16px_rgb(20_40_90/0.35)]">
+          <div className="absolute top-1/2 left-1/2 w-[30%] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-[1.6%] shadow-[0_0_0_1px_rgb(17_24_39/0.06),0_18px_40px_-16px_rgb(20_40_90/0.35)]">
             <div className="relative aspect-[16/10] overflow-hidden rounded-lg bg-[linear-gradient(135deg,#e4edf9,#c9daf2)] p-[10%]">
               <div className="h-full rounded-[5px] bg-white shadow-sm">
                 <div className="grid gap-1 p-1.5">
@@ -605,32 +616,31 @@ export function Storage() {
               </div>
               <video src="/media/camera.mp4" autoPlay muted loop playsInline className="absolute bottom-[8%] left-[6%] aspect-square w-[24%] rounded-full border border-white object-cover" />
             </div>
-            <div className="mt-2 flex items-center gap-2 px-0.5">
-              <Mark className="size-4 text-accent" />
-              <div className="min-w-0">
-                <p className="truncate text-[12px] font-semibold">walkthrough.umi</p>
-                <p className="text-[10.5px] text-muted">4K · 1.2 GB</p>
-              </div>
+            <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
+              <Mark className="size-3.5 shrink-0 text-accent" />
+              <p className="truncate text-[11px] font-semibold sm:text-[12px]">demo.umi</p>
             </div>
           </div>
-          {/* The places */}
+          {/* The places, as logos */}
           {PLACES.map((p, k) => (
             <button
               key={p.name}
               type="button"
+              aria-label={p.name}
+              title={p.name}
               onClick={() => (setActive(k), setHeld(true))}
-              className="absolute right-[5%] flex w-[30%] -translate-y-1/2 items-center gap-2.5 rounded-xl bg-white px-2.5 py-2 text-left text-[13px] font-medium transition-all duration-500"
+              className="absolute grid aspect-square w-[11.5%] place-items-center rounded-[28%] bg-white transition-all duration-500"
               style={{
-                top: `${(ys[k] / 410) * 100}%`,
-                boxShadow: k === active ? `0 0 0 2px ${p.tint}55, 0 12px 30px -12px ${p.tint}99` : "0 0 0 1px rgb(17 24 39 / 0.07)",
+                left: `${(spots[k][0] / 600) * 100}%`,
+                top: `${(spots[k][1] / 380) * 100}%`,
+                color: k === active ? p.tint : "#9aa4b2",
+                boxShadow: k === active ? `0 0 0 2px ${p.tint}, 0 14px 30px -10px ${p.tint}aa` : "0 0 0 1px rgb(17 24 39 / 0.08), 0 6px 16px -10px rgb(20 40 90 / 0.3)",
+                transform: `translate(-50%, -50%) scale(${k === active ? 1.08 : 1})`,
               }}
             >
-              <span className="grid size-8 shrink-0 place-items-center rounded-lg" style={{ background: `${p.tint}14`, color: p.tint }}>
-                <svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d={p.icon} />
-                </svg>
-              </span>
-              {p.name}
+              <svg viewBox="0 0 24 24" className="size-[48%]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d={p.icon} />
+              </svg>
             </button>
           ))}
         </Rise>
