@@ -36,7 +36,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   return (
     <main className="relative grid min-h-[100svh] place-items-center overflow-hidden px-4 py-16">
       <img src="/photos/sky.jpg" alt="" className="absolute inset-0 size-full object-cover" />
-      <a href="/" className="absolute top-5 left-5 flex items-center gap-2 text-[17px] font-semibold text-ink">
+      <a href="/" className="absolute top-5 left-5 flex items-center gap-2 text-[17px] font-semibold text-white drop-shadow-[0_1px_6px_rgb(0_40_90/0.35)]">
         <Mark className="size-6" /> Umi
       </a>
       <motion.div
