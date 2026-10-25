@@ -750,6 +750,8 @@ pub fn run() {
             });
 
             tray::install(app.handle())?;
+            // The countdown's window, made ahead so it shows the moment recording starts.
+            windows::prepare_countdown(app.handle());
             let busy = shortcuts::install(app.handle());
             if !busy.is_empty() {
                 // Shown by the main window: another app owns some of our shortcuts.

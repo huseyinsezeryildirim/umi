@@ -5,8 +5,8 @@ import { Camera, CameraOff, Pause, PenLine, Play, RotateCcw, Trash2 } from "luci
 import { formatClock, recorder } from "./api";
 import { INK_COLORS } from "./Ink";
 
-/** The bar while recording, a column on the left like the web recorder's: stop, time, pause,
- *  camera, pen, start over, discard. Draggable. */
+/** The bar while recording, a column on the left like the web recorder's, in groups: stop and
+ *  time · pause and start over · camera and pen · discard. Draggable. */
 export function Controls() {
   const [elapsed, setElapsed] = createSignal(0);
   const [paused, setPaused] = createSignal(false);
@@ -65,6 +65,16 @@ export function Controls() {
           </>
         }
       >
+        <i class="controls__line" />
+        <button type="button" class="controls__btn" onClick={() => void emit("record:pause")} title={paused() ? "Resume (⌥⇧P)" : "Pause (⌥⇧P)"}>
+          <Show when={paused()} fallback={<Pause size={19} fill="currentColor" />}>
+            <Play size={19} fill="currentColor" />
+          </Show>
+        </button>
+        <button type="button" class="controls__btn" onClick={() => void restart()} title="Start over">
+          <RotateCcw size={19} />
+        </button>
+        <i class="controls__line" />
         <Show when={hasCamera()}>
           <button
             type="button"
@@ -86,15 +96,8 @@ export function Controls() {
         <Show when={drawing()}>
           <button type="button" class="controls__swatch" onClick={nextColor} title="Pen color" style={{ background: color() }} />
         </Show>
-        <button type="button" class="controls__btn" onClick={() => void emit("record:pause")} title={paused() ? "Resume (⌥⇧P)" : "Pause (⌥⇧P)"}>
-          <Show when={paused()} fallback={<Pause size={19} fill="currentColor" />}>
-            <Play size={19} fill="currentColor" />
-          </Show>
-        </button>
-        <button type="button" class="controls__btn" onClick={() => void restart()} title="Start over">
-          <RotateCcw size={19} />
-        </button>
-        <button type="button" class="controls__btn" onClick={() => setConfirm(true)} title="Discard (⌥⇧C)">
+        <i class="controls__line" />
+        <button type="button" class="controls__btn controls__btn--danger" onClick={() => setConfirm(true)} title="Discard (⌥⇧C)">
           <Trash2 size={19} />
         </button>
       </Show>
