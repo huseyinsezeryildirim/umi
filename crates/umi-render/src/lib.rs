@@ -46,6 +46,8 @@ pub struct Renderer {
     bundle: Option<PathBuf>,
     cursor: CursorData,
     ops: Vec<Op>,
+    /// The face's path when it doesn't come from the bundle (the browser has no files).
+    faces: Vec<umi_project::project::FaceKey>,
 }
 
 impl Renderer {
@@ -60,6 +62,7 @@ impl Renderer {
             bundle,
             cursor,
             ops: Vec::new(),
+            faces: Vec::new(),
         }
     }
 
@@ -73,7 +76,14 @@ impl Renderer {
         let flag = self.planner.apply_zoom_and_moves;
         self.planner = FramePlanner::new(project, edit, &self.cursor, flag);
         // Re-read: the face path may have just been made.
-        self.planner.faces = self.bundle.as_ref().map(|b| umi_project::Bundle::new(b).read_face_track()).unwrap_or_default();
+        let read = self.bundle.as_ref().map(|b| umi_project::Bundle::new(b).read_face_track()).unwrap_or_default();
+        self.planner.faces = if read.is_empty() { self.faces.clone() } else { read };
+    }
+
+    /// The face's path in the camera video (for keeping it framed), given directly.
+    pub fn set_faces(&mut self, faces: Vec<umi_project::project::FaceKey>) {
+        self.faces = faces.clone();
+        self.planner.faces = faces;
     }
 
     /// Zoom and 3D moves on/off (the editor turns them off while placing masks or a focus).

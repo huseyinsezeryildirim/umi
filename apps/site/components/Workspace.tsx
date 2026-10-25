@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { type Account, type Plan, deleteAccount, me, resendVerification, setPlanForTesting, signOut } from "@/lib/account";
+import { API, type Account, type Plan, deleteAccount, me, resendVerification, setPlanForTesting, signOut } from "@/lib/account";
 import { saveTake } from "@/lib/library";
 import { Recorder } from "./Recorder";
 import { Mark } from "./ui";
@@ -79,7 +79,7 @@ export function Workspace() {
         <>
           <iframe
             title="Umi"
-            src={`/editor/index.html?account=${encodeURIComponent(account.id)}${view.open ? `&open=${encodeURIComponent(view.open)}` : ""}`}
+            src={`/editor/index.html?account=${encodeURIComponent(account.id)}&api=${encodeURIComponent(API)}${view.open ? `&open=${encodeURIComponent(view.open)}` : ""}`}
             className="fixed inset-0 h-full w-full border-0"
             allow="clipboard-write; fullscreen"
           />

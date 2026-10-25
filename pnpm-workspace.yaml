@@ -5,3 +5,4 @@ packages:
 allowBuilds:
   onnxruntime-node: false
   protobufjs: false
+  sharp: false

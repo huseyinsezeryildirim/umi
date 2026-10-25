@@ -1,3 +1,4 @@
+import { handleLoom } from "./loom";
 import { type Account, authenticate, can, requirePaid } from "./auth";
 import { type AppEnv, gifKey, maxUploadBytes, thumbnailKey, videoKey } from "./env";
 import { hashPassword, randomId } from "./crypto";
@@ -280,6 +281,8 @@ async function listVideos(request: Request, env: AppEnv, account: Account): Prom
 export async function handleApi(request: Request, env: AppEnv, path: string): Promise<Response> {
   const account = await authenticate(request, env);
   const method = request.method;
+  // Signed in is enough (the account isn't used further).
+  if (path.startsWith("/api/loom/")) return handleLoom(request, env, path);
 
   if (path.startsWith("/api/workspaces")) {
     const response = await handleWorkspaces(request, env, account, path);

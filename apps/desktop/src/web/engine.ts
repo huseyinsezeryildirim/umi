@@ -118,7 +118,12 @@ export class Session {
     this.wasm = new Wasm(id, name, JSON.stringify(project), cursor ? JSON.stringify(cursor) : "", mediaDuration, preset);
     this.hasCamera = files.has("camera.webm") && !!project.camera;
     this.current = JSON.parse(this.wasm.state(undefined));
-    this.attached = openGpu(this.canvas).then((gpu) => this.wasm.attach(gpu));
+    this.attached = openGpu(this.canvas).then(async (gpu) => {
+      this.wasm.attach(gpu);
+      // The face's path, when face framing was made.
+      const faces = files.get("camera-face.json");
+      if (faces) this.wasm.setFaces(await faces.text());
+    });
     void this.registerImages();
   }
 
@@ -148,10 +153,12 @@ export class Session {
     return this.current;
   }
 
-  /** A file was added to the recording (image, music, voiceover). */
+  /** A file was added to the recording (image, music, voiceover, face path). */
   addFile(name: string, blob: Blob) {
     this.files.set(name, blob);
+    this.sounds.delete(name);
     void this.registerImages();
+    if (name === "camera-face.json") void this.attached.then(async () => this.wasm.setFaces(await blob.text()));
   }
 
   file(name: string) {
