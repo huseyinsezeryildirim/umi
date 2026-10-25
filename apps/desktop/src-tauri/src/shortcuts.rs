@@ -1,5 +1,5 @@
 //! Global keyboard shortcuts (work from any app). Defaults: ⌥⇧L record/stop, ⌥⇧P pause,
-//! ⌥⇧C discard, ⌥⇧U recorder, ⌥⇧4 screenshot. People can change them; a shortcut another
+//! ⌥⇧C discard, ⌥⇧D draw, ⌥⇧U recorder, ⌥⇧4 screenshot. People can change them; a shortcut another
 //! app already owns is reported instead of silently failing.
 
 use serde::{Deserialize, Serialize};
@@ -7,10 +7,11 @@ use std::collections::BTreeMap;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-pub const ACTIONS: [(&str, &str, &str); 5] = [
+pub const ACTIONS: [(&str, &str, &str); 6] = [
     ("record", "Start / stop recording", "Alt+Shift+L"),
     ("pause", "Pause / resume", "Alt+Shift+P"),
     ("discard", "Discard recording", "Alt+Shift+C"),
+    ("draw", "Draw on screen while recording", "Alt+Shift+D"),
     ("launcher", "Show the recorder", "Alt+Shift+U"),
     ("screenshot", "Take a screenshot", "Alt+Shift+4"),
 ];

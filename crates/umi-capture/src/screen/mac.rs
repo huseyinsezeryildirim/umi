@@ -224,11 +224,16 @@ pub fn start(
 ) -> Result<Box<dyn ScreenSession>, CaptureError> {
     let content = content()?;
     let own = std::process::id() as i32;
-    let own_windows: Vec<SCWindow> = if options.exclude_own_windows {
-        content.windows().into_iter().filter(|w| w.owning_application().is_some_and(|a| a.process_id() == own)).collect()
-    } else {
-        vec![]
-    };
+    let own_windows: Vec<SCWindow> = content
+        .windows()
+        .into_iter()
+        .filter(|w| {
+            let app = w.owning_application();
+            let ours = app.as_ref().is_some_and(|a| a.process_id() == own);
+            let bundle = app.map(|a| a.bundle_identifier()).unwrap_or_default();
+            super::left_out(options, ours, w.title().as_deref(), w.window_layer(), &bundle)
+        })
+        .collect();
     let own_refs: Vec<&SCWindow> = own_windows.iter().collect();
     let err = |e: SCError| CaptureError::Other(e.to_string());
 

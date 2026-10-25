@@ -1,7 +1,9 @@
-import { emit } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
+import { emit, listen } from "@tauri-apps/api/event";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
-import { Pause, Play, RotateCcw, Square, Trash2 } from "lucide-solid";
+import { Pause, PenLine, Play, RotateCcw, Square, Trash2 } from "lucide-solid";
 import { formatClock, recorder } from "./api";
+import { INK_COLORS } from "./Ink";
 
 /** The bar while recording: time, mic level, pause, stop, restart, discard. Draggable. */
 export function Controls() {
@@ -9,6 +11,8 @@ export function Controls() {
   const [paused, setPaused] = createSignal(false);
   const [level, setLevel] = createSignal(0);
   const [confirm, setConfirm] = createSignal(false);
+  const [drawing, setDrawing] = createSignal(false);
+  const [color, setColor] = createSignal<string>(INK_COLORS[0]);
 
   onMount(() => {
     const timer = window.setInterval(async () => {
@@ -17,8 +21,18 @@ export function Controls() {
       setPaused(s.paused);
       setLevel(s.level);
     }, 100);
-    onCleanup(() => window.clearInterval(timer));
+    const off = listen<{ drawing: boolean }>("ink:mode", (e) => setDrawing(e.payload.drawing));
+    onCleanup(() => {
+      window.clearInterval(timer);
+      void off.then((f) => f());
+    });
   });
+
+  const pen = (on: boolean) => void invoke("ink_set", { drawing: on, color: color() });
+  const nextColor = () => {
+    setColor(INK_COLORS[(INK_COLORS.indexOf(color() as (typeof INK_COLORS)[number]) + 1) % INK_COLORS.length]);
+    pen(true);
+  };
 
   const restart = async () => {
     await emit("record:discard");
@@ -54,6 +68,12 @@ export function Controls() {
           </>
         }
       >
+        <button type="button" class="controls__btn" data-on={drawing() ? "true" : "false"} onClick={() => pen(!drawing())} title="Draw on screen (⌥⇧D) · Esc to stop">
+          <PenLine size={15} />
+        </button>
+        <Show when={drawing()}>
+          <button type="button" class="controls__swatch" onClick={nextColor} title="Pen color" style={{ background: color() }} />
+        </Show>
         <button type="button" class="controls__btn" onClick={() => void emit("record:pause")} title={paused() ? "Resume (⌥⇧P)" : "Pause (⌥⇧P)"}>
           <Show when={paused()} fallback={<Pause size={15} fill="currentColor" />}>
             <Play size={15} fill="currentColor" />

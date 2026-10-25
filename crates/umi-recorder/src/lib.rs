@@ -39,6 +39,9 @@ pub struct Options {
     /// Record only the camera (the screen is still captured for context but starts hidden).
     #[serde(default)]
     pub camera_only: bool,
+    /// Leave desktop icons out of the recording (macOS).
+    #[serde(default)]
+    pub hide_desktop_icons: bool,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -260,6 +263,7 @@ impl Recording {
             show_cursor: false,
             system_audio: options.system_audio,
             exclude_own_windows: true,
+            hide_desktop_icons: options.hide_desktop_icons,
         };
         // A phone: its picture comes through FFmpeg; size from the device itself.
         let device = match &options.target {

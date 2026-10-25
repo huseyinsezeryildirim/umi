@@ -1,7 +1,7 @@
 //! The app's small windows around recording. They all load the same UI with a `view`
 //! query (launcher, bubble, controls, countdown, area) and float above other apps.
 
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 pub struct Spec {
     pub view: &'static str,
@@ -12,7 +12,7 @@ pub struct Spec {
 
 pub const LAUNCHER: Spec = Spec { view: "launcher", size: (360.0, 560.0), transparent: true, focus: true };
 pub const BUBBLE: Spec = Spec { view: "bubble", size: (240.0, 240.0), transparent: true, focus: false };
-pub const CONTROLS: Spec = Spec { view: "controls", size: (340.0, 64.0), transparent: true, focus: false };
+pub const CONTROLS: Spec = Spec { view: "controls", size: (400.0, 64.0), transparent: true, focus: false };
 pub const COUNTDOWN: Spec = Spec { view: "countdown", size: (240.0, 240.0), transparent: true, focus: false };
 pub const SHOT: Spec = Spec { view: "shot", size: (1120.0, 760.0), transparent: false, focus: true };
 pub const PROMPTER: Spec = Spec { view: "prompter", size: (520.0, 220.0), transparent: true, focus: true };
@@ -95,6 +95,39 @@ pub fn show_area_picker(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         .shadow(false)
         .focused(true)
         .build()
+}
+
+/// The drawing layer over the main display. It's recorded (see `INK_WINDOW_TITLE`); while
+/// `drawing` it takes the mouse, otherwise clicks pass through to the apps below.
+#[tauri::command]
+pub fn ink_set(app: AppHandle, drawing: bool, color: Option<String>) -> Result<(), String> {
+    let window = match app.get_webview_window("ink") {
+        Some(w) => w,
+        None => {
+            let (origin, display) = main_display(&app);
+            WebviewWindowBuilder::new(&app, "ink", WebviewUrl::App("index.html?view=ink".into()))
+                .title(umi_capture::screen::INK_WINDOW_TITLE)
+                .inner_size(display.width, display.height)
+                .position(origin.x, origin.y)
+                .decorations(false)
+                .transparent(true)
+                .always_on_top(true)
+                .resizable(false)
+                .skip_taskbar(true)
+                .shadow(false)
+                .visible_on_all_workspaces(true)
+                .focused(drawing)
+                .build()
+                .map_err(|e| e.to_string())?
+        }
+    };
+    window.set_ignore_cursor_events(!drawing).map_err(|e| e.to_string())?;
+    window.show().map_err(|e| e.to_string())?;
+    if drawing {
+        let _ = window.set_focus();
+    }
+    let _ = app.emit("ink:mode", serde_json::json!({ "drawing": drawing, "color": color }));
+    Ok(())
 }
 
 #[tauri::command]

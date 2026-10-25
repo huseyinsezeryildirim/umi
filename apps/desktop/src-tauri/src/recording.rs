@@ -37,6 +37,8 @@ pub struct RecordSettings {
     /// Prompter scrolling, lines per minute (0 = still).
     pub notes_speed: f64,
     pub notes_size: f64,
+    /// Leave desktop icons out of the recording (macOS).
+    pub hide_desktop_icons: bool,
 }
 
 impl Default for RecordSettings {
@@ -57,6 +59,7 @@ impl Default for RecordSettings {
             notes_on: false,
             notes_speed: 18.0,
             notes_size: 22.0,
+            hide_desktop_icons: false,
         }
     }
 }
@@ -242,6 +245,7 @@ fn options(settings: &RecordSettings) -> Result<umi_recorder::Options, String> {
         camera: (settings.camera_on || settings.camera_only).then(|| settings.camera.clone().unwrap_or_default()),
         camera_style: settings.camera_on.then(|| settings.camera_style.clone()),
         camera_only: settings.camera_only,
+        hide_desktop_icons: settings.hide_desktop_icons,
     })
 }
 

@@ -133,6 +133,9 @@ export function Launcher() {
 
   const moreMenu = (): MenuEntry[] => [
     { label: "3-second countdown", checked: settings()?.countdown, onSelect: () => update((s) => (s.countdown = !s.countdown)) },
+    ...(navigator.platform.toLowerCase().includes("mac")
+      ? [{ label: "Hide desktop icons", checked: !!settings()?.hideDesktopIcons, onSelect: () => update((s) => (s.hideDesktopIcons = !s.hideDesktopIcons)) }]
+      : []),
     { kind: "separator" },
     { kind: "label", label: "Quality" },
     ...(["native", "1080p", "720p"] as const).map((r) => ({ label: r === "native" ? "Native resolution" : r, checked: settings()?.resolution === r, onSelect: () => update((s) => (s.resolution = r)) })),

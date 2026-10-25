@@ -21,11 +21,51 @@ pub struct ScreenOptions {
     pub system_audio: bool,
     /// Our own windows (control bar, camera bubble) left out of the recording.
     pub exclude_own_windows: bool,
+    /// Leave the desktop's icons out (macOS: Finder's desktop windows; the wallpaper stays).
+    pub hide_desktop_icons: bool,
+}
+
+/// Title of the on-screen drawing layer: it's ours but belongs in the recording.
+pub const INK_WINDOW_TITLE: &str = "Umi Ink";
+
+/// Whether a window stays out of a display recording: our own windows (except the drawing
+/// layer) and, when asked, Finder's desktop icons (below normal level; the wallpaper is
+/// the Dock's and stays).
+pub fn left_out(options: &ScreenOptions, ours: bool, title: Option<&str>, layer: i32, bundle: &str) -> bool {
+    let own = options.exclude_own_windows && ours && title != Some(INK_WINDOW_TITLE);
+    let icons = options.hide_desktop_icons && layer < 0 && bundle == "com.apple.finder";
+    own || icons
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn leaves_out_our_windows_but_keeps_the_drawing() {
+        let o = ScreenOptions::default();
+        assert!(left_out(&o, true, Some("Umi"), 3, "cam.umi.app"));
+        assert!(!left_out(&o, true, Some(INK_WINDOW_TITLE), 3, "cam.umi.app"));
+        assert!(!left_out(&o, false, Some("Safari"), 0, "com.apple.Safari"));
+        assert!(!left_out(&ScreenOptions { exclude_own_windows: false, ..o.clone() }, true, Some("Umi"), 3, ""));
+    }
+
+    #[test]
+    fn hides_desktop_icons_only_when_asked() {
+        let o = ScreenOptions::default();
+        let hide = ScreenOptions { hide_desktop_icons: true, ..o.clone() };
+        // Finder's desktop icon window sits below normal level.
+        assert!(!left_out(&o, false, None, -2147483603, "com.apple.finder"));
+        assert!(left_out(&hide, false, None, -2147483603, "com.apple.finder"));
+        // A Finder browser window and the Dock's wallpaper stay.
+        assert!(!left_out(&hide, false, Some("Downloads"), 0, "com.apple.finder"));
+        assert!(!left_out(&hide, false, Some("Wallpaper-"), -2147483624, "com.apple.dock"));
+    }
 }
 
 impl Default for ScreenOptions {
     fn default() -> Self {
-        Self { fps: 60, max_size: 0, show_cursor: false, system_audio: true, exclude_own_windows: true }
+        Self { fps: 60, max_size: 0, show_cursor: false, system_audio: true, exclude_own_windows: true, hide_desktop_icons: false }
     }
 }
 

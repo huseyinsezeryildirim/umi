@@ -16,6 +16,7 @@ fn main() {
         camera: None,
         camera_style: None,
         camera_only: false,
+        hide_desktop_icons: false,
     };
     let rec = Recording::start(&library, options).unwrap();
     std::thread::sleep(std::time::Duration::from_secs(1));

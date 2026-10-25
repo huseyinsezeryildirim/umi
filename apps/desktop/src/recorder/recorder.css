@@ -371,6 +371,30 @@ html.umi-overlay body {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
 }
+.controls__btn[data-on="true"] {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.controls__swatch {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* ───── Drawing layer (recorded) ───── */
+.ink {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  touch-action: none;
+}
+.ink[data-drawing="true"] {
+  cursor: crosshair;
+}
+
 .controls__text {
   height: 30px;
   padding: 0 10px;
