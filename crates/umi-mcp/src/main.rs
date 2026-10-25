@@ -196,7 +196,7 @@ fn call(name: &str, args: &Value) -> Result<String, String> {
             let ext = match format {
                 umi_engine::Format::Mov => "mov",
                 umi_engine::Format::Gif => "gif",
-                umi_engine::Format::Mp4 => "mp4",
+                umi_engine::Format::Mp4 | umi_engine::Format::StreamingMp4 => "mp4",
             };
             let destination = args.get("destination").and_then(Value::as_str).map(PathBuf::from).unwrap_or_else(|| {
                 let folder = library().join("Exports");

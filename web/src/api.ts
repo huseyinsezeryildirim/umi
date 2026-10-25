@@ -30,6 +30,10 @@ interface UpdateVideoBody {
 
 interface CompleteBody {
   parts: { partNumber: number; etag: string }[];
+  /** For links reserved before the video existed. */
+  durationMs?: number;
+  width?: number;
+  height?: number;
 }
 
 const MAX_TITLE = 200;
@@ -153,6 +157,8 @@ async function completeVideo(request: Request, env: AppEnv, account: Account, id
   const parts = body.parts
     .map((p) => ({ partNumber: Number(p.partNumber), etag: String(p.etag ?? "").replace(/^W\//, "").replace(/"/g, "") }))
     .sort((a, b) => a.partNumber - b.partNumber);
+  // A link reserved before recording finished learns these now.
+  const meta = [optionalInt(body.durationMs, "durationMs"), optionalInt(body.width, "width"), optionalInt(body.height, "height")];
 
   try {
     await env.VIDEOS.resumeMultipartUpload(videoKey(id), video.upload_id!).complete(parts);
@@ -167,9 +173,17 @@ async function completeVideo(request: Request, env: AppEnv, account: Account, id
   ]);
   if (!object) throw new HttpError(500, "complete_failed", "Upload completed but object is missing.");
   await env.DB.prepare(
-    "UPDATE videos SET status = 'ready', upload_id = NULL, size_bytes = ?, has_thumbnail = ?, has_gif = ?, updated_at = ? WHERE id = ?",
+    `UPDATE videos SET status = 'ready', upload_id = NULL, size_bytes = ?, has_thumbnail = ?, has_gif = ?, updated_at = ?,
+       duration_ms = COALESCE(?, duration_ms), width = COALESCE(?, width), height = COALESCE(?, height) WHERE id = ?`,
   )
-    .bind(object.size, thumb ? 1 : 0, gif ? 1 : 0, Date.now(), id)
+    .bind(
+      object.size,
+      thumb ? 1 : 0,
+      gif ? 1 : 0,
+      Date.now(),
+      ...meta,
+      id,
+    )
     .run();
   return json({ video: toJson((await getVideo(env, id))!, env, request) });
 }

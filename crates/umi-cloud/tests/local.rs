@@ -47,3 +47,82 @@ fn shares_a_video_end_to_end() {
     client.delete(&done.id).unwrap();
     assert!(client.video(&done.id).is_err() || client.video(&done.id).unwrap().status == "deleted");
 }
+
+/// Instant mode: the link exists before the video; the file is uploaded while it's
+/// written, and its first bytes change at the very end (like an MP4 writer patching mdat).
+#[test]
+fn uploads_a_file_while_it_grows() {
+    let Ok(base) = std::env::var("UMI_CLOUD_TEST") else { return };
+    let client = Client::new(&base, "umi_dev_token");
+    let reservation = client.reserve("Growing upload test").unwrap();
+    assert_eq!(reservation.video.status, "uploading");
+
+    // 25 MiB of pseudo-random bytes: three parts at the server's 10 MiB part size.
+    let mut data = vec![0u8; 25 * 1024 * 1024 + 123];
+    let mut x = 0x2545F491u32;
+    for b in data.iter_mut() {
+        x ^= x << 13;
+        x ^= x >> 17;
+        x ^= x << 5;
+        *b = x as u8;
+    }
+    let path = std::env::temp_dir().join("umi-growing-upload.bin");
+    std::fs::write(&path, b"").unwrap();
+    let done = std::sync::atomic::AtomicBool::new(false);
+    let sent = std::sync::atomic::AtomicU64::new(0);
+    let video = std::thread::scope(|scope| {
+        scope.spawn(|| {
+            use std::io::{Seek, SeekFrom, Write};
+            let mut f = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+            // The header is a placeholder until the end.
+            f.write_all(&[0u8; 64]).unwrap();
+            for chunk in data[64..].chunks(1024 * 1024) {
+                f.write_all(chunk).unwrap();
+                f.flush().unwrap();
+                std::thread::sleep(std::time::Duration::from_millis(40));
+            }
+            f.seek(SeekFrom::Start(0)).unwrap();
+            f.write_all(&data[..64]).unwrap();
+            f.flush().unwrap();
+            done.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        client
+            .upload_growing(
+                &reservation,
+                &path,
+                &|| {
+                    done.load(std::sync::atomic::Ordering::SeqCst).then(|| {
+                        Ok(umi_cloud::Finished { duration_ms: 42_000, width: 1920, height: 1080, poster: None, gif: None })
+                    })
+                },
+                &|n| {
+                    // Parts go up before the file is finished.
+                    if !done.load(std::sync::atomic::Ordering::SeqCst) {
+                        sent.store(n, std::sync::atomic::Ordering::SeqCst);
+                    }
+                },
+            )
+            .unwrap()
+    });
+    assert!(sent.load(std::sync::atomic::Ordering::SeqCst) >= 10 * 1024 * 1024, "nothing uploaded while writing");
+    assert_eq!(video.status, "ready");
+    assert_eq!((video.duration_ms, video.width, video.height), (Some(42_000), Some(1920), Some(1080)));
+    assert_eq!(video.size_bytes, Some(data.len() as u64));
+    let mut served = ureq::get(&format!("{}/video.mp4", video.url)).call().unwrap();
+    let bytes = served.body_mut().with_config().limit(64 * 1024 * 1024).read_to_vec().unwrap();
+    assert!(bytes == data, "served file differs");
+    client.delete(&video.id).unwrap();
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn stops_when_the_file_fails() {
+    let Ok(base) = std::env::var("UMI_CLOUD_TEST") else { return };
+    let client = Client::new(&base, "umi_dev_token");
+    let reservation = client.reserve("Failing upload test").unwrap();
+    let path = std::env::temp_dir().join("umi-failing-upload.bin");
+    std::fs::write(&path, vec![1u8; 1000]).unwrap();
+    let err = client.upload_growing(&reservation, &path, &|| Some(Err("export failed".into())), &|_| {}).unwrap_err();
+    assert_eq!(err.to_string(), "export failed");
+    client.delete(&reservation.video.id).unwrap();
+}
