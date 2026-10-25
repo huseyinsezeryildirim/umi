@@ -658,25 +658,27 @@ export function Testimonials() {
 
 export function Loom() {
   return (
-    <section id="loom" className="px-3 pt-32 sm:px-4">
-      <Rise className="mx-auto flex max-w-[1400px] flex-col gap-10 rounded-[36px] bg-panel px-8 py-14 sm:px-14 md:flex-row md:items-center">
+    <section id="loom" className="px-4 pt-32">
+      <Rise className="mx-auto flex max-w-5xl flex-col items-center gap-8 rounded-[28px] bg-panel px-8 py-12 text-center md:flex-row md:text-left">
         <div className="flex-1">
-          <p className="flex items-center gap-2 font-mono text-[12px] tracking-[0.14em] text-ink uppercase">
-            <i className="size-2 bg-[#625df5]" />
+          <p className="flex items-center justify-center gap-2 text-[15px] font-medium text-[#625df5] md:justify-start">
+            <LoomIcon className="size-4" />
             Switching from Loom
           </p>
-          <h3 className="h-display mt-5 max-w-xl text-[clamp(32px,4.4vw,56px)]">Bring your whole Loom library with you.</h3>
-          <p className="lead mt-5 max-w-xl">Paste your links or drop in the CSV of your library. Every video comes into Umi as a recording you can edit.</p>
+          <h3 className="h-display mt-2 text-[clamp(26px,3.2vw,34px)]">Bring your whole Loom library.</h3>
+          <p className="mt-2 text-muted">Paste the links or drop in your library’s CSV. They become Umi projects you can edit.</p>
         </div>
-        <div className="flex flex-col items-start gap-3 md:items-end">
-          <a href="#download" className="btn-glass">
-            <LoomIcon className="size-5" />
-            Import from Loom
-            <span aria-hidden>→</span>
-          </a>
-          <p className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[14px] text-muted shadow-[0_0_0_1px_rgb(17_24_39/0.06)]">
+        <div className="flex w-full max-w-md flex-col items-center gap-3 md:items-end">
+          <div className="flex w-full items-center gap-2 rounded-full bg-white p-1.5 pl-5 shadow-[0_0_0_1px_rgb(17_24_39/0.06)]">
+            <span className="flex-1 truncate text-left text-[15px] text-faint">loom.com/share/… or library.csv</span>
+            <a href="#download" className="btn-dark h-10">
+              Import in Umi
+              <span aria-hidden>→</span>
+            </a>
+          </div>
+          <p className="flex items-center gap-2 text-[14px] text-muted">
             <span className="grid size-5 place-items-center rounded-full bg-[#30d158]/15 text-[11px] text-[#1f9d47]">✓</span>
-            Free. No account, no limits.
+            Free. No account needed.
           </p>
         </div>
       </Rise>
