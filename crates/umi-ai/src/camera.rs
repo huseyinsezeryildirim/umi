@@ -144,7 +144,19 @@ pub fn process_background(bundle: &Path, mode: Background, progress: &dyn Fn(f64
         }
         smoothed = Some(mask);
         if writer.is_none() {
-            writer = Some(StreamWriter::create(&temp, &WriterSettings { width: w, height: h, fps: info.fps.round().max(1.0) as u32, codec: VideoCodec::H264, bit_rate: 0, audio_tracks: 0, fragmented: false, hardware: true })?);
+            writer = Some(StreamWriter::create(
+                &temp,
+                &WriterSettings {
+                    width: w,
+                    height: h,
+                    fps: info.fps.round().max(1.0) as u32,
+                    codec: VideoCodec::H264,
+                    bit_rate: 0,
+                    audio_tracks: 0,
+                    fragmented: false,
+                    hardware: true,
+                },
+            )?);
         }
         if let Some(wr) = writer.as_mut() {
             wr.push_video(Pixels::Rgba { data: &out, stride: w as usize * 4 }, frame.pts - info.start)?;
@@ -159,7 +171,6 @@ pub fn process_background(bundle: &Path, mode: Background, progress: &dyn Fn(f64
 }
 
 pub use umi_project::project::{FACE_FILE, FaceKey};
-
 
 /// Finds the face 5 times a second and saves its smoothed path to `camera-face.json`.
 pub fn track_face(bundle: &Path, progress: &dyn Fn(f64)) -> Result<Vec<FaceKey>, AiError> {
@@ -176,7 +187,12 @@ pub fn track_face(bundle: &Path, progress: &dyn Fn(f64)) -> Result<Vec<FaceKey>,
                 let raw = FaceKey { t: t - info.start, x: cx, y: cy, size: face.height };
                 // Ease toward each detection so the framing glides instead of twitching.
                 let key = match keys.last() {
-                    Some(p) => FaceKey { t: raw.t, x: p.x + (raw.x - p.x) * 0.5, y: p.y + (raw.y - p.y) * 0.5, size: p.size + (raw.size - p.size) * 0.3 },
+                    Some(p) => FaceKey {
+                        t: raw.t,
+                        x: p.x + (raw.x - p.x) * 0.5,
+                        y: p.y + (raw.y - p.y) * 0.5,
+                        size: p.size + (raw.size - p.size) * 0.3,
+                    },
                     None => raw,
                 };
                 keys.push(key);

@@ -6,11 +6,11 @@ mod editor;
 mod import;
 mod presets;
 mod recording;
-mod windows;
-mod tray;
-mod shortcuts;
-mod share;
 mod screenshot;
+mod share;
+mod shortcuts;
+mod tray;
+mod windows;
 
 use editor::{EditorSession, EditorState, Op};
 use parking_lot::Mutex;
@@ -94,7 +94,8 @@ async fn open_editor(state: State<'_, AppState>, path: PathBuf) -> Result<Editor
         return Ok(existing.state(None));
     }
     let gpu = state.gpu()?;
-    let session = tauri::async_runtime::spawn_blocking(move || EditorSession::open(gpu, id.clone(), &path)).await.map_err(|e| e.to_string())??;
+    let session =
+        tauri::async_runtime::spawn_blocking(move || EditorSession::open(gpu, id.clone(), &path)).await.map_err(|e| e.to_string())??;
     let result = session.state(None);
     state.editors.lock().insert(session.id.clone(), session);
     Ok(result)
@@ -111,9 +112,18 @@ fn editor_save(state: State<'_, AppState>, id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn editor_frame(state: State<'_, AppState>, id: String, time: f64, width: u32, height: u32, flat: Option<bool>) -> Result<Response, String> {
+async fn editor_frame(
+    state: State<'_, AppState>,
+    id: String,
+    time: f64,
+    width: u32,
+    height: u32,
+    flat: Option<bool>,
+) -> Result<Response, String> {
     let editor = state.editor(&id)?;
-    let bytes = tauri::async_runtime::spawn_blocking(move || editor.frame(time, width, height, flat.unwrap_or(false))).await.map_err(|e| e.to_string())??;
+    let bytes = tauri::async_runtime::spawn_blocking(move || editor.frame(time, width, height, flat.unwrap_or(false)))
+        .await
+        .map_err(|e| e.to_string())??;
     Ok(Response::new(bytes))
 }
 
@@ -132,7 +142,10 @@ async fn recording_thumbnails(path: PathBuf, count: usize, height: u32) -> Resul
             .map(|(w, h, rgba)| {
                 let img = image::RgbaImage::from_raw(w, h, rgba).ok_or("bad thumbnail")?;
                 let mut jpeg = Vec::new();
-                image::DynamicImage::ImageRgba8(img).to_rgb8().write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg).map_err(|e| e.to_string())?;
+                image::DynamicImage::ImageRgba8(img)
+                    .to_rgb8()
+                    .write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg)
+                    .map_err(|e| e.to_string())?;
                 Ok(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(jpeg)))
             })
             .collect()
@@ -163,7 +176,10 @@ async fn recording_preview(state: State<'_, AppState>, path: PathBuf) -> Result<
                 let (w, h, rgba) = umi_media::to_rgba(&frame, 480).map_err(|e| e.to_string())?;
                 let img = image::RgbaImage::from_raw(w, h, rgba).ok_or("bad frame")?;
                 let mut jpeg = Vec::new();
-                image::DynamicImage::ImageRgba8(img).to_rgb8().write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg).map_err(|e| e.to_string())?;
+                image::DynamicImage::ImageRgba8(img)
+                    .to_rgb8()
+                    .write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg)
+                    .map_err(|e| e.to_string())?;
                 out.push(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(jpeg)));
             }
         }
@@ -220,7 +236,13 @@ async fn editor_layout(state: State<'_, AppState>, id: String, time: f64) -> Res
 
 /// Tracks a mask's area; progress is streamed on `progress` (0…1).
 #[tauri::command]
-async fn editor_track_mask(state: State<'_, AppState>, id: String, mask: uuid::Uuid, anchor: Option<f64>, progress: tauri::ipc::Channel<f64>) -> Result<EditorState, String> {
+async fn editor_track_mask(
+    state: State<'_, AppState>,
+    id: String,
+    mask: uuid::Uuid,
+    anchor: Option<f64>,
+    progress: tauri::ipc::Channel<f64>,
+) -> Result<EditorState, String> {
     let editor = state.editor(&id)?;
     tauri::async_runtime::spawn_blocking(move || {
         let last = std::sync::atomic::AtomicU32::new(0);
@@ -256,7 +278,12 @@ struct ExportRequest {
 
 /// Exports the editor's video; progress (0…1) is streamed on `progress`.
 #[tauri::command]
-async fn editor_export(state: State<'_, AppState>, id: String, request: ExportRequest, progress: tauri::ipc::Channel<f64>) -> Result<PathBuf, String> {
+async fn editor_export(
+    state: State<'_, AppState>,
+    id: String,
+    request: ExportRequest,
+    progress: tauri::ipc::Channel<f64>,
+) -> Result<PathBuf, String> {
     let editor = state.editor(&id)?;
     let gpu = state.gpu()?;
     let cancel = Arc::new(AtomicBool::new(false));
@@ -271,12 +298,18 @@ async fn editor_export(state: State<'_, AppState>, id: String, request: ExportRe
     let flag = cancel.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let last = std::sync::atomic::AtomicU32::new(0);
-        editor.export(gpu, &settings, &destination, &|p| {
-            let step = (p * 200.0) as u32;
-            if step != last.swap(step, Ordering::Relaxed) {
-                let _ = progress.send(p);
-            }
-        }, &flag)
+        editor.export(
+            gpu,
+            &settings,
+            &destination,
+            &|p| {
+                let step = (p * 200.0) as u32;
+                if step != last.swap(step, Ordering::Relaxed) {
+                    let _ = progress.send(p);
+                }
+            },
+            &flag,
+        )
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -317,7 +350,12 @@ struct Stage {
 
 /// Captions from the voice, on device (Whisper). Progress: model download, then transcription.
 #[tauri::command]
-async fn editor_transcribe(state: State<'_, AppState>, id: String, language: Option<String>, progress: tauri::ipc::Channel<Stage>) -> Result<EditorState, String> {
+async fn editor_transcribe(
+    state: State<'_, AppState>,
+    id: String,
+    language: Option<String>,
+    progress: tauri::ipc::Channel<Stage>,
+) -> Result<EditorState, String> {
     let editor = state.editor(&id)?;
     tauri::async_runtime::spawn_blocking(move || {
         let last = Mutex::new((String::new(), -1i32));
@@ -346,7 +384,12 @@ struct InsightsOut {
 /// Title, summary and chapters from what was said (needs captions).
 #[tauri::command]
 fn editor_insights(state: State<'_, AppState>, id: String) -> Result<Option<InsightsOut>, String> {
-    Ok(state.editor(&id)?.insights().map(|(i, text)| InsightsOut { title: i.title, summary: i.summary, chapters: i.chapters, chapter_text: text }))
+    Ok(state.editor(&id)?.insights().map(|(i, text)| InsightsOut {
+        title: i.title,
+        summary: i.summary,
+        chapters: i.chapters,
+        chapter_text: text,
+    }))
 }
 
 /// Writes the captions as an .srt or .vtt file.
@@ -398,7 +441,12 @@ async fn editor_voiceover(
 /// Makes a camera effect for the editor's recording: "blur" or "remove" (background), or
 /// "face" (the face's path, for keeping it framed). Progress 0…1 per stage.
 #[tauri::command]
-async fn editor_camera_effect(state: State<'_, AppState>, id: String, effect: String, progress: tauri::ipc::Channel<Stage>) -> Result<(), String> {
+async fn editor_camera_effect(
+    state: State<'_, AppState>,
+    id: String,
+    effect: String,
+    progress: tauri::ipc::Channel<Stage>,
+) -> Result<(), String> {
     let editor = state.editor(&id)?;
     let bundle = editor.bundle.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -432,7 +480,11 @@ async fn editor_camera_effect(state: State<'_, AppState>, id: String, effect: St
 #[tauri::command]
 fn editor_camera_effects(state: State<'_, AppState>, id: String) -> Result<Vec<String>, String> {
     let bundle = state.editor(&id)?.bundle.clone();
-    Ok([("blur", "camera-blur.mov"), ("remove", "camera-matte.mov"), ("face", "camera-face.json")].iter().filter(|(_, f)| bundle.join(f).exists()).map(|(k, _)| k.to_string()).collect())
+    Ok([("blur", "camera-blur.mov"), ("remove", "camera-matte.mov"), ("face", "camera-face.json")]
+        .iter()
+        .filter(|(_, f)| bundle.join(f).exists())
+        .map(|(k, _)| k.to_string())
+        .collect())
 }
 
 #[derive(Serialize)]
@@ -479,12 +531,26 @@ async fn library_combine(state: State<'_, AppState>, paths: Vec<PathBuf>, progre
             let out = folder.join(format!("take-{i}.mp4"));
             let settings = umi_engine::ExportSettings { format: umi_engine::Format::Mp4, resolution: 1080, fps: 30, hardware: true };
             let cancel = AtomicBool::new(false);
-            umi_engine::export(gpu.clone(), path, edit, &settings, &out, &|p| { let _ = progress.send((i as f64 + p) / n * 0.8); }, &cancel).map_err(|e| e.to_string())?;
+            umi_engine::export(
+                gpu.clone(),
+                path,
+                edit,
+                &settings,
+                &out,
+                &|p| {
+                    let _ = progress.send((i as f64 + p) / n * 0.8);
+                },
+                &cancel,
+            )
+            .map_err(|e| e.to_string())?;
             files.push(out);
         }
         let joined = folder.join("Combined.mp4");
         let refs: Vec<&std::path::Path> = files.iter().map(PathBuf::as_path).collect();
-        umi_engine::combine::concatenate(&refs, &joined, 30, &|p| { let _ = progress.send(0.8 + p * 0.2); }).map_err(|e| e.to_string())?;
+        umi_engine::combine::concatenate(&refs, &joined, 30, &|p| {
+            let _ = progress.send(0.8 + p * 0.2);
+        })
+        .map_err(|e| e.to_string())?;
         let name = format!("Combined {}", chrono::Local::now().format("%Y-%m-%d at %H.%M"));
         let bundle = import::import_file(&library_folder(), &joined, Some(&name));
         let _ = std::fs::remove_dir_all(&folder);
@@ -527,7 +593,10 @@ fn open_privacy_settings(kind: String) -> Result<(), String> {
             "input" => "Privacy_ListenEvent",
             _ => "Privacy_ScreenCapture",
         };
-        std::process::Command::new("open").arg(format!("x-apple.systempreferences:com.apple.preference.security?{pane}")).status().map_err(|e| e.to_string())?;
+        std::process::Command::new("open")
+            .arg(format!("x-apple.systempreferences:com.apple.preference.security?{pane}"))
+            .status()
+            .map_err(|e| e.to_string())?;
     }
     #[cfg(windows)]
     {
@@ -592,7 +661,11 @@ pub fn run() {
                 handle,
                 "Window",
                 true,
-                &[&PredefinedMenuItem::minimize(handle, None)?, &PredefinedMenuItem::maximize(handle, None)?, &PredefinedMenuItem::close_window(handle, None)?],
+                &[
+                    &PredefinedMenuItem::minimize(handle, None)?,
+                    &PredefinedMenuItem::maximize(handle, None)?,
+                    &PredefinedMenuItem::close_window(handle, None)?,
+                ],
             )?;
             app.set_menu(Menu::with_items(handle, &[&app_menu, &edit_menu, &window_menu])?)?;
             app.on_menu_event(|app, event| {

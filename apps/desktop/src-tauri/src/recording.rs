@@ -107,10 +107,19 @@ pub async fn record_sources() -> Result<Sources, String> {
     tauri::async_runtime::spawn_blocking(|| {
         let (displays, windows, missing) = match (umi_capture::screen::displays(), umi_capture::screen::windows()) {
             (Ok(d), Ok(w)) => (d, w, None),
-            (Err(umi_capture::CaptureError::ScreenPermission), _) | (_, Err(umi_capture::CaptureError::ScreenPermission)) => (vec![], vec![], Some("screen".to_string())),
+            (Err(umi_capture::CaptureError::ScreenPermission), _) | (_, Err(umi_capture::CaptureError::ScreenPermission)) => {
+                (vec![], vec![], Some("screen".to_string()))
+            }
             (d, w) => (d.unwrap_or_default(), w.unwrap_or_default(), None),
         };
-        Sources { displays, windows, microphones: umi_capture::audio::microphones(), cameras: umi_capture::camera::cameras(), phones: umi_media::device::screen_devices(), missing_permission: missing }
+        Sources {
+            displays,
+            windows,
+            microphones: umi_capture::audio::microphones(),
+            cameras: umi_capture::camera::cameras(),
+            phones: umi_media::device::screen_devices(),
+            missing_permission: missing,
+        }
     })
     .await
     .map_err(|e| e.to_string())
@@ -122,7 +131,8 @@ pub fn record_meter(state: State<'_, AppState>, microphone: Option<String>) -> R
     let mut meter = state.recorder.meter.lock();
     *meter = None;
     if let Some(id) = microphone {
-        *meter = Some(umi_capture::audio::start(Some(id.as_str()).filter(|s| !s.is_empty()), Clock::new(), None).map_err(|e| e.to_string())?);
+        *meter =
+            Some(umi_capture::audio::start(Some(id.as_str()).filter(|s| !s.is_empty()), Clock::new(), None).map_err(|e| e.to_string())?);
     }
     Ok(())
 }
@@ -143,7 +153,12 @@ pub fn record_status(state: State<'_, AppState>) -> Status {
         Some(r) => r.mic_level(),
         None => state.recorder.meter.lock().as_ref().map_or(0.0, |m| m.level()),
     };
-    Status { recording: current.is_some(), paused: current.as_ref().is_some_and(|r| r.is_paused()), elapsed: current.as_ref().map_or(0.0, |r| r.elapsed()), level }
+    Status {
+        recording: current.is_some(),
+        paused: current.as_ref().is_some_and(|r| r.is_paused()),
+        elapsed: current.as_ref().map_or(0.0, |r| r.elapsed()),
+        level,
+    }
 }
 
 /// Camera frames for the bubble: small JPEGs, at most ~30 a second.
@@ -166,7 +181,8 @@ impl VideoSink for Preview {
         let Some(img) = image::RgbaImage::from_raw(width, height, data[..stride * height as usize].to_vec()) else { return };
         let small = image::imageops::thumbnail(&img, 480, (480 * height / width.max(1)).max(1));
         let mut jpeg = Vec::new();
-        if image::DynamicImage::ImageRgba8(small).to_rgb8().write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg).is_ok() {
+        if image::DynamicImage::ImageRgba8(small).to_rgb8().write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg).is_ok()
+        {
             let _ = channel.send(Response::new(jpeg));
         }
     }
@@ -192,7 +208,10 @@ pub async fn record_camera_preview(app: AppHandle, camera: Option<String>, frame
             return Ok(());
         }
         if let Some(id) = camera {
-            *preview = Some(umi_capture::camera::start(Some(id.as_str()).filter(|s| !s.is_empty()), Clock::new(), rec.preview_sink()).map_err(|e| e.to_string())?);
+            *preview = Some(
+                umi_capture::camera::start(Some(id.as_str()).filter(|s| !s.is_empty()), Clock::new(), rec.preview_sink())
+                    .map_err(|e| e.to_string())?,
+            );
         }
         Ok(())
     })
@@ -203,7 +222,11 @@ pub async fn record_camera_preview(app: AppHandle, camera: Option<String>, frame
 fn options(settings: &RecordSettings) -> Result<umi_recorder::Options, String> {
     let target = match &settings.target {
         Some(t) => t.clone(),
-        None => umi_capture::screen::displays().map_err(|e| e.to_string())?.first().map(|d| Target::Display { id: d.id }).ok_or("No display found")?,
+        None => umi_capture::screen::displays()
+            .map_err(|e| e.to_string())?
+            .first()
+            .map(|d| Target::Display { id: d.id })
+            .ok_or("No display found")?,
     };
     let max_size = match settings.resolution.as_str() {
         "1080p" => 1920,
@@ -304,7 +327,9 @@ pub fn copy_file_to_clipboard(path: PathBuf) -> Result<(), String> {
     } else if cfg!(windows) {
         std::process::Command::new("powershell").args(["-NoProfile", "-Command", &format!("Set-Clipboard -Path \"{path}\"")]).status()
     } else {
-        std::process::Command::new("sh").args(["-c", &format!("printf 'file://%s' \"{path}\" | xclip -selection clipboard -t text/uri-list")]).status()
+        std::process::Command::new("sh")
+            .args(["-c", &format!("printf 'file://%s' \"{path}\" | xclip -selection clipboard -t text/uri-list")])
+            .status()
     };
     status.map_err(|e| e.to_string()).and_then(|s| if s.success() { Ok(()) } else { Err("Couldn't copy".into()) })
 }

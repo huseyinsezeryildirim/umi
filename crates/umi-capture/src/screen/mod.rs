@@ -3,12 +3,12 @@
 use crate::{AudioSink, CaptureError, Clock, Display, Target, VideoSink, Window};
 use std::sync::Arc;
 
+#[cfg(target_os = "linux")]
+mod linux;
 #[cfg(target_os = "macos")]
 mod mac;
 #[cfg(windows)]
 mod windows;
-#[cfg(target_os = "linux")]
-mod linux;
 
 #[derive(Debug, Clone)]
 pub struct ScreenOptions {
@@ -59,7 +59,13 @@ pub fn windows() -> Result<Vec<Window>, CaptureError> {
 }
 
 /// Starts capturing `target`; frames go to `video`, system sound (if asked) to `audio`.
-pub fn start(target: &Target, options: &ScreenOptions, clock: Clock, video: Arc<dyn VideoSink>, audio: Option<Arc<dyn AudioSink>>) -> Result<Box<dyn ScreenSession>, CaptureError> {
+pub fn start(
+    target: &Target,
+    options: &ScreenOptions,
+    clock: Clock,
+    video: Arc<dyn VideoSink>,
+    audio: Option<Arc<dyn AudioSink>>,
+) -> Result<Box<dyn ScreenSession>, CaptureError> {
     #[cfg(target_os = "macos")]
     return mac::start(target, options, clock, video, audio);
     #[cfg(windows)]
@@ -86,7 +92,10 @@ pub fn geometry(target: &Target) -> Result<((f64, f64, f64, f64), f64), CaptureE
         }
         Target::Window { id } => {
             let w = windows()?.into_iter().find(|w| w.id == *id).ok_or_else(|| CaptureError::NotFound("That window".into()))?;
-            let scale = displays()?.into_iter().find(|d| w.x >= d.x && w.x < d.x + d.width && w.y >= d.y && w.y < d.y + d.height).map_or(2.0, |d| d.scale);
+            let scale = displays()?
+                .into_iter()
+                .find(|d| w.x >= d.x && w.x < d.x + d.width && w.y >= d.y && w.y < d.y + d.height)
+                .map_or(2.0, |d| d.scale);
             Ok(((w.x, w.y, w.width, w.height), scale))
         }
         // Read by the recorder through FFmpeg; its size comes from the device.

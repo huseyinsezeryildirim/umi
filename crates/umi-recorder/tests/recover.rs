@@ -9,7 +9,20 @@ fn finishes_a_recording_left_behind() {
     let bundle = library.join("Umi crash.umi");
     std::fs::create_dir_all(&bundle).unwrap();
     let (w, h) = (320u32, 200u32);
-    let mut writer = StreamWriter::create(&bundle.join("screen.mov"), &WriterSettings { width: w, height: h, fps: 30, codec: VideoCodec::H264, bit_rate: 0, audio_tracks: 1, fragmented: true, hardware: true }).unwrap();
+    let mut writer = StreamWriter::create(
+        &bundle.join("screen.mov"),
+        &WriterSettings {
+            width: w,
+            height: h,
+            fps: 30,
+            codec: VideoCodec::H264,
+            bit_rate: 0,
+            audio_tracks: 1,
+            fragmented: true,
+            hardware: true,
+        },
+    )
+    .unwrap();
     let y = vec![90u8; (w * h) as usize];
     let uv = vec![128u8; (w * h / 2) as usize];
     for i in 0..90 {

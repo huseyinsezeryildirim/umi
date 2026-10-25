@@ -21,7 +21,11 @@ fn library() -> PathBuf {
 /// A recording path from an argument: absolute, or a name in the library.
 fn bundle_arg(args: &Value) -> Result<PathBuf, String> {
     let name = args.get("recording").and_then(Value::as_str).ok_or("`recording` (name or path) is required")?;
-    let path = if Path::new(name).is_absolute() { PathBuf::from(name) } else { library().join(if name.ends_with(".umi") { name.to_string() } else { format!("{name}.umi") }) };
+    let path = if Path::new(name).is_absolute() {
+        PathBuf::from(name)
+    } else {
+        library().join(if name.ends_with(".umi") { name.to_string() } else { format!("{name}.umi") })
+    };
     if !path.join("project.json").exists() {
         return Err(format!("No recording at {}", path.display()));
     }
@@ -105,8 +109,12 @@ fn call(name: &str, args: &Value) -> Result<String, String> {
             let track = doc.project.audio.microphone_track.map(|t| t as usize).filter(|t| *t < tracks).unwrap_or(0);
             let samples = umi_ai::transcribe::read_mono_16k(&screen, track).map_err(|e| e.to_string())?;
             let language = args.get("language").and_then(Value::as_str).map(str::to_string);
-            let (words, detected) = umi_ai::transcribe::transcribe(&model, &samples, language.as_deref(), |_| {}).map_err(|e| e.to_string())?;
-            doc.edit.captions.words = words.iter().map(|w| umi_project::edit::CaptionWord { id: uuid::Uuid::new_v4(), start: w.start, end: w.end, text: w.text.clone() }).collect();
+            let (words, detected) =
+                umi_ai::transcribe::transcribe(&model, &samples, language.as_deref(), |_| {}).map_err(|e| e.to_string())?;
+            doc.edit.captions.words = words
+                .iter()
+                .map(|w| umi_project::edit::CaptionWord { id: uuid::Uuid::new_v4(), start: w.start, end: w.end, text: w.text.clone() })
+                .collect();
             doc.edit.captions.language = detected.clone();
             save(&path, &doc)?;
             let lines: Vec<String> = umi_project::captions::caption_lines(&doc.edit.captions.words)
@@ -149,7 +157,9 @@ fn call(name: &str, args: &Value) -> Result<String, String> {
                         }
                     }
                     "captions" => doc.edit.captions.enabled = op.get("on").and_then(Value::as_bool).unwrap_or(true),
-                    "aspect" => doc.edit.aspect = serde_json::from_value(op.get("value").cloned().unwrap_or_default()).map_err(|e| e.to_string())?,
+                    "aspect" => {
+                        doc.edit.aspect = serde_json::from_value(op.get("value").cloned().unwrap_or_default()).map_err(|e| e.to_string())?
+                    }
                     "background" => {
                         let g = op.get("gradient").cloned().unwrap_or(json!("sky"));
                         doc.edit.background = serde_json::from_value(json!({ "gradient": { "_0": g } })).map_err(|e| e.to_string())?;
@@ -194,7 +204,12 @@ fn call(name: &str, args: &Value) -> Result<String, String> {
                 folder.join(format!("{}.{ext}", Bundle::new(&path).name()))
             });
             let gpu = umi_render::Gpu::new().map_err(|e| e.to_string())?;
-            let settings = umi_engine::ExportSettings { format, resolution: args.get("resolution").and_then(Value::as_u64).unwrap_or(1080) as u32, fps: 60, hardware: true };
+            let settings = umi_engine::ExportSettings {
+                format,
+                resolution: args.get("resolution").and_then(Value::as_u64).unwrap_or(1080) as u32,
+                fps: 60,
+                hardware: true,
+            };
             let cancel = std::sync::atomic::AtomicBool::new(false);
             umi_engine::export(gpu, &path, doc.edit.clone(), &settings, &destination, &|_| {}, &cancel).map_err(|e| e.to_string())?;
             Ok(format!("Exported {}", destination.display()))
@@ -224,7 +239,9 @@ fn handle(message: &Value) -> Option<Value> {
                 Err(e) => json!({ "content": [{ "type": "text", "text": e }], "isError": true }),
             }
         }
-        _ => return Some(json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32601, "message": format!("Unknown method {method}") } })),
+        _ => {
+            return Some(json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32601, "message": format!("Unknown method {method}") } }));
+        }
     };
     Some(json!({ "jsonrpc": "2.0", "id": id, "result": result }))
 }
@@ -254,12 +271,16 @@ mod tests {
 
     #[test]
     fn speaks_the_protocol() {
-        let init = handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2025-06-18" } })).unwrap();
+        let init =
+            handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2025-06-18" } })).unwrap();
         assert_eq!(init["result"]["serverInfo"]["name"], "umi");
         let list = handle(&json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" })).unwrap();
         assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 5);
         assert!(handle(&json!({ "jsonrpc": "2.0", "method": "notifications/initialized" })).is_none());
-        let bad = handle(&json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": { "name": "describe_recording", "arguments": {} } })).unwrap();
+        let bad = handle(
+            &json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": { "name": "describe_recording", "arguments": {} } }),
+        )
+        .unwrap();
         assert_eq!(bad["result"]["isError"], true);
     }
 

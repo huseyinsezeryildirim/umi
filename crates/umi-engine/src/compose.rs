@@ -68,7 +68,15 @@ fn cut_out(camera: &DecodedFrame, matte: &DecodedFrame) -> Option<DecodedFrame> 
             rgba[i + 3] = a as u8;
         }
     }
-    Some(DecodedFrame { pts: camera.pts, width: w, height: h, format: umi_media::FrameFormat::Rgba, color: camera.color, planes: vec![rgba], strides: vec![w * 4] })
+    Some(DecodedFrame {
+        pts: camera.pts,
+        width: w,
+        height: h,
+        format: umi_media::FrameFormat::Rgba,
+        color: camera.color,
+        planes: vec![rgba],
+        strides: vec![w * 4],
+    })
 }
 
 impl FrameSource {
@@ -101,7 +109,8 @@ impl FrameSource {
         if !self.has_camera {
             return Ok((screen, None));
         }
-        let mut read = |file: &str| if set == 0 { self.sources.frame(file, t) } else { self.sources.frame_aliased(file, &format!("{file}#1"), t) };
+        let mut read =
+            |file: &str| if set == 0 { self.sources.frame(file, t) } else { self.sources.frame_aliased(file, &format!("{file}#1"), t) };
         let camera = match self.camera {
             CameraFeed::Original => read(CAMERA)?,
             CameraFeed::Blurred => read(CAMERA_BLUR)?,

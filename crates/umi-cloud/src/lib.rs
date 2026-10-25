@@ -145,7 +145,9 @@ impl Client {
         struct Body {
             error: Inner,
         }
-        let (code, message) = serde_json::from_str::<Body>(&text).map(|b| (b.error.code, b.error.message)).unwrap_or_else(|_| ("http".into(), format!("Umi Cloud answered {status}.")));
+        let (code, message) = serde_json::from_str::<Body>(&text)
+            .map(|b| (b.error.code, b.error.message))
+            .unwrap_or_else(|_| ("http".into(), format!("Umi Cloud answered {status}.")));
         Err(CloudError::Server { status, code, message })
     }
 
@@ -188,8 +190,16 @@ impl Client {
                 std::thread::sleep(std::time::Duration::from_millis(600 * attempt));
             }
             match Self::agent().put(url).header("Content-Type", content_type).send(bytes) {
-                Ok(r) if r.status().is_success() => return Ok(r.headers().get("etag").and_then(|v| v.to_str().ok()).unwrap_or_default().to_string()),
-                Ok(r) => last = Some(CloudError::Server { status: r.status().as_u16(), code: "upload_failed".into(), message: "Upload failed. Check your connection and try again.".into() }),
+                Ok(r) if r.status().is_success() => {
+                    return Ok(r.headers().get("etag").and_then(|v| v.to_str().ok()).unwrap_or_default().to_string());
+                }
+                Ok(r) => {
+                    last = Some(CloudError::Server {
+                        status: r.status().as_u16(),
+                        code: "upload_failed".into(),
+                        message: "Upload failed. Check your connection and try again.".into(),
+                    })
+                }
                 Err(e) => last = Some(CloudError::Network(e.to_string())),
             }
         }
@@ -258,7 +268,8 @@ impl Client {
         let mut etags = etags.into_inner().unwrap_or_else(|e| e.into_inner());
         etags.sort_by_key(|(n, _)| *n);
         let parts: Vec<serde_json::Value> = etags.iter().map(|(n, e)| serde_json::json!({ "partNumber": n, "etag": e })).collect();
-        let done: VideoBody = self.send("POST", &format!("/api/videos/{}/complete", created.video.id), Some(serde_json::json!({ "parts": parts })))?;
+        let done: VideoBody =
+            self.send("POST", &format!("/api/videos/{}/complete", created.video.id), Some(serde_json::json!({ "parts": parts })))?;
         progress(1.0);
         Ok(done.video)
     }
@@ -276,7 +287,9 @@ pub fn link_at(url: &str, seconds: Option<f64>) -> String {
 pub fn embed_code(url: &str, kind: &str) -> String {
     let embed = url.replacen("/v/", "/e/", 1);
     match kind {
-        "fixed" => format!("<iframe src=\"{embed}\" width=\"640\" height=\"360\" frameborder=\"0\" allow=\"fullscreen; picture-in-picture\" allowfullscreen></iframe>"),
+        "fixed" => format!(
+            "<iframe src=\"{embed}\" width=\"640\" height=\"360\" frameborder=\"0\" allow=\"fullscreen; picture-in-picture\" allowfullscreen></iframe>"
+        ),
         "gif" => format!("<a href=\"{url}\"><img src=\"{url}/preview.gif\" alt=\"Watch the video\" width=\"480\"></a>"),
         "thumbnail" => format!("<a href=\"{url}\"><img src=\"{url}/thumbnail.jpg\" alt=\"Watch the video\" width=\"640\"></a>"),
         _ => format!(

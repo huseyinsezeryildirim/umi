@@ -80,7 +80,11 @@ pub fn start(id: Option<&str>, clock: Clock, sink: Arc<dyn VideoSink>) -> Result
                 Ok(c) => c,
                 Err(e) => {
                     let text = e.to_string();
-                    let _ = ready_tx.send(Err(if text.to_lowercase().contains("permission") || text.to_lowercase().contains("authoriz") { CaptureError::CameraPermission } else { CaptureError::Other(text) }));
+                    let _ = ready_tx.send(Err(if text.to_lowercase().contains("permission") || text.to_lowercase().contains("authoriz") {
+                        CaptureError::CameraPermission
+                    } else {
+                        CaptureError::Other(text)
+                    }));
                     return;
                 }
             };
@@ -88,7 +92,10 @@ pub fn start(id: Option<&str>, clock: Clock, sink: Arc<dyn VideoSink>) -> Result
                 let _ = ready_tx.send(Err(CaptureError::Other(e.to_string())));
                 return;
             }
-            let res = { let r = camera.resolution(); (r.width(), r.height()) };
+            let res = {
+                let r = camera.resolution();
+                (r.width(), r.height())
+            };
             let _ = ready_tx.send(Ok(res));
             while !flag.load(Ordering::Relaxed) {
                 let Ok(buffer) = camera.frame() else { continue };

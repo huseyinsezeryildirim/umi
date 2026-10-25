@@ -42,7 +42,10 @@ fn wallpaper_files() -> Vec<PathBuf> {
             let hidden = path.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.'));
             if path.is_dir() && !hidden && out.len() < 200 {
                 stack.push(path);
-            } else if path.extension().is_some_and(|e| matches!(e.to_string_lossy().to_lowercase().as_str(), "heic" | "jpg" | "jpeg" | "png")) {
+            } else if path
+                .extension()
+                .is_some_and(|e| matches!(e.to_string_lossy().to_lowercase().as_str(), "heic" | "jpg" | "jpeg" | "png"))
+            {
                 out.push(path);
             }
         }
@@ -81,7 +84,9 @@ pub async fn system_wallpapers() -> Result<Vec<Wallpaper>, String> {
 /// A small preview of any image file (for pickers).
 #[tauri::command]
 pub async fn image_thumbnail(path: PathBuf) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || thumbnail(&path).ok_or_else(|| "can't read image".to_string())).await.map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || thumbnail(&path).ok_or_else(|| "can't read image".to_string()))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// One frame of the recording's screen at recording time `time` (JPEG data URL), for the
@@ -95,7 +100,10 @@ pub async fn recording_still(path: PathBuf, time: f64, max_side: u32) -> Result<
         let (w, h, rgba) = umi_media::to_rgba(&frame, max_side).map_err(|e| e.to_string())?;
         let img = image::RgbaImage::from_raw(w, h, rgba).ok_or("bad frame")?;
         let mut jpeg = Vec::new();
-        image::DynamicImage::ImageRgba8(img).to_rgb8().write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg).map_err(|e| e.to_string())?;
+        image::DynamicImage::ImageRgba8(img)
+            .to_rgb8()
+            .write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg)
+            .map_err(|e| e.to_string())?;
         Ok(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(jpeg)))
     })
     .await

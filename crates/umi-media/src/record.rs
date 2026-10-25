@@ -69,10 +69,16 @@ impl StreamWriter {
         crate::init();
         let mut output = ff::format::output_as(path, "mov").map_err(|e| MediaError::open(path, e))?;
         let global_header = output.format().flags().contains(ff::format::Flags::GLOBAL_HEADER);
-        let bit_rate = if s.bit_rate > 0 { s.bit_rate } else { ((s.width as f64 * s.height as f64 * s.fps as f64 * 0.12) as usize).clamp(3_000_000, 120_000_000) };
+        let bit_rate = if s.bit_rate > 0 {
+            s.bit_rate
+        } else {
+            ((s.width as f64 * s.height as f64 * s.fps as f64 * 0.12) as usize).clamp(3_000_000, 120_000_000)
+        };
         let tb = ff::Rational::new(1, TIME_BASE);
         let names: Vec<&str> = match (s.codec, s.hardware) {
-            (VideoCodec::H264, true) => vec!["h264_videotoolbox", "h264_nvenc", "h264_qsv", "h264_amf", "h264_mf", "libx264", "libopenh264"],
+            (VideoCodec::H264, true) => {
+                vec!["h264_videotoolbox", "h264_nvenc", "h264_qsv", "h264_amf", "h264_mf", "libx264", "libopenh264"]
+            }
             (VideoCodec::Hevc, true) => vec!["hevc_videotoolbox", "hevc_nvenc", "hevc_qsv", "hevc_amf", "hevc_mf", "libx265"],
             (VideoCodec::H264, false) => vec!["libx264", "libopenh264", "h264_videotoolbox"],
             (VideoCodec::Hevc, false) => vec!["libx265", "hevc_videotoolbox"],
@@ -150,7 +156,14 @@ impl StreamWriter {
             let mut stream = output.add_stream(Some(codec))?;
             stream.set_parameters(&encoder);
             stream.set_time_base(ff::Rational::new(1, SAMPLE_RATE as i32));
-            tracks.push(Track { encoder, stream: stream.index(), tb: ff::Rational::new(1, SAMPLE_RATE as i32), frame_size, pending: vec![], written: 0 });
+            tracks.push(Track {
+                encoder,
+                stream: stream.index(),
+                tb: ff::Rational::new(1, SAMPLE_RATE as i32),
+                frame_size,
+                pending: vec![],
+                written: 0,
+            });
         }
         let mut opts = ff::Dictionary::new();
         if s.fragmented {
@@ -165,7 +178,18 @@ impl StreamWriter {
         for t in &mut tracks {
             t.tb = output.stream(t.stream).map(|st| st.time_base()).unwrap_or(t.tb);
         }
-        Ok(Self { output, video, video_stream, video_tb, pix_fmt, scaler: None, last_pts: -1, tracks, encoder_name: name.to_owned(), frames: 0 })
+        Ok(Self {
+            output,
+            video,
+            video_stream,
+            video_tb,
+            pix_fmt,
+            scaler: None,
+            last_pts: -1,
+            tracks,
+            encoder_name: name.to_owned(),
+            frames: 0,
+        })
     }
 
     pub fn frames_written(&self) -> u64 {
@@ -188,7 +212,9 @@ impl StreamWriter {
             (pixels, target) => {
                 // Convert (BGRA/RGBA → NV12, or anything → YUV420P for software encoders).
                 let (format, planes): (Pixel, Vec<(&[u8], usize, usize)>) = match pixels {
-                    Pixels::Nv12 { y, y_stride, uv, uv_stride } => (Pixel::NV12, vec![(y, y_stride, h as usize), (uv, uv_stride, h as usize / 2)]),
+                    Pixels::Nv12 { y, y_stride, uv, uv_stride } => {
+                        (Pixel::NV12, vec![(y, y_stride, h as usize), (uv, uv_stride, h as usize / 2)])
+                    }
                     Pixels::Bgra { data, stride } => (Pixel::BGRA, vec![(data, stride, h as usize)]),
                     Pixels::Rgba { data, stride } => (Pixel::RGBA, vec![(data, stride, h as usize)]),
                 };

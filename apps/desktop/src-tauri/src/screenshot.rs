@@ -19,9 +19,15 @@ impl VideoSink for Grab {
             return;
         }
         let rgba = match frame {
-            Frame::Rgba { width, height, data, stride } => (width, height, rows(data, stride, width as usize * 4, height, |p| [p[0], p[1], p[2], p[3]])),
-            Frame::Bgra { width, height, data, stride } => (width, height, rows(data, stride, width as usize * 4, height, |p| [p[2], p[1], p[0], p[3]])),
-            Frame::Nv12 { width, height, y, y_stride, uv, uv_stride } => (width, height, nv12_to_rgba(width, height, y, y_stride, uv, uv_stride)),
+            Frame::Rgba { width, height, data, stride } => {
+                (width, height, rows(data, stride, width as usize * 4, height, |p| [p[0], p[1], p[2], p[3]]))
+            }
+            Frame::Bgra { width, height, data, stride } => {
+                (width, height, rows(data, stride, width as usize * 4, height, |p| [p[2], p[1], p[0], p[3]]))
+            }
+            Frame::Nv12 { width, height, y, y_stride, uv, uv_stride } => {
+                (width, height, nv12_to_rgba(width, height, y, y_stride, uv, uv_stride))
+            }
         };
         *slot = Some(rgba);
     }
@@ -90,7 +96,9 @@ pub fn screenshot_copy(png: Vec<u8>) -> Result<(), String> {
     let img = image::load_from_memory(&png).map_err(|e| e.to_string())?.to_rgba8();
     let (w, h) = img.dimensions();
     let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
-    clipboard.set_image(arboard::ImageData { width: w as usize, height: h as usize, bytes: img.into_raw().into() }).map_err(|e| e.to_string())
+    clipboard
+        .set_image(arboard::ImageData { width: w as usize, height: h as usize, bytes: img.into_raw().into() })
+        .map_err(|e| e.to_string())
 }
 
 /// Saves the finished image in ~/Pictures/Umi (or the chosen path); returns where.

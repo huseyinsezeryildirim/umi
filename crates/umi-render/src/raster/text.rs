@@ -307,7 +307,14 @@ pub fn card(text: &TextOverlay, characters: usize, canvas_height: f64) -> Option
 }
 
 /// A caption line on a dark pill, with the active word on an accent pill.
-pub fn caption(words: &[String], active: Option<usize>, height: f64, accent: [f32; 4], style: CaptionStyle, shown: usize) -> Option<RasterImage> {
+pub fn caption(
+    words: &[String],
+    active: Option<usize>,
+    height: f64,
+    accent: [f32; 4],
+    style: CaptionStyle,
+    shown: usize,
+) -> Option<RasterImage> {
     let height = height as f32;
     let weight = if style == CaptionStyle::Bold { 850 } else { 700 };
     let mut guard = fonts().lock();
@@ -350,7 +357,13 @@ pub fn caption(words: &[String], active: Option<usize>, height: f64, accent: [f3
                     let mut p = Paint::default();
                     p.set_color(Color::from_rgba8(accent8[0], accent8[1], accent8[2], 255));
                     p.anti_alias = true;
-                    if let Some(r) = rounded_rect(x - height * 0.14, pad_h - height * 0.06, s.width + height * 0.28, ascent + descent + height * 0.12, height * 0.16) {
+                    if let Some(r) = rounded_rect(
+                        x - height * 0.14,
+                        pad_h - height * 0.06,
+                        s.width + height * 0.28,
+                        ascent + descent + height * 0.12,
+                        height * 0.16,
+                    ) {
                         pm.fill_path(&r, &p, FillRule::Winding, Transform::identity(), None);
                     }
                 }
@@ -383,7 +396,8 @@ pub fn keycaps(keys: &[String], height: f64) -> Option<RasterImage> {
     let height = height as f32;
     let size = height * 0.52;
     let mut guard = fonts().lock();
-    let shaped: Vec<Shaped> = keys.iter().map(|k| shape(&mut guard, &Line { text: k.clone(), face: Face::Sans(600), size, color: WHITE })).collect();
+    let shaped: Vec<Shaped> =
+        keys.iter().map(|k| shape(&mut guard, &Line { text: k.clone(), face: Face::Sans(600), size, color: WHITE })).collect();
     drop(guard);
     let gap = height * 0.14;
     let pad = height * 0.18;
@@ -417,4 +431,3 @@ pub fn keycaps(keys: &[String], height: f64) -> Option<RasterImage> {
     }
     Some(from_pixmap(pm))
 }
-

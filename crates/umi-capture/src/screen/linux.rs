@@ -20,7 +20,11 @@ pub fn displays() -> Result<Vec<Display>, CaptureError> {
         .map(|(i, m)| {
             Ok(Display {
                 id: m.id().map_err(err)?,
-                name: if m.is_primary().unwrap_or(i == 0) { "Main display".into() } else { m.friendly_name().unwrap_or_else(|_| format!("Display {}", i + 1)) },
+                name: if m.is_primary().unwrap_or(i == 0) {
+                    "Main display".into()
+                } else {
+                    m.friendly_name().unwrap_or_else(|_| format!("Display {}", i + 1))
+                },
                 width: m.width().map_err(err)? as f64,
                 height: m.height().map_err(err)? as f64,
                 scale: 1.0,
@@ -78,14 +82,30 @@ impl ScreenSession for Session {
     }
 }
 
-pub fn start(target: &Target, options: &ScreenOptions, clock: Clock, video: Arc<dyn VideoSink>, audio: Option<Arc<dyn AudioSink>>) -> Result<Box<dyn ScreenSession>, CaptureError> {
+pub fn start(
+    target: &Target,
+    options: &ScreenOptions,
+    clock: Clock,
+    video: Arc<dyn VideoSink>,
+    audio: Option<Arc<dyn AudioSink>>,
+) -> Result<Box<dyn ScreenSession>, CaptureError> {
     let display_id = match target {
         Target::Display { id } | Target::Area { display: id, .. } => *id,
         // Windows: the display they're on, cropped to the window.
         Target::Device { .. } => return Err(CaptureError::Unsupported),
-        Target::Window { id } => xcap::Window::all().map_err(err)?.into_iter().find(|w| w.id().is_ok_and(|x| x == *id)).and_then(|w| w.current_monitor().ok()).and_then(|m| m.id().ok()).unwrap_or(0),
+        Target::Window { id } => xcap::Window::all()
+            .map_err(err)?
+            .into_iter()
+            .find(|w| w.id().is_ok_and(|x| x == *id))
+            .and_then(|w| w.current_monitor().ok())
+            .and_then(|m| m.id().ok())
+            .unwrap_or(0),
     };
-    let monitor = xcap::Monitor::all().map_err(err)?.into_iter().find(|m| m.id().is_ok_and(|x| x == display_id)).ok_or_else(|| CaptureError::NotFound("That display".into()))?;
+    let monitor = xcap::Monitor::all()
+        .map_err(err)?
+        .into_iter()
+        .find(|m| m.id().is_ok_and(|x| x == display_id))
+        .ok_or_else(|| CaptureError::NotFound("That display".into()))?;
     let (mx, my) = (monitor.x().unwrap_or(0) as f64, monitor.y().unwrap_or(0) as f64);
     let crop: Option<(u32, u32, u32, u32)> = match target {
         Target::Area { x, y, width, height, .. } => Some((*x as u32, *y as u32, *width as u32, *height as u32)),

@@ -24,7 +24,10 @@ fn main_display(app: &AppHandle) -> (LogicalPosition<f64>, LogicalSize<f64>) {
         .flatten()
         .map(|m| {
             let s = m.scale_factor();
-            (LogicalPosition::new(m.position().x as f64 / s, m.position().y as f64 / s), LogicalSize::new(m.size().width as f64 / s, m.size().height as f64 / s))
+            (
+                LogicalPosition::new(m.position().x as f64 / s, m.position().y as f64 / s),
+                LogicalSize::new(m.size().width as f64 / s, m.size().height as f64 / s),
+            )
         })
         .unwrap_or((LogicalPosition::new(0.0, 0.0), LogicalSize::new(1440.0, 900.0)))
 }

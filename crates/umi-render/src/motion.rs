@@ -293,7 +293,11 @@ mod tests {
 
     #[test]
     fn spring_cursor_settles_on_target() {
-        let data = CursorData { moves: vec![CursorMove { t: 0.0, x: 0.0, y: 0.0 }, CursorMove { t: 0.1, x: 1.0, y: 1.0 }], clicks: vec![], keys: vec![] };
+        let data = CursorData {
+            moves: vec![CursorMove { t: 0.0, x: 0.0, y: 0.0 }, CursorMove { t: 0.1, x: 1.0, y: 1.0 }],
+            clicks: vec![],
+            keys: vec![],
+        };
         let track = CursorTrack::new(&data, 3.0, Some((170.0, 26.0)));
         let p = track.position(3.0).unwrap();
         assert!((p.x - 1.0).abs() < 0.01 && (p.y - 1.0).abs() < 0.01);
@@ -306,7 +310,14 @@ mod tests {
         let z = Zoom {
             auto: false,
             scale: 2.0,
-            segments: vec![ZoomSegment { id: uuid::Uuid::nil(), start: 1.0, end: 3.0, scale: 2.0, focus: Some(Point::new(0.2, 0.3)), loupe: false }],
+            segments: vec![ZoomSegment {
+                id: uuid::Uuid::nil(),
+                start: 1.0,
+                end: 3.0,
+                scale: 2.0,
+                focus: Some(Point::new(0.2, 0.3)),
+                loupe: false,
+            }],
             glide: false,
             ..Zoom::default()
         };
@@ -320,7 +331,14 @@ mod tests {
 
     #[test]
     fn glides_between_close_zooms() {
-        let seg = |start: f64, end: f64, scale: f64, x: f64| ZoomSegment { id: uuid::Uuid::new_v4(), start, end, scale, focus: Some(Point::new(x, 0.5)), loupe: false };
+        let seg = |start: f64, end: f64, scale: f64, x: f64| ZoomSegment {
+            id: uuid::Uuid::new_v4(),
+            start,
+            end,
+            scale,
+            focus: Some(Point::new(x, 0.5)),
+            loupe: false,
+        };
         let mut z = Zoom { auto: false, segments: vec![seg(1.0, 3.0, 2.0, 0.2), seg(4.0, 6.0, 3.0, 0.8)], glide: false, ..Zoom::default() };
         // Without glide it zooms out in the gap.
         assert!(ZoomTrack::new(&z, &CursorData::default(), 8.0).state(3.5).0 < 1.5);
@@ -340,10 +358,18 @@ mod tests {
     fn click_follow_pans_to_clicks() {
         let data = CursorData {
             moves: vec![CursorMove { t: 0.0, x: 0.1, y: 0.1 }, CursorMove { t: 2.5, x: 0.9, y: 0.9 }],
-            clicks: vec![CursorClick { t: 1.0, x: 0.3, y: 0.3, button: MouseButton::Left }, CursorClick { t: 3.0, x: 0.7, y: 0.6, button: MouseButton::Left }],
+            clicks: vec![
+                CursorClick { t: 1.0, x: 0.3, y: 0.3, button: MouseButton::Left },
+                CursorClick { t: 3.0, x: 0.7, y: 0.6, button: MouseButton::Left },
+            ],
             keys: vec![],
         };
-        let z = Zoom { auto: false, follow: ZoomFollow::Clicks, segments: vec![ZoomSegment { id: uuid::Uuid::nil(), start: 0.0, end: 6.0, scale: 2.0, focus: None, loupe: false }], ..Zoom::default() };
+        let z = Zoom {
+            auto: false,
+            follow: ZoomFollow::Clicks,
+            segments: vec![ZoomSegment { id: uuid::Uuid::nil(), start: 0.0, end: 6.0, scale: 2.0, focus: None, loupe: false }],
+            ..Zoom::default()
+        };
         let track = ZoomTrack::new(&z, &data, 6.0);
         // Holds on the first click while the cursor wanders off, then settles on the next.
         let p = track.state(2.6).1;

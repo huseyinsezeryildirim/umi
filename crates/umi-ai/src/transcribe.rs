@@ -45,7 +45,12 @@ pub fn read_mono_16k(path: &Path, track: usize) -> Result<Vec<f32>, AiError> {
 
 /// Transcribes `samples` (mono 16 kHz) into words. `language` is a code like "en" or "tr";
 /// `None` detects it. `progress` gets 0…1.
-pub fn transcribe(model: &Path, samples: &[f32], language: Option<&str>, progress: impl FnMut(i32) + 'static) -> Result<(Vec<Word>, String), AiError> {
+pub fn transcribe(
+    model: &Path,
+    samples: &[f32],
+    language: Option<&str>,
+    progress: impl FnMut(i32) + 'static,
+) -> Result<(Vec<Word>, String), AiError> {
     whisper_rs::install_logging_hooks();
     let ctx = WhisperContext::new_with_params(model, WhisperContextParameters::default()).map_err(|e| AiError::Model(e.to_string()))?;
     let mut state = ctx.create_state().map_err(|e| AiError::Model(e.to_string()))?;

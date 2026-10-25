@@ -13,7 +13,10 @@ use windows_capture::capture::{CaptureControl, Context, GraphicsCaptureApiHandle
 use windows_capture::frame::Frame as WinFrame;
 use windows_capture::graphics_capture_api::InternalCaptureControl;
 use windows_capture::monitor::Monitor;
-use windows_capture::settings::{ColorFormat, CursorCaptureSettings, DirtyRegionSettings, DrawBorderSettings, MinimumUpdateIntervalSettings, SecondaryWindowSettings, Settings};
+use windows_capture::settings::{
+    ColorFormat, CursorCaptureSettings, DirtyRegionSettings, DrawBorderSettings, MinimumUpdateIntervalSettings, SecondaryWindowSettings,
+    Settings,
+};
 use windows_capture::window::Window as WinWindow;
 
 fn err(e: impl std::fmt::Display) -> CaptureError {
@@ -28,7 +31,15 @@ pub fn displays() -> Result<Vec<Display>, CaptureError> {
         .enumerate()
         .map(|(i, m)| {
             let (w, h) = (m.width().map_err(err)? as f64, m.height().map_err(err)? as f64);
-            let d = Display { id: i as u32, name: if i == 0 { "Main display".into() } else { format!("Display {}", i + 1) }, width: w, height: h, scale: 1.0, x, y: 0.0 };
+            let d = Display {
+                id: i as u32,
+                name: if i == 0 { "Main display".into() } else { format!("Display {}", i + 1) },
+                width: w,
+                height: h,
+                scale: 1.0,
+                x,
+                y: 0.0,
+            };
             x += w;
             Ok(d)
         })
@@ -111,7 +122,13 @@ impl ScreenSession for Session {
     }
 }
 
-pub fn start(target: &Target, options: &ScreenOptions, clock: Clock, video: Arc<dyn VideoSink>, audio: Option<Arc<dyn AudioSink>>) -> Result<Box<dyn ScreenSession>, CaptureError> {
+pub fn start(
+    target: &Target,
+    options: &ScreenOptions,
+    clock: Clock,
+    video: Arc<dyn VideoSink>,
+    audio: Option<Arc<dyn AudioSink>>,
+) -> Result<Box<dyn ScreenSession>, CaptureError> {
     let interval = MinimumUpdateIntervalSettings::Custom(Duration::from_secs_f64(1.0 / options.fps.max(1) as f64));
     let cursor = if options.show_cursor { CursorCaptureSettings::WithCursor } else { CursorCaptureSettings::WithoutCursor };
     let make = |crop| Flags { clock: clock.clone(), video: video.clone(), crop };
@@ -119,21 +136,41 @@ pub fn start(target: &Target, options: &ScreenOptions, clock: Clock, video: Arc<
         Target::Display { id } | Target::Area { display: id, .. } => {
             let monitor = Monitor::from_index(*id as usize + 1).map_err(err)?;
             let crop = match target {
-                Target::Area { x, y, width, height, .. } => Some((*x as u32, *y as u32, (*width as u32).max(2) & !1, (*height as u32).max(2) & !1)),
+                Target::Area { x, y, width, height, .. } => {
+                    Some((*x as u32, *y as u32, (*width as u32).max(2) & !1, (*height as u32).max(2) & !1))
+                }
                 _ => None,
             };
             let size = match crop {
                 Some((_, _, w, h)) => (w, h),
                 None => fit(monitor.width().map_err(err)? as f64, monitor.height().map_err(err)? as f64, 0),
             };
-            let settings = Settings::new(monitor, cursor, DrawBorderSettings::WithoutBorder, SecondaryWindowSettings::Default, interval, DirtyRegionSettings::Default, ColorFormat::Bgra8, make(crop));
+            let settings = Settings::new(
+                monitor,
+                cursor,
+                DrawBorderSettings::WithoutBorder,
+                SecondaryWindowSettings::Default,
+                interval,
+                DirtyRegionSettings::Default,
+                ColorFormat::Bgra8,
+                make(crop),
+            );
             (Handler::start_free_threaded(settings).map_err(err)?, size)
         }
         Target::Device { .. } => return Err(CaptureError::Unsupported),
         Target::Window { id } => {
             let window = WinWindow::from_raw_hwnd(*id as usize as *mut std::ffi::c_void);
             let size = fit(window.width().map_err(err)? as f64, window.height().map_err(err)? as f64, 0);
-            let settings = Settings::new(window, cursor, DrawBorderSettings::WithoutBorder, SecondaryWindowSettings::Default, interval, DirtyRegionSettings::Default, ColorFormat::Bgra8, make(None));
+            let settings = Settings::new(
+                window,
+                cursor,
+                DrawBorderSettings::WithoutBorder,
+                SecondaryWindowSettings::Default,
+                interval,
+                DirtyRegionSettings::Default,
+                ColorFormat::Bgra8,
+                make(None),
+            );
             (Handler::start_free_threaded(settings).map_err(err)?, size)
         }
     };

@@ -13,7 +13,20 @@ impl VideoSink for Sink {
         let mut w = self.0.lock();
         let (fw, fh) = frame.size();
         let writer = w.get_or_insert_with(|| {
-            StreamWriter::create(&self.1, &WriterSettings { width: fw, height: fh, fps: 60, codec: VideoCodec::H264, bit_rate: 0, audio_tracks: 0, fragmented: true, hardware: true }).unwrap()
+            StreamWriter::create(
+                &self.1,
+                &WriterSettings {
+                    width: fw,
+                    height: fh,
+                    fps: 60,
+                    codec: VideoCodec::H264,
+                    bit_rate: 0,
+                    audio_tracks: 0,
+                    fragmented: true,
+                    hardware: true,
+                },
+            )
+            .unwrap()
         });
         *self.2.lock() += 1;
         let pixels = match frame {

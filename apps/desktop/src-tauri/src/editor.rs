@@ -20,40 +20,111 @@ use umi_render::Gpu;
 #[serde(tag = "op", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum Op {
     /// Replace the whole edit (inspector changes).
-    SetEdit { edit: Box<EditSettings> },
-    Split { time: f64 },
-    Cut { start: f64, end: f64 },
-    DeleteClip { index: usize },
-    JoinClips { index: usize },
-    TrimClip { index: usize, start: Option<f64>, end: Option<f64> },
-    SetSpeed { index: usize, speed: f64 },
-    MoveClip { from: usize, to: usize },
-    ClipToVideo2 { index: usize, time: f64 },
-    AddZoom { time: f64 },
-    AddMask { time: f64, style: Option<umi_project::edit::MaskStyle> },
-    AddScene { layout: SceneLayout, time: f64 },
-    AddText { style: TextStyle, time: f64 },
-    AddMove { kind: MoveKind, time: f64 },
-    AddOverlay { file: String, kind: MediaKind, duration: Option<f64>, time: f64 },
-    Retime { selection: Selection, start: f64, end: f64 },
-    Delete { selection: Selection },
-    DeleteMany { selections: Vec<Selection> },
+    SetEdit {
+        edit: Box<EditSettings>,
+    },
+    Split {
+        time: f64,
+    },
+    Cut {
+        start: f64,
+        end: f64,
+    },
+    DeleteClip {
+        index: usize,
+    },
+    JoinClips {
+        index: usize,
+    },
+    TrimClip {
+        index: usize,
+        start: Option<f64>,
+        end: Option<f64>,
+    },
+    SetSpeed {
+        index: usize,
+        speed: f64,
+    },
+    MoveClip {
+        from: usize,
+        to: usize,
+    },
+    ClipToVideo2 {
+        index: usize,
+        time: f64,
+    },
+    AddZoom {
+        time: f64,
+    },
+    AddMask {
+        time: f64,
+        style: Option<umi_project::edit::MaskStyle>,
+    },
+    AddScene {
+        layout: SceneLayout,
+        time: f64,
+    },
+    AddText {
+        style: TextStyle,
+        time: f64,
+    },
+    AddMove {
+        kind: MoveKind,
+        time: f64,
+    },
+    AddOverlay {
+        file: String,
+        kind: MediaKind,
+        duration: Option<f64>,
+        time: f64,
+    },
+    Retime {
+        selection: Selection,
+        start: f64,
+        end: f64,
+    },
+    Delete {
+        selection: Selection,
+    },
+    DeleteMany {
+        selections: Vec<Selection>,
+    },
     /// Moves several timed items by the same amount (multi-selection drag).
-    ShiftMany { selections: Vec<Selection>, delta: f64 },
+    ShiftMany {
+        selections: Vec<Selection>,
+        delta: f64,
+    },
     /// Puts a voiceover on the Voice track, or replaces `replace`'s audio and text in place.
-    AddVoiceover { file: String, text: String, start: f64, duration: f64, replace: Option<uuid::Uuid> },
+    AddVoiceover {
+        file: String,
+        text: String,
+        start: f64,
+        duration: f64,
+        replace: Option<uuid::Uuid>,
+    },
     /// Replaces the words of one caption line.
-    EditCaptionLine { ids: Vec<uuid::Uuid>, text: String },
+    EditCaptionLine {
+        ids: Vec<uuid::Uuid>,
+        text: String,
+    },
     /// Text-based editing: cuts these words out of the video.
-    CutWords { ids: Vec<uuid::Uuid> },
+    CutWords {
+        ids: Vec<uuid::Uuid>,
+    },
     /// Cuts every filler word ("um", "uh", "şey"…).
     RemoveFillers,
     /// Shortens silences longer than `min` seconds.
-    RemovePauses { min: f64 },
+    RemovePauses {
+        min: f64,
+    },
     /// Plays long typing faster.
-    SpeedUpTyping { speed: f64 },
+    SpeedUpTyping {
+        speed: f64,
+    },
     /// Hides the camera while nobody speaks for `min` seconds or more.
-    HideCameraInSilence { min: f64 },
+    HideCameraInSilence {
+        min: f64,
+    },
     BeginGesture,
     EndGesture,
     Undo,
@@ -91,9 +162,20 @@ pub struct RecordingInfo {
 }
 
 enum Job {
-    Frame { time: f64, width: u32, height: u32, flat: bool, edit: Option<Box<EditSettings>>, reply: Sender<Result<Vec<u8>, String>> },
+    Frame {
+        time: f64,
+        width: u32,
+        height: u32,
+        flat: bool,
+        edit: Option<Box<EditSettings>>,
+        reply: Sender<Result<Vec<u8>, String>>,
+    },
     /// Where the screen content sits on the canvas at an output time (normalized, top-left).
-    Layout { time: f64, edit: Option<Box<EditSettings>>, reply: Sender<[f64; 4]> },
+    Layout {
+        time: f64,
+        edit: Option<Box<EditSettings>>,
+        reply: Sender<[f64; 4]>,
+    },
     /// Reopen the composer (new files in the bundle).
     Refresh,
 }
@@ -204,7 +286,8 @@ impl EditorSession {
             Op::AddMove { kind, time } => selection = doc.add_move(kind, time),
             Op::AddOverlay { file, kind, duration, time } => {
                 // A video plays for its own length unless told otherwise.
-                let duration = duration.or_else(|| (kind == MediaKind::Video).then(|| umi_media::duration(&self.bundle.join(&file)).ok()).flatten());
+                let duration =
+                    duration.or_else(|| (kind == MediaKind::Video).then(|| umi_media::duration(&self.bundle.join(&file)).ok()).flatten());
                 selection = Some(Selection::Overlay(doc.add_overlay(file, kind, duration, time)));
             }
             Op::Retime { selection: s, start, end } => doc.retime(s, start, end),
@@ -229,7 +312,14 @@ impl EditorSession {
                         v.id
                     }
                     None => {
-                        let v = umi_project::edit::Voiceover { id: uuid::Uuid::new_v4(), file, start: start.max(0.0), end: start.max(0.0) + duration, text, volume: 1.0 };
+                        let v = umi_project::edit::Voiceover {
+                            id: uuid::Uuid::new_v4(),
+                            file,
+                            start: start.max(0.0),
+                            end: start.max(0.0) + duration,
+                            text,
+                            volume: 1.0,
+                        };
                         let id = v.id;
                         doc.edit.voiceovers.push(v);
                         id
@@ -349,7 +439,14 @@ impl EditorSession {
     }
 
     /// Exports the current edit to `destination`.
-    pub fn export(&self, gpu: Arc<Gpu>, settings: &ExportSettings, destination: &Path, progress: &(dyn Fn(f64) + Sync), cancel: &AtomicBool) -> Result<(), String> {
+    pub fn export(
+        &self,
+        gpu: Arc<Gpu>,
+        settings: &ExportSettings,
+        destination: &Path,
+        progress: &(dyn Fn(f64) + Sync),
+        cancel: &AtomicBool,
+    ) -> Result<(), String> {
         let edit = self.doc.lock().edit.clone();
         umi_engine::export(gpu, &self.bundle, edit, settings, destination, progress, cancel).map_err(|e| e.to_string())
     }
@@ -373,7 +470,8 @@ impl EditorSession {
         let report = std::sync::Arc::new(parking_lot::Mutex::new(Vec::<i32>::new()));
         let (words, detected) = std::thread::scope(|scope| {
             let sink = report.clone();
-            let job = scope.spawn(move || umi_ai::transcribe::transcribe(&model, &samples, language.as_deref(), move |p| sink.lock().push(p)));
+            let job =
+                scope.spawn(move || umi_ai::transcribe::transcribe(&model, &samples, language.as_deref(), move |p| sink.lock().push(p)));
             // Whisper reports progress on its own thread; relay it from here.
             while !job.is_finished() {
                 if let Some(p) = report.lock().last().copied() {
@@ -411,7 +509,10 @@ impl EditorSession {
     /// Captions as SRT or WebVTT on the edited timeline.
     pub fn subtitles(&self, vtt: bool) -> String {
         let doc = self.doc.lock();
-        umi_project::captions::subtitles(&doc, if vtt { umi_project::captions::SubtitleFormat::Vtt } else { umi_project::captions::SubtitleFormat::Srt })
+        umi_project::captions::subtitles(
+            &doc,
+            if vtt { umi_project::captions::SubtitleFormat::Vtt } else { umi_project::captions::SubtitleFormat::Srt },
+        )
     }
 
     /// New files appeared in the bundle (camera effects): reopen sources on the next frame.
@@ -448,7 +549,8 @@ impl EditorSession {
             let anchor = anchor.unwrap_or(m.start).clamp(m.start, m.end);
             (m.rect_at(anchor), anchor, m.start, m.end)
         };
-        let keys = umi_engine::track::track_region(&Bundle::new(&self.bundle).screen(), rect, anchor, start, end, progress).map_err(|e| e.to_string())?;
+        let keys = umi_engine::track::track_region(&Bundle::new(&self.bundle).screen(), rect, anchor, start, end, progress)
+            .map_err(|e| e.to_string())?;
         let mut edit = self.doc.lock().edit.clone();
         if let Some(m) = edit.masks.iter_mut().find(|m| m.id == mask) {
             m.rect = rect;
@@ -542,7 +644,8 @@ fn merge(old: Job, new: Job) -> Job {
 
 fn handle_layout(composer: &mut Composer, job: Job) {
     if let Job::Refresh = job {
-        if let Ok(fresh) = Composer::open(composer.renderer.gpu().clone(), &composer.bundle.clone(), composer.renderer.edit().clone(), true) {
+        if let Ok(fresh) = Composer::open(composer.renderer.gpu().clone(), &composer.bundle.clone(), composer.renderer.edit().clone(), true)
+        {
             *composer = fresh;
         }
         return;
@@ -556,6 +659,11 @@ fn handle_layout(composer: &mut Composer, job: Job) {
         let canvas = umi_project::Rect::new(0.0, 0.0, size.0 as f64, size.1 as f64);
         let r = composer.renderer.planner().screen_content_rect(moment.layer.source_time, canvas);
         // Bottom-left canvas px → normalized top-left.
-        let _ = reply.send([r.min_x() / canvas.width(), 1.0 - r.max_y() / canvas.height(), r.width() / canvas.width(), r.height() / canvas.height()]);
+        let _ = reply.send([
+            r.min_x() / canvas.width(),
+            1.0 - r.max_y() / canvas.height(),
+            r.width() / canvas.width(),
+            r.height() / canvas.height(),
+        ]);
     }
 }

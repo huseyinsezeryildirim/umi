@@ -11,7 +11,9 @@ pub fn import_file(library: &Path, file: &Path, name: Option<&str>) -> Result<Pa
     let info = decoder.info().clone();
     let _ = &mut decoder;
     let audio = umi_media::audio_streams(file).map(|a| a.len()).unwrap_or(0);
-    let stem = name.map(str::to_string).unwrap_or_else(|| file.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "Imported video".into()));
+    let stem = name
+        .map(str::to_string)
+        .unwrap_or_else(|| file.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "Imported video".into()));
     let clean: String = stem.chars().map(|c| if "/\\:*?\"<>|".contains(c) { '-' } else { c }).collect();
     std::fs::create_dir_all(library).map_err(|e| e.to_string())?;
     let mut folder = library.join(format!("{clean}.umi"));
@@ -113,7 +115,10 @@ mod tests {
 
     #[test]
     fn reads_loom_links() {
-        assert_eq!(loom_id("https://www.loom.com/share/0281766fa2d04bb788eaf19e65135184?sid=abc").as_deref(), Some("0281766fa2d04bb788eaf19e65135184"));
+        assert_eq!(
+            loom_id("https://www.loom.com/share/0281766fa2d04bb788eaf19e65135184?sid=abc").as_deref(),
+            Some("0281766fa2d04bb788eaf19e65135184")
+        );
         assert_eq!(loom_id("loom.com/embed/0281766fa2d04bb788eaf19e65135184").as_deref(), Some("0281766fa2d04bb788eaf19e65135184"));
         assert_eq!(loom_id("https://www.loom.com/looms/videos"), None);
         assert_eq!(loom_id("https://example.com/share/0281766fa2d04bb788eaf19e65135184"), None);

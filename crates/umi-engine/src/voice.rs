@@ -17,7 +17,8 @@ pub struct VoiceFilter {
 
 impl VoiceFilter {
     pub fn new(denoise: bool, level: bool) -> Self {
-        let mut f = Self { denoise: denoise.then(DenoiseState::new), pending: vec![], ready: Default::default(), level: level.then(Leveler::new) };
+        let mut f =
+            Self { denoise: denoise.then(DenoiseState::new), pending: vec![], ready: Default::default(), level: level.then(Leveler::new) };
         f.prime();
         f
     }

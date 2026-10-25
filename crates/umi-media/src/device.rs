@@ -29,7 +29,14 @@ mod mac {
 
     #[link(name = "CoreMediaIO", kind = "framework")]
     unsafe extern "C" {
-        fn CMIOObjectSetPropertyData(object: u32, address: *const PropertyAddress, qualifier_size: u32, qualifier: *const c_void, size: u32, data: *const c_void) -> i32;
+        fn CMIOObjectSetPropertyData(
+            object: u32,
+            address: *const PropertyAddress,
+            qualifier_size: u32,
+            qualifier: *const c_void,
+            size: u32,
+            data: *const c_void,
+        ) -> i32;
     }
 
     #[link(name = "AVFoundation", kind = "framework")]
@@ -95,7 +102,8 @@ impl VideoDecoder {
         let mut options = ff::Dictionary::new();
         options.set("framerate", &fps.to_string());
         options.set("capture_raw_data", "0");
-        let input = ff::format::open_with(&format!("{name}:none"), &format, options).map_err(|e| MediaError::open(std::path::Path::new(name), e))?;
+        let input = ff::format::open_with(&format!("{name}:none"), &format, options)
+            .map_err(|e| MediaError::open(std::path::Path::new(name), e))?;
         Self::from_input(input.input(), false)
     }
 }

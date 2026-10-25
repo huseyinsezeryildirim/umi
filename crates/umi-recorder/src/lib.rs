@@ -20,7 +20,7 @@ use umi_capture::{AudioSink, CaptureError, Clock, Frame, Target, VideoSink};
 use umi_media::{Pixels, StreamWriter, VideoCodec, WriterSettings};
 use umi_project::edit::Camera as CameraStyle;
 use umi_project::project::{AudioInfo, CameraInfo, ScreenInfo};
-use umi_project::{Bundle, Rect, RecordingProject};
+use umi_project::{Bundle, RecordingProject, Rect};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -126,7 +126,9 @@ impl VideoSink for Tee {
         let copy = match &frame {
             Frame::Rgba { width, height, data, stride } => Frame::Rgba { width: *width, height: *height, data, stride: *stride },
             Frame::Bgra { width, height, data, stride } => Frame::Bgra { width: *width, height: *height, data, stride: *stride },
-            Frame::Nv12 { width, height, y, y_stride, uv, uv_stride } => Frame::Nv12 { width: *width, height: *height, y, y_stride: *y_stride, uv, uv_stride: *uv_stride },
+            Frame::Nv12 { width, height, y, y_stride, uv, uv_stride } => {
+                Frame::Nv12 { width: *width, height: *height, y, y_stride: *y_stride, uv, uv_stride: *uv_stride }
+            }
         };
         self.1.frame(copy, t);
         self.0.frame(frame, t);
@@ -161,15 +163,28 @@ fn writer_thread(path: PathBuf, settings: Option<WriterSettings>, fps: u32, rx: 
                         if writer.is_none() {
                             // Camera: the size comes with the first frame.
                             let (w, h) = match planes {
-                                FramePlanes::Rgba { stride } | FramePlanes::Bgra { stride } => (stride as u32 / 4, (data.len() / stride) as u32),
+                                FramePlanes::Rgba { stride } | FramePlanes::Bgra { stride } => {
+                                    (stride as u32 / 4, (data.len() / stride) as u32)
+                                }
                                 FramePlanes::Nv12 { y_len, y_stride, .. } => (y_stride as u32, (y_len / y_stride) as u32),
                             };
-                            let settings = WriterSettings { width: w & !1, height: h & !1, fps, codec: VideoCodec::H264, bit_rate: 0, audio_tracks: 0, fragmented: true, hardware: true };
+                            let settings = WriterSettings {
+                                width: w & !1,
+                                height: h & !1,
+                                fps,
+                                codec: VideoCodec::H264,
+                                bit_rate: 0,
+                                audio_tracks: 0,
+                                fragmented: true,
+                                hardware: true,
+                            };
                             writer = Some(StreamWriter::create(&path, &settings).map_err(|e| e.to_string())?);
                         }
                         let Some(w) = writer.as_mut() else { continue };
                         let pixels = match planes {
-                            FramePlanes::Nv12 { y_len, y_stride, uv_stride } => Pixels::Nv12 { y: &data[..y_len], y_stride, uv: &data[y_len..], uv_stride },
+                            FramePlanes::Nv12 { y_len, y_stride, uv_stride } => {
+                                Pixels::Nv12 { y: &data[..y_len], y_stride, uv: &data[y_len..], uv_stride }
+                            }
                             FramePlanes::Bgra { stride } => Pixels::Bgra { data: &data, stride },
                             FramePlanes::Rgba { stride } => Pixels::Rgba { data: &data, stride },
                         };
@@ -239,7 +254,13 @@ impl Recording {
     /// `camera_preview` also gets every camera frame (the on-screen bubble), so the camera
     /// is opened once.
     pub fn prepare(library: &Path, options: Options, camera_preview: Option<Arc<dyn VideoSink>>) -> Result<Recording, RecordError> {
-        let screen_options = ScreenOptions { fps: options.fps, max_size: options.max_size, show_cursor: false, system_audio: options.system_audio, exclude_own_windows: true };
+        let screen_options = ScreenOptions {
+            fps: options.fps,
+            max_size: options.max_size,
+            show_cursor: false,
+            system_audio: options.system_audio,
+            exclude_own_windows: true,
+        };
         // A phone: its picture comes through FFmpeg; size from the device itself.
         let device = match &options.target {
             Target::Device { name } => Some(umi_media::VideoDecoder::open_device(name, options.fps)?),
@@ -268,7 +289,16 @@ impl Recording {
 
         let (tx, rx) = bounded::<Job>(256);
         let screen_feed = Arc::new(Feed::new(tx));
-        let settings = WriterSettings { width: size.0, height: size.1, fps: options.fps, codec: VideoCodec::H264, bit_rate: 0, audio_tracks: tracks, fragmented: true, hardware: true };
+        let settings = WriterSettings {
+            width: size.0,
+            height: size.1,
+            fps: options.fps,
+            codec: VideoCodec::H264,
+            bit_rate: 0,
+            audio_tracks: tracks,
+            fragmented: true,
+            hardware: true,
+        };
         let mut writers = vec![writer_thread(bundle.screen(), Some(settings), options.fps, rx)];
 
         let mut recording = Recording {
@@ -290,10 +320,13 @@ impl Recording {
         };
 
         let result = (|| -> Result<(), RecordError> {
-            let system: Option<Arc<dyn AudioSink>> = audio.system_track.map(|t| Arc::new(Track(screen_feed.clone(), t as usize)) as Arc<dyn AudioSink>);
+            let system: Option<Arc<dyn AudioSink>> =
+                audio.system_track.map(|t| Arc::new(Track(screen_feed.clone(), t as usize)) as Arc<dyn AudioSink>);
             match device {
                 Some(decoder) => recording.device = Some(device_thread(decoder, clock.clone(), screen_feed.clone())),
-                None => recording.screen = Some(screen::start(&options.target, &screen_options, clock.clone(), screen_feed.clone(), system)?),
+                None => {
+                    recording.screen = Some(screen::start(&options.target, &screen_options, clock.clone(), screen_feed.clone(), system)?)
+                }
             }
             if let (Some(id), Some(track)) = (&options.microphone, audio.microphone_track) {
                 let sink: Arc<dyn AudioSink> = Arc::new(Track(screen_feed.clone(), track as usize));
@@ -405,7 +438,10 @@ impl Recording {
                 capture_rect: Rect::new(self.capture_rect.0, self.capture_rect.1, self.capture_rect.2, self.capture_rect.3),
                 fps: self.options.fps,
             },
-            camera: has_camera.then(|| CameraInfo { bubble_center: self.options.camera_style.as_ref().map(|c| c.position), bubble: self.options.camera_style.clone() }),
+            camera: has_camera.then(|| CameraInfo {
+                bubble_center: self.options.camera_style.as_ref().map(|c| c.position),
+                bubble: self.options.camera_style.clone(),
+            }),
             audio: self.audio,
             edit: None,
             camera_only: self.options.camera_only.then_some(true),
@@ -415,7 +451,8 @@ impl Recording {
             // A phone recording starts in a phone frame, upright.
             let mut edit = project.default_edit(None);
             edit.frame = umi_project::edit::DeviceFrame::Phone;
-            edit.aspect = if self.size.1 >= self.size.0 { umi_project::edit::AspectRatio::Vertical } else { umi_project::edit::AspectRatio::Wide };
+            edit.aspect =
+                if self.size.1 >= self.size.0 { umi_project::edit::AspectRatio::Vertical } else { umi_project::edit::AspectRatio::Wide };
             project.edit = Some(edit);
         }
         bundle.write_project(&project).map_err(|e| RecordError::Write(e.to_string()))?;
@@ -434,7 +471,11 @@ impl Recording {
 }
 
 /// Reads a live device (a phone's screen) into a feed until stopped.
-fn device_thread(mut decoder: umi_media::VideoDecoder, clock: Clock, feed: Arc<Feed>) -> (Arc<std::sync::atomic::AtomicBool>, JoinHandle<()>) {
+fn device_thread(
+    mut decoder: umi_media::VideoDecoder,
+    clock: Clock,
+    feed: Arc<Feed>,
+) -> (Arc<std::sync::atomic::AtomicBool>, JoinHandle<()>) {
     let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let flag = stop.clone();
     let thread = std::thread::Builder::new()
@@ -445,8 +486,20 @@ fn device_thread(mut decoder: umi_media::VideoDecoder, clock: Clock, feed: Arc<F
                 let Some(t) = clock.now() else { continue };
                 let (w, h) = (frame.width, frame.height);
                 match frame.format {
-                    umi_media::FrameFormat::Nv12 => feed.frame(Frame::Nv12 { width: w, height: h, y: &frame.planes[0], y_stride: frame.strides[0] as usize, uv: &frame.planes[1], uv_stride: frame.strides[1] as usize }, t),
-                    umi_media::FrameFormat::Rgba => feed.frame(Frame::Rgba { width: w, height: h, data: &frame.planes[0], stride: frame.strides[0] as usize }, t),
+                    umi_media::FrameFormat::Nv12 => feed.frame(
+                        Frame::Nv12 {
+                            width: w,
+                            height: h,
+                            y: &frame.planes[0],
+                            y_stride: frame.strides[0] as usize,
+                            uv: &frame.planes[1],
+                            uv_stride: frame.strides[1] as usize,
+                        },
+                        t,
+                    ),
+                    umi_media::FrameFormat::Rgba => {
+                        feed.frame(Frame::Rgba { width: w, height: h, data: &frame.planes[0], stride: frame.strides[0] as usize }, t)
+                    }
                 }
             }
         })
@@ -461,7 +514,10 @@ pub fn recover(library: &Path) -> Vec<PathBuf> {
     for entry in std::fs::read_dir(library).into_iter().flatten().flatten() {
         let path = entry.path();
         let bundle = Bundle::new(&path);
-        if path.extension().is_none_or(|e| e != "umi") || bundle.file(umi_project::project::PROJECT_FILE).exists() || !bundle.screen().exists() {
+        if path.extension().is_none_or(|e| e != "umi")
+            || bundle.file(umi_project::project::PROJECT_FILE).exists()
+            || !bundle.screen().exists()
+        {
             continue;
         }
         let Ok(mut decoder) = umi_media::VideoDecoder::open(&bundle.screen(), false) else { continue };
@@ -473,9 +529,18 @@ pub fn recover(library: &Path) -> Vec<PathBuf> {
         let tracks = umi_media::audio_streams(&bundle.screen()).map(|a| a.len()).unwrap_or(0);
         let project = RecordingProject {
             version: 1,
-            created_at: entry.metadata().and_then(|m| m.created()).map(chrono::DateTime::<chrono::Utc>::from).unwrap_or_else(|_| chrono::Utc::now()),
+            created_at: entry
+                .metadata()
+                .and_then(|m| m.created())
+                .map(chrono::DateTime::<chrono::Utc>::from)
+                .unwrap_or_else(|_| chrono::Utc::now()),
             duration: info.duration,
-            screen: ScreenInfo { pixel_width: info.width, pixel_height: info.height, capture_rect: Rect::new(0.0, 0.0, info.width as f64 / 2.0, info.height as f64 / 2.0), fps: info.fps.round().max(1.0) as u32 },
+            screen: ScreenInfo {
+                pixel_width: info.width,
+                pixel_height: info.height,
+                capture_rect: Rect::new(0.0, 0.0, info.width as f64 / 2.0, info.height as f64 / 2.0),
+                fps: info.fps.round().max(1.0) as u32,
+            },
             camera: bundle.camera().exists().then(CameraInfo::default),
             // Without the original settings: the last track is taken as the microphone.
             audio: AudioInfo { system_track: (tracks >= 2).then_some(0), microphone_track: (tracks >= 1).then_some(tracks as u32 - 1) },

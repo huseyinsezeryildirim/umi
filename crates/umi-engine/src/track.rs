@@ -224,7 +224,14 @@ fn blend(into: &mut Patch, fresh: &Patch) {
 /// Follows `rect` (normalized to the recording, top-left origin), placed at recording time
 /// `anchor`, across `start…end`. Returns keyframes at [`TRACK_FPS`]; rects may leave 0…1
 /// when the content scrolls off screen. `progress` gets 0…1.
-pub fn track_region(screen: &Path, rect: Rect, anchor: f64, start: f64, end: f64, progress: &dyn Fn(f64)) -> Result<Vec<MaskKeyframe>, MediaError> {
+pub fn track_region(
+    screen: &Path,
+    rect: Rect,
+    anchor: f64,
+    start: f64,
+    end: f64,
+    progress: &dyn Fn(f64),
+) -> Result<Vec<MaskKeyframe>, MediaError> {
     let mut decoder = VideoDecoder::open(screen, true)?;
     let count = ((end - start) * TRACK_FPS).ceil().max(1.0) as usize + 1;
     let mut frames: Vec<(f64, Gray)> = Vec::with_capacity(count);

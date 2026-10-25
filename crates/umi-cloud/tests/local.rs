@@ -32,7 +32,8 @@ fn shares_a_video_end_to_end() {
     let head = ureq::head(&format!("{}/video.mp4", done.url)).call().unwrap();
     assert_eq!(head.headers().get("content-length").unwrap().to_str().unwrap(), size.to_string());
 
-    let updated = client.update(&done.id, &Settings { password: Some("secret".into()), allow_comments: Some(false), ..Default::default() }).unwrap();
+    let updated =
+        client.update(&done.id, &Settings { password: Some("secret".into()), allow_comments: Some(false), ..Default::default() }).unwrap();
     assert!(updated.has_password && updated.allow_comments == Some(false));
     client.delete(&done.id).unwrap();
     assert!(client.video(&done.id).is_err() || client.video(&done.id).unwrap().status == "deleted");

@@ -13,7 +13,13 @@ fn main() {
             let m = if mode == "remove" { umi_ai::camera::Background::Remove } else { umi_ai::camera::Background::Blur };
             umi_ai::camera::process_background(bundle, m, &|_| {}).unwrap();
             let out = bundle.join(m.file());
-            println!("{} ({:.1} MB, {:.2}s) in {:.1}s", out.display(), std::fs::metadata(&out).unwrap().len() as f64 / 1e6, umi_media::duration(&out).unwrap(), t.elapsed().as_secs_f64());
+            println!(
+                "{} ({:.1} MB, {:.2}s) in {:.1}s",
+                out.display(),
+                std::fs::metadata(&out).unwrap().len() as f64 / 1e6,
+                umi_media::duration(&out).unwrap(),
+                t.elapsed().as_secs_f64()
+            );
         }
     }
 }

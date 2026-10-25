@@ -37,7 +37,10 @@ impl Segmenter {
     pub fn mask(&mut self, rgba: &[u8], width: u32, height: u32) -> Result<Vec<f32>, AiError> {
         let input = planar_rgb(rgba, width, height, MASK_SIZE, MASK_SIZE, |v| v as f32 / 255.0);
         let err = |e: ort::Error| AiError::Model(e.to_string());
-        let outputs = self.session.run(ort::inputs!["pixel_values" => Tensor::from_array(([1usize, 3, MASK_SIZE, MASK_SIZE], input)).map_err(err)?]).map_err(err)?;
+        let outputs = self
+            .session
+            .run(ort::inputs!["pixel_values" => Tensor::from_array(([1usize, 3, MASK_SIZE, MASK_SIZE], input)).map_err(err)?])
+            .map_err(err)?;
         let (_, data) = outputs[0].try_extract_tensor::<f32>().map_err(err)?;
         Ok(data.to_vec())
     }
@@ -73,7 +76,8 @@ impl FaceDetector {
     pub fn detect(&mut self, rgba: &[u8], width: u32, height: u32) -> Result<Vec<Face>, AiError> {
         let input = planar_rgb(rgba, width, height, 320, 240, |v| (v as f32 - 127.0) / 128.0);
         let err = |e: ort::Error| AiError::Model(e.to_string());
-        let outputs = self.session.run(ort::inputs!["input" => Tensor::from_array(([1usize, 3, 240, 320], input)).map_err(err)?]).map_err(err)?;
+        let outputs =
+            self.session.run(ort::inputs!["input" => Tensor::from_array(([1usize, 3, 240, 320], input)).map_err(err)?]).map_err(err)?;
         let (_, scores) = outputs[0].try_extract_tensor::<f32>().map_err(err)?;
         let (_, boxes) = outputs[1].try_extract_tensor::<f32>().map_err(err)?;
         let mut faces: Vec<Face> = scores

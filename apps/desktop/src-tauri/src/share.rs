@@ -23,7 +23,11 @@ fn config_file() -> PathBuf {
 }
 
 fn server() -> String {
-    std::fs::read(config_file()).ok().and_then(|b| serde_json::from_slice::<CloudConfig>(&b).ok()).and_then(|c| c.server).unwrap_or_else(|| DEFAULT_SERVER.into())
+    std::fs::read(config_file())
+        .ok()
+        .and_then(|b| serde_json::from_slice::<CloudConfig>(&b).ok())
+        .and_then(|c| c.server)
+        .unwrap_or_else(|| DEFAULT_SERVER.into())
 }
 
 fn token() -> Option<String> {
@@ -73,7 +77,9 @@ pub async fn cloud_connect(server: String, token: String) -> Result<CloudStatus,
     let server = server.trim().trim_end_matches('/').to_string();
     let token = token.trim().to_string();
     tauri::async_runtime::spawn_blocking(move || {
-        Client::new(&server, &token).check().map_err(|e| if e.unauthorized() { "That token wasn't accepted.".to_string() } else { e.to_string() })?;
+        Client::new(&server, &token)
+            .check()
+            .map_err(|e| if e.unauthorized() { "That token wasn't accepted.".to_string() } else { e.to_string() })?;
         keyring::Entry::new(KEYCHAIN_SERVICE, "token").and_then(|e| e.set_password(&token)).map_err(|e| e.to_string())?;
         let json = serde_json::to_vec(&CloudConfig { server: Some(server.clone()) }).map_err(|e| e.to_string())?;
         std::fs::write(config_file(), json).map_err(|e| e.to_string())?;
@@ -147,7 +153,8 @@ pub async fn share_start(state: State<'_, AppState>, id: String, progress: Chann
             &|p| send("upload", p, None),
         );
         let _ = std::fs::remove_dir_all(&folder);
-        let video = result.map_err(|e| if e.needs_plan() { "Sharing links needs an Umi Cloud plan.".to_string() } else { e.to_string() })?;
+        let video =
+            result.map_err(|e| if e.needs_plan() { "Sharing links needs an Umi Cloud plan.".to_string() } else { e.to_string() })?;
         remember(&bundle, &video);
         send("done", 1.0, Some(video.clone()));
         Ok(video)
@@ -218,7 +225,13 @@ fn double_option<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Option
 
 impl From<SettingsInput> for Settings {
     fn from(s: SettingsInput) -> Self {
-        Settings { title: None, allow_download: s.allow_download, allow_comments: s.allow_comments, password: s.password, expires_at: s.expires_at }
+        Settings {
+            title: None,
+            allow_download: s.allow_download,
+            allow_comments: s.allow_comments,
+            password: s.password,
+            expires_at: s.expires_at,
+        }
     }
 }
 
