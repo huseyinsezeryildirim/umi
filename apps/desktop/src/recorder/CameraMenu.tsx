@@ -11,7 +11,7 @@ import { recorder, type RecordSettings } from "./api";
  */
 export function CameraMenu() {
   const [settings, setSettings] = createSignal<RecordSettings | null>(null);
-  const [sources] = createResource(() => recorder.sources());
+  const [sources, { refetch }] = createResource(() => recorder.sources());
   const [centerStage, setCenterStage] = createSignal<boolean | null>(null);
 
   let box!: HTMLDivElement;
@@ -22,6 +22,14 @@ export function CameraMenu() {
     onCleanup(() => ro.disconnect());
     void recorder.settings().then(setSettings);
     void invoke<boolean | null>("camera_center_stage").then(setCenterStage);
+    // Made ahead and hidden: read the cameras and settings again each time it opens.
+    const opened = () => {
+      void refetch();
+      void recorder.settings().then(setSettings);
+      void invoke<boolean | null>("camera_center_stage").then(setCenterStage);
+    };
+    window.addEventListener("focus", opened);
+    onCleanup(() => window.removeEventListener("focus", opened));
     const close = () => void recorder.hide("camera");
     const key = (e: KeyboardEvent) => e.key === "Escape" && close();
     window.addEventListener("blur", close);

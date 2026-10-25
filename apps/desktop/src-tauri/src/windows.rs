@@ -83,6 +83,12 @@ fn show_window(app: &AppHandle, spec: &Spec, at: Option<(f64, f64)>) -> tauri::R
         }
         return Ok(w);
     }
+    let window = build(app, spec, place, true)?;
+    Ok(window)
+}
+
+/// Makes a window for `spec` at `place`, shown or not.
+fn build(app: &AppHandle, spec: &Spec, place: (f64, f64), visible: bool) -> tauri::Result<WebviewWindow> {
     let window = WebviewWindowBuilder::new(app, spec.view, WebviewUrl::App(format!("index.html?view={}", spec.view).into()))
         .title("Umi")
         .inner_size(spec.size.0, spec.size.1)
@@ -94,9 +100,10 @@ fn show_window(app: &AppHandle, spec: &Spec, at: Option<(f64, f64)>) -> tauri::R
         .skip_taskbar(spec.transparent)
         .shadow(!spec.transparent)
         .visible_on_all_workspaces(true)
-        .focused(spec.focus)
+        .focused(spec.focus && visible)
         // A click on the bar or the bubble works at once (not just brings the window forward).
         .accept_first_mouse(spec.transparent)
+        .visible(visible)
         .build()?;
     if spec.transparent {
         float_over_full_screen(&window, 25);
@@ -129,36 +136,30 @@ pub fn float_over_full_screen(window: &WebviewWindow, level: isize) {
     }
 }
 
-/// Makes the countdown's full-screen window now, unseen, so the 3 shows the moment Start is
-/// pressed (a window's first load takes a moment).
-pub fn prepare_countdown(app: &AppHandle) {
-    if app.get_webview_window("countdown").is_some() {
-        return;
-    }
+/// Makes the windows that show up while recording (countdown, control bar, camera menu) now,
+/// unseen: the countdown shows the moment Start is pressed (a window's first load takes a
+/// moment), and the recording leaves them out from its first frame (they already exist).
+pub fn prepare_recording_windows(app: &AppHandle) {
     let (origin, display) = main_display(app);
-    if let Ok(w) = WebviewWindowBuilder::new(app, "countdown", WebviewUrl::App("index.html?view=countdown".into()))
-        .title("Umi")
-        .inner_size(display.width, display.height)
-        .position(origin.x, origin.y)
-        .decorations(false)
-        .transparent(true)
-        .always_on_top(true)
-        .resizable(false)
-        .skip_taskbar(true)
-        .shadow(false)
-        .visible_on_all_workspaces(true)
-        .focused(false)
-        .visible(false)
-        .build()
-    {
-        let _ = w.set_ignore_cursor_events(true);
-        float_over_full_screen(&w, 25);
+    let countdown = Spec { view: "countdown", size: (display.width, display.height), transparent: true, focus: false };
+    for (spec, place) in [
+        (&countdown, (origin.x, origin.y)),
+        (&CONTROLS, (origin.x + 16.0, origin.y + (display.height - CONTROLS.size.1) / 2.0)),
+        (&CAMERA_MENU, (origin.x + 16.0, origin.y + 40.0)),
+    ] {
+        if app.get_webview_window(spec.view).is_none() {
+            if let Ok(w) = build(app, spec, place, false) {
+                if spec.view == "countdown" {
+                    let _ = w.set_ignore_cursor_events(true);
+                }
+            }
+        }
     }
 }
 
 /// The recorder, with the camera bubble when the camera was left on.
 pub fn show_launcher(app: &AppHandle, at: Option<(f64, f64)>) -> tauri::Result<WebviewWindow> {
-    prepare_countdown(app);
+    prepare_recording_windows(app);
     let window = show(app, &LAUNCHER, at)?;
     let settings = crate::recording::load_settings();
     if settings.camera_on || settings.camera_only {
