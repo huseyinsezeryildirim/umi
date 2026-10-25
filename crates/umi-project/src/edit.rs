@@ -79,6 +79,33 @@ pub struct EditSettings {
     /// while it plays.
     #[serde(default, deserialize_with = "t", skip_serializing_if = "Vec::is_empty")]
     pub voiceovers: Vec<Voiceover>,
+    /// Voice clean-up and levels.
+    #[serde(default, deserialize_with = "t", skip_serializing_if = "Sound::is_default")]
+    pub sound: Sound,
+}
+
+/// How the recording's own sound is treated.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Sound {
+    /// Remove background noise (fans, hum, keyboard) from the microphone.
+    pub denoise: bool,
+    /// Even out the voice: quiet parts up, loud parts down.
+    pub level_voice: bool,
+    pub microphone_volume: f64,
+    pub system_volume: f64,
+}
+
+impl Default for Sound {
+    fn default() -> Self {
+        Self { denoise: false, level_voice: false, microphone_volume: 1.0, system_volume: 1.0 }
+    }
+}
+
+impl Sound {
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
 }
 
 // Fields whose default isn't the type's zero value need their own tolerant decoder.
@@ -146,6 +173,7 @@ impl Default for EditSettings {
             overlays: vec![],
             watermark: None,
             voiceovers: vec![],
+            sound: Sound::default(),
         }
     }
 }

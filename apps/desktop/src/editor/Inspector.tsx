@@ -49,6 +49,12 @@ export function Inspector(props: { editor: Editor }) {
   const ed = props.editor;
   const [tab, setTab] = createSignal<Tab>("background");
   const [cropping, setCropping] = createSignal(false);
+  const sound = () => edit().sound ?? { denoise: false, levelVoice: false, microphoneVolume: 1, systemVolume: 1 };
+  const setSound = (change: (s: NonNullable<EditSettings["sound"]>) => void) =>
+    set((e) => {
+      e.sound ??= { denoise: false, levelVoice: false, microphoneVolume: 1, systemVolume: 1 };
+      change(e.sound);
+    });
   createEffect(() => {
     const request = ed.panelRequest();
     if (request) setTab(request.tab as Tab);
@@ -259,6 +265,12 @@ export function Inspector(props: { editor: Editor }) {
           </Match>
 
           <Match when={tab() === "audio"}>
+            <Section title="Voice" icon={<Mic size={15} />} hint="Runs on this computer. Undo or switch off any time.">
+              <SwitchRow label="Remove background noise" checked={sound().denoise} onChange={(v) => setSound((x) => (x.denoise = v))} />
+              <SwitchRow label="Even out voice volume" checked={sound().levelVoice} onChange={(v) => setSound((x) => (x.levelVoice = v))} />
+              <SliderField label="Microphone" value={sound().microphoneVolume} max={2} format={pct} onInput={(v) => setSound((x) => (x.microphoneVolume = v))} {...gesture} />
+              <SliderField label="Computer sound" value={sound().systemVolume} max={2} format={pct} onInput={(v) => setSound((x) => (x.systemVolume = v))} {...gesture} />
+            </Section>
             <Section title="Clips" icon={<Scissors size={15} />} hint="Blends each cut into the next clip.">
               <SliderField label="Crossfade" value={edit().crossfade} max={1.5} format={(v) => `${v.toFixed(1)}s`} onInput={(v) => set((e) => (e.crossfade = v))} {...gesture} />
             </Section>
