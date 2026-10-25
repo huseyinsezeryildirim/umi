@@ -6591,6 +6591,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "umi-mcp"
+version = "0.2.0"
+dependencies = [
+ "dirs 6.0.0",
+ "serde",
+ "serde_json",
+ "umi-ai",
+ "umi-engine",
+ "umi-media",
+ "umi-project",
+ "umi-render",
+ "uuid",
+]
+
+[[package]]
 name = "umi-media"
 version = "0.2.0"
 dependencies = [

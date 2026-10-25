@@ -1,0 +1,24 @@
+[package]
+name = "umi-mcp"
+description = "MCP server so AI agents (Claude Code, Claude Desktop…) can find, transcribe, edit and export Umi recordings."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "umi-mcp"
+path = "src/main.rs"
+
+[dependencies]
+umi-project.workspace = true
+umi-engine = { path = "../umi-engine" }
+umi-render = { path = "../umi-render" }
+umi-media = { path = "../umi-media" }
+umi-ai = { path = "../umi-ai" }
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+dirs = "6"
+
+[lints]
+workspace = true
