@@ -6,14 +6,11 @@ import { clientIp, throttle } from "./limits";
 import { getVideo } from "./videos";
 
 const REASONS = ["spam", "abuse", "copyright", "illegal", "other"] as const;
-/**
- * Different people reporting a video before it's hidden for review: 2 for illegal content, 3
- * otherwise. Never one, so a single person (a rival, a troll) can't take a video down.
- */
-const HIDE_AFTER = 3;
-const HIDE_AFTER_ILLEGAL = 2;
 
-/** POST /v/:id/report — { reason, details? } from the viewer page. */
+/**
+ * POST /v/:id/report — { reason, details? } from the viewer page. Reports wait in the moderation
+ * panel (/adagiris) for a decision; nothing is hidden or deleted automatically.
+ */
 export async function postReport(request: Request, env: AppEnv, id: string): Promise<Response> {
   if (!/^application\/json\b/i.test(request.headers.get("content-type") ?? "")) {
     throw new HttpError(415, "unsupported_media_type", "Send JSON with Content-Type: application/json.");
@@ -33,20 +30,15 @@ export async function postReport(request: Request, env: AppEnv, id: string): Pro
   await env.DB.prepare("INSERT OR IGNORE INTO reports (id, video_id, reason, details, ip_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)")
     .bind(randomId(), id, reason, details || null, ipHash, now)
     .run();
-  const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE video_id = ?").bind(id).first<{ n: number }>();
+  const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE video_id = ? AND resolved_at IS NULL").bind(id).first<{ n: number }>();
   const n = count?.n ?? 0;
-  const illegal = await env.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE video_id = ? AND reason = 'illegal'").bind(id).first<{ n: number }>();
-  const hide = n >= HIDE_AFTER || (illegal?.n ?? 0) >= HIDE_AFTER_ILLEGAL;
-  if (!video.flagged_at && hide) {
-    await env.DB.prepare("UPDATE videos SET flagged_at = ? WHERE id = ? AND flagged_at IS NULL").bind(now, id).run();
-  }
   const to = env.ABUSE_EMAIL;
   if (to) {
     await sendEmail(env, {
       to,
       subject: `Report (${reason}) on video ${id}`,
       html: "",
-      text: `Video ${id} ("${video.title}") was reported: ${reason}.\n${details ?? ""}\nReports so far: ${n}.\nHidden for review: ${video.flagged_at || hide ? "yes" : "no"}.`,
+      text: `Video ${id} ("${video.title}") was reported: ${reason}.\n${details ?? ""}\nOpen reports on it: ${n}.\nDecide in the moderation panel: ${new URL("/adagiris", request.url).toString()}`,
     }).catch(() => {});
   }
   return json({ ok: true });

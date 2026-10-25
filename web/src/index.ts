@@ -1,3 +1,4 @@
+import { handleAdmin } from "./admin";
 import { postReport } from "./reports";
 import type { AppEnv } from "./env";
 import { handleApi } from "./api";
@@ -19,6 +20,7 @@ async function route(request: Request, env: AppEnv): Promise<Response> {
 
   if (pathname === "/" && method === "GET") return Response.redirect("https://umi.cam", 302);
   if (pathname === "/healthz") return json({ ok: true });
+  if (pathname === "/adagiris" || pathname.startsWith("/adagiris/")) return handleAdmin(request, env, pathname);
 
   if ((m = /^\/v\/([0-9A-Za-z]+)\/?$/.exec(pathname)) && method === "GET") return handleViewer(request, env, m[1]!);
   if ((m = /^\/v\/([0-9A-Za-z]+)\/unlock$/.exec(pathname)) && method === "POST") return handleUnlock(request, env, m[1]!);

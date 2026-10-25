@@ -21,10 +21,14 @@
     "SITE_URL": "http://localhost:3210",
     // "resend", "brevo" or "log" (print emails to the Worker log; local development).
     "EMAIL_PROVIDER": "log",
-    "EMAIL_FROM": "Umi <hello@umi.cam>"
+    "EMAIL_FROM": "Umi <hello@umi.cam>",
+    // Viewer reports are emailed here, and this email signs in to the moderation panel (/adagiris).
+    "ABUSE_EMAIL": "hi@ux.center",
+    "ADMIN_EMAIL": "hi@ux.center"
   },
   // Secrets (set with `wrangler secret put`, or in .dev.vars locally):
   //   SIGNING_SECRET        HMAC key for upload URLs and password-unlock cookies (required)
+  //   ADMIN_PASSWORD        password for the moderation panel at /adagiris (sign in with ADMIN_EMAIL)
   //   R2_ACCESS_KEY_ID      only with R2_S3_ENDPOINT
   //   R2_SECRET_ACCESS_KEY  only with R2_S3_ENDPOINT
   //   RESEND_API_KEY        with EMAIL_PROVIDER "resend"
@@ -60,7 +64,9 @@
         "SITE_ORIGINS": "https://staging.umi-site.pages.dev",
         "SITE_URL": "https://staging.umi-site.pages.dev",
         "EMAIL_PROVIDER": "log",
-        "EMAIL_FROM": "Umi <hello@umi.cam>"
+        "EMAIL_FROM": "Umi <hello@umi.cam>",
+        "ABUSE_EMAIL": "hi@ux.center",
+        "ADMIN_EMAIL": "hi@ux.center"
       },
       "ratelimits": [{ "name": "VIEW_LIMIT", "namespace_id": "1001", "simple": { "limit": 600, "period": 60 } }, { "name": "ACTION_LIMIT", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } }],
       "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "umi-videos-staging" }],
@@ -81,7 +87,8 @@
         { "pattern": "umi.cam/e/*", "zone_name": "umi.cam" },
         { "pattern": "umi.cam/api/*", "zone_name": "umi.cam" },
         { "pattern": "umi.cam/oembed*", "zone_name": "umi.cam" },
-        { "pattern": "umi.cam/healthz", "zone_name": "umi.cam" }
+        { "pattern": "umi.cam/healthz", "zone_name": "umi.cam" },
+        { "pattern": "umi.cam/adagiris*", "zone_name": "umi.cam" }
       ],
       "vars": {
         "PUBLIC_BASE_URL": "https://umi.cam",
@@ -92,7 +99,9 @@
         "SITE_ORIGINS": "https://umi.cam",
         "SITE_URL": "https://umi.cam",
         "EMAIL_PROVIDER": "resend",
-        "EMAIL_FROM": "Umi <hello@umi.cam>"
+        "EMAIL_FROM": "Umi <hello@umi.cam>",
+        "ABUSE_EMAIL": "hi@ux.center",
+        "ADMIN_EMAIL": "hi@ux.center"
       },
       "ratelimits": [{ "name": "VIEW_LIMIT", "namespace_id": "1001", "simple": { "limit": 600, "period": 60 } }, { "name": "ACTION_LIMIT", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } }],
       "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "umi-videos" }],

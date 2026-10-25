@@ -8,6 +8,9 @@ export interface AppEnv extends Env {
   DEV_TOOLS?: string;
   /** Where viewer reports go (optional). */
   ABUSE_EMAIL?: string;
+  /** The moderation panel's sign-in (/adagiris): email as a var, password as a secret. */
+  ADMIN_EMAIL?: string;
+  ADMIN_PASSWORD?: string;
 }
 
 export function baseUrl(env: AppEnv, request: Request): string {
