@@ -1,7 +1,8 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { Button, Dialog, IconButton, Menu, Spinner, toast } from "@umi/ui";
-import { Film, FolderOpen, MoreHorizontal, Trash2 } from "lucide-solid";
+import { Button, Dialog, IconButton, Menu, Progress, Spinner, toast } from "@umi/ui";
+import { Download, Film, FolderOpen, MoreHorizontal, Trash2, Upload } from "lucide-solid";
 import { Editor } from "./editor/Editor";
 import { createEditor, formatTime, type Editor as EditorModel } from "./editor/store";
 import type { EditorState, RecordingSummary } from "./editor/types";
@@ -38,11 +39,33 @@ export function App() {
 }
 
 function Library(props: { recordings: RecordingSummary[]; loading: boolean; opening: string | null; onOpen: (path: string) => void; onChanged: () => void }) {
+  const [loom, setLoom] = createSignal(false);
+  const importFiles = async () => {
+    const picked = await openDialog({ title: "Import videos", multiple: true, filters: [{ name: "Videos", extensions: ["mp4", "mov", "m4v", "webm", "mkv"] }] });
+    const paths = Array.isArray(picked) ? picked : picked ? [picked] : [];
+    if (!paths.length) return;
+    try {
+      const made = await invoke<string[]>("import_videos", { paths });
+      toast(made.length === 1 ? "Video imported" : `${made.length} videos imported`);
+      props.onChanged();
+    } catch (e) {
+      toast(String(e));
+    }
+  };
   return (
     <div class="lib" data-tauri-drag-region>
       <header class="lib__header" data-tauri-drag-region>
         <h1>Recordings</h1>
+        <div class="lib__actions">
+          <Button size="sm" onClick={() => void importFiles()}>
+            <Upload size={14} /> Import video
+          </Button>
+          <Button size="sm" onClick={() => setLoom(true)}>
+            <Download size={14} /> Import from Loom
+          </Button>
+        </div>
       </header>
+      <LoomImport open={loom()} onClose={() => setLoom(false)} onDone={props.onChanged} />
       <Show when={!props.loading} fallback={<Spinner />}>
         <div class="lib__grid">
           <For each={props.recordings} fallback={<p class="lib__empty">No recordings yet.</p>}>
@@ -138,5 +161,63 @@ function RecordingCard(props: { recording: RecordingSummary; index: number; open
         <div class="lib__sub">{new Date(props.recording.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</div>
       </div>
     </div>
+  );
+}
+
+/** Paste Loom share links; each video downloads into the library (free, no account needed). */
+function LoomImport(props: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const [links, setLinks] = createSignal("");
+  const [progress, setProgress] = createSignal<{ index: number; total: number; value: number } | null>(null);
+  const run = async () => {
+    const list = links()
+      .split(/\s+/)
+      .map((l) => l.trim())
+      .filter((l) => l.includes("loom.com/"));
+    if (!list.length) return toast("Paste one or more loom.com/share/… links");
+    let done = 0;
+    for (const [index, link] of list.entries()) {
+      const channel = new Channel<number>();
+      channel.onmessage = (value) => setProgress({ index, total: list.length, value });
+      setProgress({ index, total: list.length, value: 0 });
+      try {
+        await invoke("import_loom", { link, progress: channel });
+        done++;
+      } catch (e) {
+        toast(String(e));
+      }
+    }
+    setProgress(null);
+    if (done) {
+      toast(done === 1 ? "Loom video imported" : `${done} Loom videos imported`);
+      props.onDone();
+      setLinks("");
+      props.onClose();
+    }
+  };
+  return (
+    <Dialog open={props.open} title="Import from Loom" onClose={() => !progress() && props.onClose()} width={480}>
+      <p class="umi-section__hint" style={{ "margin-top": "-6px" }}>
+        Paste share links, one per line. Videos must be viewable by anyone with the link. They're downloaded to this computer and become recordings you can edit.
+      </p>
+      <textarea class="umi-input ed-script" style={{ "min-height": "110px", width: "100%" }} placeholder="https://www.loom.com/share/…" value={links()} onInput={(e) => setLinks(e.currentTarget.value)} />
+      <Show when={progress()}>
+        {(p) => (
+          <div style={{ display: "flex", "flex-direction": "column", gap: "6px", "margin-top": "10px" }}>
+            <div class="umi-section__hint">
+              Downloading {p().index + 1} of {p().total}… {Math.round(p().value * 100)}%
+            </div>
+            <Progress value={p().value} />
+          </div>
+        )}
+      </Show>
+      <div style={{ display: "flex", gap: "8px", "justify-content": "flex-end", "margin-top": "14px" }}>
+        <Button onClick={props.onClose} disabled={!!progress()}>
+          Cancel
+        </Button>
+        <Button variant="ink" onClick={() => void run()} disabled={!!progress() || !links().trim()}>
+          <Download size={14} /> Import
+        </Button>
+      </div>
+    </Dialog>
   );
 }

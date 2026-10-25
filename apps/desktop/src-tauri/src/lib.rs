@@ -3,6 +3,7 @@
 
 mod assets;
 mod editor;
+mod import;
 mod presets;
 
 use editor::{EditorSession, EditorState, Op};
@@ -382,6 +383,30 @@ fn ai_models() -> Vec<ModelInfo> {
     umi_ai::models::Model::ALL.iter().map(|m| ModelInfo { model: *m, purpose: m.purpose(), ready: m.is_ready() }).collect()
 }
 
+/// Video files → new recordings in the library.
+#[tauri::command]
+async fn import_videos(paths: Vec<PathBuf>) -> Result<Vec<PathBuf>, String> {
+    tauri::async_runtime::spawn_blocking(move || paths.iter().map(|p| import::import_file(&library_folder(), p, None)).collect())
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// A Loom share link → a new recording (downloaded); progress 0…1.
+#[tauri::command]
+async fn import_loom(link: String, progress: tauri::ipc::Channel<f64>) -> Result<PathBuf, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let last = std::sync::atomic::AtomicU32::new(0);
+        import::import_loom(&library_folder(), &link, &|p| {
+            let step = (p * 100.0) as u32;
+            if step != last.swap(step, Ordering::Relaxed) {
+                let _ = progress.send(p);
+            }
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 fn editor_close(state: State<'_, AppState>, id: String) -> Result<(), String> {
     if let Some(editor) = state.editors.lock().remove(&id) {
@@ -465,6 +490,8 @@ pub fn run() {
             editor_export,
             editor_export_cancel,
             export_default_path,
+            import_videos,
+            import_loom,
             editor_transcribe,
             editor_voiceover,
             editor_save_subtitles,

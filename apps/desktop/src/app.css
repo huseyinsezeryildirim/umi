@@ -126,3 +126,11 @@
 .lib__more:focus-within {
   opacity: 1;
 }
+.lib__header {
+  justify-content: space-between;
+  padding-right: 4px;
+}
+.lib__actions {
+  display: flex;
+  gap: 8px;
+}
