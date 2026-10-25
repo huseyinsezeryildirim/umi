@@ -1305,38 +1305,90 @@
 .ed-viewers {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 10px;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
   background: var(--umi-ice-top);
   box-shadow: inset 0 0 0 1px var(--umi-hairline);
 }
 .ed-viewers__stats {
-  display: flex;
-  gap: 16px;
-  font-size: var(--umi-text-sm);
-  color: var(--umi-ink);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
 }
 .ed-viewers__stats div {
   display: flex;
-  align-items: center;
-  gap: 5px;
+  flex-direction: column;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--umi-hairline);
 }
 .ed-viewers__stats b {
+  font-size: 17px;
   font-weight: var(--umi-weight-semibold);
-  color: var(--umi-accent);
+  letter-spacing: -0.01em;
+  color: var(--umi-ink);
+  font-variant-numeric: tabular-nums;
+}
+.ed-viewers__stats span {
+  font-size: 11.5px;
+  color: var(--umi-text-3);
+}
+.ed-viewers__block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ed-viewers__label {
+  font-size: 11.5px;
+  font-weight: var(--umi-weight-medium);
+  color: var(--umi-text-3);
 }
 .ed-viewers__curve {
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  height: 34px;
+  height: 38px;
 }
 .ed-viewers__curve span {
   flex: 1;
   border-radius: 2px 2px 0 0;
+  background: linear-gradient(180deg, #6fb5ef, var(--umi-accent));
+}
+.ed-viewers__country {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 7.5em) 1fr 2.5em;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--umi-text-sm);
+}
+.ed-viewers__flag {
+  font-size: 14px;
+  line-height: 1;
+}
+.ed-viewers__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--umi-ink);
+}
+.ed-viewers__bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(17, 111, 245, 0.1);
+  overflow: hidden;
+}
+.ed-viewers__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
   background: var(--umi-accent);
-  opacity: 0.75;
+}
+.ed-viewers__country b {
+  text-align: right;
+  font-weight: var(--umi-weight-semibold);
+  font-variant-numeric: tabular-nums;
 }
 .ed-insights {
   display: flex;

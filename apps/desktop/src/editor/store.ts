@@ -45,7 +45,10 @@ function toRust(selection: Selection) {
  */
 export function createEditor(initial: EditorState) {
   const [state, setState] = createSignal(initial);
+  // `?t=` (development and the website demo) starts the playhead somewhere else.
+  const startAt = (import.meta.env.DEV || import.meta.env.VITE_DEMO) ? Number(new URLSearchParams(location.search).get("t")) || 0 : 0;
   const [time, setTime] = createSignal(0);
+  if (startAt) setTimeout(() => setTime(startAt), 900);
   const [playing, setPlaying] = createSignal(false);
   /** Selected items; the last one is the "primary" one the inspector shows. */
   const [selected, setSelected] = createSignal<Selection[]>([]);
