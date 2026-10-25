@@ -3,10 +3,10 @@
 import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { Launcher } from "../recorder/Launcher";
 import { Controls } from "../recorder/Controls";
+import { Bubble } from "../recorder/Bubble";
 import { tourIndex } from "./tour";
 import wallpaper from "./wallpaper.jpg";
 import screen from "./screen-a.jpg";
-import webcam from "./camera.mp4";
 import "./desktop.css";
 
 /** Where the cursor goes while recording (percent of the app window), and the clicks. */
@@ -23,14 +23,27 @@ const CLICKS = [1.2, 4.7];
 export function DesktopDemo() {
   const [count, setCount] = createSignal<number | null>(null);
   const [recording, setRecording] = createSignal(false);
-  const [camera, setCamera] = createSignal(false);
+  // The camera bubble is the app's own, shown and sized the way the app asks for its window.
+  const [bubble, setBubble] = createSignal(false);
+  const [bubbleSize, setBubbleSize] = createSignal(220);
+  const onWindow = (e: Event) => {
+    const { view, shown } = (e as CustomEvent<{ view: string; shown: boolean }>).detail;
+    if (view === "bubble") setBubble(shown);
+  };
+  const onResize = (e: Event) => {
+    // Only the bubble asks for a square window.
+    const { width, height } = (e as CustomEvent<{ width: number; height: number }>).detail;
+    if (width === height) setBubbleSize(width);
+  };
+  addEventListener("demo:window", onWindow);
+  addEventListener("demo:resize", onResize);
+  onCleanup(() => (removeEventListener("demo:window", onWindow), removeEventListener("demo:resize", onResize)));
   const [t, setT] = createSignal(0);
   // Steps (see tour.tsx): 0 menu bar, 1 camera, 2 start, 3 recording, 4 stop.
   const launcher = () => tourIndex() >= 1 && tourIndex() <= 2;
 
   createEffect(
     on(tourIndex, (i) => {
-      if (i === 2) setCamera(true);
       if (i === 3 && !recording()) {
         setCount(3);
         const a = setTimeout(() => setCount(2), 900);
@@ -105,9 +118,9 @@ export function DesktopDemo() {
         </div>
       </Show>
 
-      <Show when={camera()}>
-        <div class="desk__bubble">
-          <video src={webcam} autoplay muted loop playsinline />
+      <Show when={bubble()}>
+        <div class="desk__bubble" style={{ width: `${bubbleSize() + 12}px`, height: `${bubbleSize() + 12}px` }}>
+          <Bubble />
         </div>
       </Show>
 

@@ -211,10 +211,7 @@ export function Footer() {
           </div>
         ))}
       </div>
-      <div className="mx-auto mt-14 flex max-w-6xl items-center justify-between text-xs text-faint">
-        <p>© 2026 Umi</p>
-        <p>Photos from Pexels</p>
-      </div>
+      <p className="mx-auto mt-14 max-w-6xl text-xs text-faint">© 2026 Umi</p>
     </footer>
   );
 }
