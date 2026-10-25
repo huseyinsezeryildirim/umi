@@ -1,10 +1,16 @@
 //! Region tracking for privacy masks: a blur "sticks" to what's under it (a message, a
 //! window, a face) as the screen scrolls and moves.
 //!
-//! Frames over the mask's span are decoded once into small luma images; the area at the
-//! anchor time (where the user placed the mask) is then followed forward to the end and
-//! backward to the start by template matching (zero-mean SSD, coarse-to-fine), with the
-//! template adapting slowly so gradual changes don't lose the lock.
+//! Frames over the mask's span are decoded once into small luma images. From the anchor
+//! (where the user placed the mask) the area is followed forward and backward:
+//!
+//! 1. **Motion**: a wide context around the mask (more texture, so fast scrolls still lock)
+//!    is matched over a large window to find how the content moved.
+//! 2. **Refine**: the mask's own patch is matched in a small window around that prediction.
+//!
+//! Positions may leave the image: content scrolled off screen takes the mask with it, and
+//! partly visible patches are compared on their visible part only (no jumping to a
+//! look-alike when the real content is gone).
 
 use std::path::Path;
 use umi_media::{DecodedFrame, FrameFormat, MediaError, VideoDecoder};
@@ -15,6 +21,8 @@ use umi_project::edit::MaskKeyframe;
 const WORK_WIDTH: usize = 480;
 /// Analysis rate (and keyframes per second written).
 pub const TRACK_FPS: f64 = 30.0;
+/// Samples per side of a matched patch (patches are subsampled to about this size).
+const SAMPLES: usize = 28;
 
 struct Gray {
     w: usize,
@@ -52,78 +60,170 @@ impl Gray {
         }
         Gray { w, h, px }
     }
+
+    fn at(&self, x: i64, y: i64) -> Option<f32> {
+        (x >= 0 && y >= 0 && (x as usize) < self.w && (y as usize) < self.h).then(|| self.px[y as usize * self.w + x as usize] as f32)
+    }
 }
 
+/// A subsampled patch: `cols × rows` samples spread over its size, with a validity flag per
+/// sample (off-image samples are skipped when comparing).
+#[derive(Clone)]
 struct Patch {
     cols: usize,
     rows: usize,
-    step: usize,
+    sx: f64,
+    sy: f64,
     values: Vec<f32>,
+    valid: Vec<bool>,
 }
 
-fn sample(img: &Gray, x: usize, y: usize, p: &Patch) -> Vec<f32> {
-    let mut v = Vec::with_capacity(p.cols * p.rows);
-    for r in 0..p.rows {
-        for c in 0..p.cols {
-            let (px, py) = ((x + c * p.step).min(img.w - 1), (y + r * p.step).min(img.h - 1));
-            v.push(img.px[py * img.w + px] as f32);
-        }
+impl Patch {
+    fn new(w: i64, h: i64) -> Patch {
+        let cols = SAMPLES.min(w.max(1) as usize);
+        let rows = SAMPLES.min(h.max(1) as usize);
+        Patch { cols, rows, sx: w as f64 / cols as f64, sy: h as f64 / rows as f64, values: vec![], valid: vec![] }
     }
-    let mean = v.iter().sum::<f32>() / v.len().max(1) as f32;
-    v.iter_mut().for_each(|q| *q -= mean);
-    v
+
+    /// Samples the patch with its top-left at (x, y); returns values (mean removed over the
+    /// valid ones) and validity.
+    fn sample(&self, img: &Gray, x: i64, y: i64) -> (Vec<f32>, Vec<bool>) {
+        let mut v = Vec::with_capacity(self.cols * self.rows);
+        let mut ok = Vec::with_capacity(self.cols * self.rows);
+        for r in 0..self.rows {
+            for c in 0..self.cols {
+                let px = x + (c as f64 * self.sx) as i64;
+                let py = y + (r as f64 * self.sy) as i64;
+                match img.at(px, py) {
+                    Some(p) => {
+                        v.push(p);
+                        ok.push(true);
+                    }
+                    None => {
+                        v.push(0.0);
+                        ok.push(false);
+                    }
+                }
+            }
+        }
+        let n = ok.iter().filter(|b| **b).count().max(1) as f32;
+        let mean = v.iter().zip(&ok).filter(|(_, b)| **b).map(|(p, _)| *p).sum::<f32>() / n;
+        for (p, b) in v.iter_mut().zip(&ok) {
+            if *b {
+                *p -= mean;
+            }
+        }
+        (v, ok)
+    }
+
+    fn grab(&mut self, img: &Gray, x: i64, y: i64) {
+        let (v, ok) = self.sample(img, x, y);
+        self.values = v;
+        self.valid = ok;
+    }
+
+    /// Mean squared difference over samples valid in both, raised when little overlaps
+    /// (a sliver at the image edge matches anything); `None` under 30 % overlap.
+    fn cost(&self, img: &Gray, x: i64, y: i64) -> Option<f32> {
+        let (v, ok) = self.sample(img, x, y);
+        let mut sum = 0.0;
+        let mut n = 0usize;
+        for i in 0..v.len() {
+            if ok[i] && self.valid[i] {
+                let d = v[i] - self.values[i];
+                sum += d * d;
+                n += 1;
+            }
+        }
+        let cover = n as f32 / v.len() as f32;
+        (cover >= 0.3).then(|| sum / n as f32 / cover)
+    }
+
+    /// Best position around (cx, cy) within ±(rx, ry), testing every `s` px. Far moves
+    /// cost more (`reach` px doubles the cost), so a look-alike elsewhere on the page (a
+    /// grid of thumbnails, repeated rows) loses to the nearby true match.
+    fn search(&self, img: &Gray, cx: i64, cy: i64, rx: i64, ry: i64, s: i64, reach: f32) -> Option<(i64, i64, f32)> {
+        let mut best: Option<(i64, i64, f32)> = None;
+        let mut dy = -ry;
+        while dy <= ry {
+            let mut dx = -rx;
+            while dx <= rx {
+                if let Some(c) = self.cost(img, cx + dx, cy + dy) {
+                    let d2 = (dx * dx + dy * dy) as f32 / (reach * reach);
+                    let c = (c + 1.0) * (1.0 + d2);
+                    if best.is_none_or(|b| c < b.2) {
+                        best = Some((cx + dx, cy + dy, c));
+                    }
+                }
+                dx += s;
+            }
+            dy += s;
+        }
+        best
+    }
 }
 
-fn cost(img: &Gray, x: usize, y: usize, p: &Patch) -> f32 {
-    sample(img, x, y, p).iter().zip(&p.values).map(|(a, b)| (a - b) * (a - b)).sum()
-}
-
-/// Follows a patch through `frames` (in order), starting at `(x, y)` in `frames[0]`.
-/// Returns the top-left of the patch in every frame after the first.
-fn follow(frames: &[&Gray], x: usize, y: usize, pw: usize, ph: usize) -> Vec<(usize, usize)> {
+/// Follows the patch at (x, y) (size pw×ph) through `frames`; returns its top-left in every
+/// frame after the first.
+fn follow(frames: &[&Gray], x: i64, y: i64, pw: i64, ph: i64) -> Vec<(i64, i64)> {
     let Some(first) = frames.first() else { return vec![] };
-    let step = (pw.max(ph) / 32).max(1);
-    let mut patch = Patch { cols: pw.div_ceil(step), rows: ph.div_ceil(step), step, values: vec![] };
-    patch.values = sample(first, x, y, &patch);
-    // Scrolling can move content a long way between frames: search a generous window.
-    let radius = (pw.max(ph) as i64 * 3 / 4).max(first.h as i64 / 6) + 6;
-    let (mut x, mut y) = (x as i64, y as i64);
+    let (iw, ih) = (first.w as i64, first.h as i64);
+    // Context: the mask plus a generous margin, for motion (more texture than the mask).
+    let margin_x = pw.max(iw / 8);
+    let margin_y = ph.max(ih / 8);
+    let mut context = Patch::new(pw + 2 * margin_x, ph + 2 * margin_y);
+    context.grab(first, x - margin_x, y - margin_y);
+    let mut patch = Patch::new(pw, ph);
+    patch.grab(first, x, y);
+
+    let (mut x, mut y) = (x, y);
+    let (mut vx, mut vy) = (0i64, 0i64);
     let mut out = Vec::with_capacity(frames.len());
     for img in &frames[1..] {
-        let (max_x, max_y) = ((img.w - pw) as i64, (img.h - ph) as i64);
-        let mut best = (x, y, f32::MAX);
-        let scan = |cx: i64, cy: i64, r: i64, s: i64, best: &mut (i64, i64, f32)| {
-            let mut dy = -r;
-            while dy <= r {
-                let mut dx = -r;
-                while dx <= r {
-                    let (nx, ny) = ((cx + dx).clamp(0, max_x), (cy + dy).clamp(0, max_y));
-                    let c = cost(img, nx as usize, ny as usize, &patch);
-                    if c < best.2 {
-                        *best = (nx, ny, c);
-                    }
-                    dx += s;
-                }
-                dy += s;
-            }
+        // 1. Motion of the surroundings, searched widely (fast scrolls), starting from the
+        //    previous velocity.
+        let (px, py) = (x + vx, y + vy);
+        let coarse = context.search(img, px - margin_x, py - margin_y, iw / 4, ih / 2, 4, ih as f32 / 3.0);
+        let (mx, my) = match coarse {
+            Some((cx, cy, _)) => match context.search(img, cx, cy, 4, 4, 1, f32::INFINITY) {
+                Some((fx, fy, _)) => (fx + margin_x, fy + margin_y),
+                None => (cx + margin_x, cy + margin_y),
+            },
+            None => (px, py),
         };
-        // Coarse (every 4 px), then refine around the best.
-        scan(x, y, radius, 4, &mut best);
-        let (bx, by) = (best.0, best.1);
-        scan(bx, by, 4, 1, &mut best);
-        x = best.0;
-        y = best.1;
-        let fresh = sample(img, x as usize, y as usize, &patch);
-        for (v, f) in patch.values.iter_mut().zip(fresh) {
-            *v = *v * 0.9 + f * 0.1;
-        }
-        out.push((x as usize, y as usize));
+        // 2. Refine on the mask's own content near the prediction (when enough is visible).
+        let (nx, ny) = match patch.search(img, mx, my, 6, 6, 1, f32::INFINITY) {
+            Some((fx, fy, _)) => (fx, fy),
+            None => (mx, my),
+        };
+        vx = nx - x;
+        vy = ny - y;
+        x = nx;
+        y = ny;
+        // Adapt slowly to gradual changes (hover effects, video thumbnails playing).
+        let mut fresh = context.clone();
+        fresh.grab(img, x - margin_x, y - margin_y);
+        blend(&mut context, &fresh);
+        let mut fresh = patch.clone();
+        fresh.grab(img, x, y);
+        blend(&mut patch, &fresh);
+        out.push((x, y));
     }
     out
 }
 
+fn blend(into: &mut Patch, fresh: &Patch) {
+    for i in 0..into.values.len() {
+        if fresh.valid[i] {
+            into.values[i] = if into.valid[i] { into.values[i] * 0.85 + fresh.values[i] * 0.15 } else { fresh.values[i] };
+            into.valid[i] = true;
+        }
+    }
+}
+
 /// Follows `rect` (normalized to the recording, top-left origin), placed at recording time
-/// `anchor`, across `start…end`. Returns keyframes at [`TRACK_FPS`]. `progress` gets 0…1.
+/// `anchor`, across `start…end`. Returns keyframes at [`TRACK_FPS`]; rects may leave 0…1
+/// when the content scrolls off screen. `progress` gets 0…1.
 pub fn track_region(screen: &Path, rect: Rect, anchor: f64, start: f64, end: f64, progress: &dyn Fn(f64)) -> Result<Vec<MaskKeyframe>, MediaError> {
     let mut decoder = VideoDecoder::open(screen, true)?;
     let count = ((end - start) * TRACK_FPS).ceil().max(1.0) as usize + 1;
@@ -132,24 +232,24 @@ pub fn track_region(screen: &Path, rect: Rect, anchor: f64, start: f64, end: f64
         let t = (start + k as f64 / TRACK_FPS).min(end);
         let Some(frame) = decoder.frame_at(t)? else { break };
         frames.push((t, Gray::from_frame(&frame)));
-        progress(0.7 * (k + 1) as f64 / count as f64);
+        progress(0.6 * (k + 1) as f64 / count as f64);
     }
     let Some((_, first)) = frames.first() else { return Ok(vec![]) };
     let (iw, ih) = (first.w as f64, first.h as f64);
-    let pw = ((rect.width() * iw).round() as usize).clamp(6, first.w);
-    let ph = ((rect.height() * ih).round() as usize).clamp(6, first.h);
-    let ax = ((rect.min_x() * iw).round() as usize).min(first.w - pw);
-    let ay = ((rect.min_y() * ih).round() as usize).min(first.h - ph);
+    let pw = ((rect.width() * iw).round() as i64).max(4);
+    let ph = ((rect.height() * ih).round() as i64).max(4);
+    let ax = (rect.min_x() * iw).round() as i64;
+    let ay = (rect.min_y() * ih).round() as i64;
     let a = frames.iter().position(|(t, _)| *t >= anchor - 0.5 / TRACK_FPS).unwrap_or(0);
 
     let forward: Vec<&Gray> = frames[a..].iter().map(|(_, g)| g).collect();
     let backward: Vec<&Gray> = frames[..=a].iter().rev().map(|(_, g)| g).collect();
     let ahead = follow(&forward, ax, ay, pw, ph);
-    progress(0.85);
+    progress(0.8);
     let behind = follow(&backward, ax, ay, pw, ph);
     progress(1.0);
 
-    let key = |t: f64, x: usize, y: usize| MaskKeyframe { t, rect: Rect::new(x as f64 / iw, y as f64 / ih, rect.width(), rect.height()) };
+    let key = |t: f64, x: i64, y: i64| MaskKeyframe { t, rect: Rect::new(x as f64 / iw, y as f64 / ih, rect.width(), rect.height()) };
     let mut keys: Vec<MaskKeyframe> = Vec::with_capacity(frames.len());
     for (i, (x, y)) in behind.iter().enumerate().rev() {
         keys.push(key(frames[a - 1 - i].0, *x, *y));

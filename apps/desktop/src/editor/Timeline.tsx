@@ -119,7 +119,6 @@ export function Timeline(props: { editor: Editor }) {
    * drag draws a box that selects everything it touches (Shift adds to the selection).
    */
   const laneDown = (e: PointerEvent) => {
-    console.warn("TLMARQUEE down", (e.target as HTMLElement).className, e.button);
     if (e.button !== 0) return;
     const r0 = content.getBoundingClientRect();
     const sx = e.clientX - r0.left;

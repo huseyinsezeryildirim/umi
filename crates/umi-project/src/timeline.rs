@@ -15,13 +15,13 @@ use uuid::Uuid;
 #[serde(tag = "kind", content = "id", rename_all = "camelCase")]
 pub enum Selection {
     Clip(usize),
-    Zoom(Uuid),
-    Mask(Uuid),
-    Scene(Uuid),
-    Text(Uuid),
-    Move(Uuid),
+    Zoom(#[serde(with = "crate::serde_util::uuid_upper")] Uuid),
+    Mask(#[serde(with = "crate::serde_util::uuid_upper")] Uuid),
+    Scene(#[serde(with = "crate::serde_util::uuid_upper")] Uuid),
+    Text(#[serde(with = "crate::serde_util::uuid_upper")] Uuid),
+    Move(#[serde(with = "crate::serde_util::uuid_upper")] Uuid),
     Music,
-    Overlay(Uuid),
+    Overlay(#[serde(with = "crate::serde_util::uuid_upper")] Uuid),
 }
 
 /// A kept clip laid out on the output timeline.

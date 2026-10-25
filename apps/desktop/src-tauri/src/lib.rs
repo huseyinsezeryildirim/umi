@@ -157,6 +157,24 @@ async fn recording_preview(state: State<'_, AppState>, path: PathBuf) -> Result<
     Ok(frames)
 }
 
+/// Moves a recording to the system Trash (recoverable), closing its editor first.
+#[tauri::command]
+fn recording_trash(state: State<'_, AppState>, path: PathBuf) -> Result<(), String> {
+    if path.extension().is_none_or(|e| e != "umi") {
+        return Err("not a recording".into());
+    }
+    state.editors.lock().remove(&path.to_string_lossy().into_owned());
+    state.previews.lock().remove(&path);
+    trash::delete(&path).map_err(|e| e.to_string())
+}
+
+/// Shows a recording in Finder / Explorer / the file manager.
+#[tauri::command]
+fn recording_reveal(app: tauri::AppHandle, path: PathBuf) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener().reveal_item_in_dir(path).map_err(|e| e.to_string())
+}
+
 /// Voice loudness (0…1) at 50 values per second, from the mic track (or the first audio).
 #[tauri::command]
 async fn recording_waveform(path: PathBuf) -> Result<Vec<f32>, String> {
@@ -274,6 +292,8 @@ pub fn run() {
             editor_close,
             recording_thumbnails,
             recording_preview,
+            recording_trash,
+            recording_reveal,
             editor_layout,
             editor_track_mask,
             recording_waveform

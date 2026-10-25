@@ -99,10 +99,10 @@ export function MaskHandles(props: { editor: Editor; mask: PrivacyMask; frame: {
           <For each={["nw", "ne", "sw", "se"] as Corner[]}>{(corner) => <div class={`ed-handle ed-handle--${corner}`} onPointerDown={(e) => drag(corner, e)} />}</For>
           <Show when={ed.tracking()?.mask === props.mask.id} fallback={
             <Show when={props.mask.follow} fallback={<Show when={props.mask.keyframes?.length}><span class="ed-handle-badge">Keyframe at {source().toFixed(1)}s</span></Show>}>
-              <span class="ed-handle-badge">Stuck to content</span>
+              <span class="ed-handle-badge">Following content</span>
             </Show>
           }>
-            <span class="ed-handle-badge">Sticking… {Math.round((ed.tracking()?.progress ?? 0) * 100)}%</span>
+            <span class="ed-handle-badge">Following… {Math.round((ed.tracking()?.progress ?? 0) * 100)}%</span>
           </Show>
         </div>
       )}
