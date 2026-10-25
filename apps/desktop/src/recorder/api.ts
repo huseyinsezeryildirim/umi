@@ -26,6 +26,10 @@ export interface RecordSettings {
   countdown: boolean;
   flow: "studio" | "instant";
   cameraOnly: boolean;
+  notes: string;
+  notesOn: boolean;
+  notesSpeed: number;
+  notesSize: number;
 }
 
 export interface Display {

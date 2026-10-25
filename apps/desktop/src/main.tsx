@@ -20,6 +20,7 @@ void ready.then(async () => {
     controls: () => import("./recorder/Controls").then((m) => m.Controls),
     countdown: () => import("./recorder/Countdown").then((m) => m.Countdown),
     area: () => import("./recorder/AreaPicker").then((m) => m.AreaPicker),
+    prompter: () => import("./recorder/Prompter").then((m) => m.Prompter),
   } as const;
   const View = await (views[view as keyof typeof views] ?? views.launcher)();
   render(() => <View />, root);
