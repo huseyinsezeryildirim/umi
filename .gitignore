@@ -23,3 +23,6 @@ apps/desktop/src-tauri/release.conf.json
 
 # Umi Cloud lives in its own (private) repository, cloned here for local development.
 /web/
+
+# Windows release: FFmpeg DLLs copied in by the release workflow.
+apps/desktop/src-tauri/ffmpeg-dlls/

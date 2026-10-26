@@ -219,9 +219,14 @@ jobs:
           const env = process.env;
           const bundle = { createUpdaterArtifacts: env.CAN_SIGN_UPDATES === "true" };
           if (env.RUNNER_OS === "Windows") {
-            // FFmpeg's DLLs next to umi-desktop.exe.
-            const bin = env.FFMPEG_DIR.replace(/\\/g, "/") + "/bin";
-            bundle.resources = Object.fromEntries(fs.readdirSync(bin).filter((f) => f.endsWith(".dll")).map((f) => [`${bin}/${f}`, f]));
+            // FFmpeg's DLLs next to umi-desktop.exe. Copied into src-tauri first: Tauri resolves
+            // resource paths relative to it and mangles absolute Windows paths (C:/...).
+            const bin = env.FFMPEG_DIR + "\\bin";
+            const dest = "apps/desktop/src-tauri/ffmpeg-dlls";
+            fs.mkdirSync(dest, { recursive: true });
+            const dlls = fs.readdirSync(bin).filter((f) => f.endsWith(".dll"));
+            for (const f of dlls) fs.copyFileSync(`${bin}\\${f}`, `${dest}/${f}`);
+            bundle.resources = Object.fromEntries(dlls.map((f) => [`ffmpeg-dlls/${f}`, f]));
             if (env.AZURE_CLIENT_ID) {
               bundle.windows = {
                 signCommand: `trusted-signing-cli -e ${env.AZURE_SIGNING_ENDPOINT} -a ${env.AZURE_SIGNING_ACCOUNT} -c ${env.AZURE_CERTIFICATE_PROFILE} -d Umi %1`,
