@@ -64,11 +64,11 @@ export function Hero() {
         <div className="flex items-center gap-4 text-[15px] text-faint">
           Also on
           <span className="flex items-center gap-3.5 text-[#5f6673]">
-            <Tip label="Windows">
+            <Tip label="Windows" href="#download">
               <WindowsIcon className="size-[18px]" />
             </Tip>
-            <Tip label="Linux">
-              <LinuxIcon className="size-5" />
+            <Tip label="Linux" href="#download">
+              <LinuxIcon className="size-5" mono />
             </Tip>
             <Tip label="Record in your browser" href="/signup">
               <BrowserIcon className="size-5" />

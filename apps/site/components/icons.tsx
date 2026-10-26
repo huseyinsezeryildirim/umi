@@ -16,7 +16,29 @@ export function WindowsIcon({ className }: P) {
   );
 }
 
-export function LinuxIcon({ className }: P) {
+/** Tux. `mono`: one color (the text color), the belly and eyes cut out, like the other icons in a row. */
+export function LinuxIcon({ className, mono = false }: P & { mono?: boolean }) {
+  if (mono)
+    return (
+      <svg viewBox="0 0 24 24" className={className} aria-label="Linux">
+        <mask id="tux-cut">
+          <rect width="24" height="24" fill="#fff" />
+          <ellipse cx="12" cy="15.5" rx="3.8" ry="5.2" fill="#000" />
+          <circle cx="10.4" cy="6" r="1.1" fill="#000" />
+          <circle cx="13.6" cy="6" r="1.1" fill="#000" />
+        </mask>
+        <g fill="currentColor" mask="url(#tux-cut)">
+          <ellipse cx="12" cy="14" rx="6" ry="7.5" />
+          <circle cx="12" cy="6.5" r="4.2" />
+        </g>
+        <g fill="currentColor">
+          <circle cx="10.5" cy="6.1" r=".5" />
+          <circle cx="13.5" cy="6.1" r=".5" />
+          <ellipse cx="8.6" cy="21.2" rx="2.4" ry="1.1" />
+          <ellipse cx="15.4" cy="21.2" rx="2.4" ry="1.1" />
+        </g>
+      </svg>
+    );
   return (
     <svg viewBox="0 0 24 24" className={className} aria-label="Linux">
       <ellipse cx="12" cy="14" rx="6" ry="7.5" fill="#1f2328" />
