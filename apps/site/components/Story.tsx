@@ -132,6 +132,9 @@ export function Ending() {
             <DownloadButton />
           </div>
           <p className="mt-4 text-[15px] text-ink/60">Also for Windows, Linux and your browser</p>
+          <a href="/code-signing" className="mt-2 inline-block text-[13px] text-ink/50 underline-offset-2 hover:underline">
+            Code signing policy
+          </a>
         </Rise>
       </div>
     </section>
@@ -143,7 +146,7 @@ export function Footer() {
     ["Product", [["Download", "#download"], ["Pricing", "#pricing"], ["Questions", "#faq"]]],
     ["Open source", [["GitHub", "https://github.com/huseyinsezeryildirim/umi"], ["Releases", "https://github.com/huseyinsezeryildirim/umi/releases"], ["Report a bug", "https://github.com/huseyinsezeryildirim/umi/issues"]]],
     ["Platforms", [["macOS", "#download"], ["Windows", "#download"], ["Linux", "#download"], ["Browser", "/signup"]]],
-    ["Legal", [["Terms", "/terms"], ["Privacy", "/privacy"], ["Refunds", "/refunds"], ["Copyright", "/copyright"], ["Contact", "mailto:hi@ux.center"]]],
+    ["Legal", [["Terms", "/terms"], ["Privacy", "/privacy"], ["Refunds", "/refunds"], ["Copyright", "/copyright"], ["Code signing policy", "/code-signing"], ["Contact", "mailto:hi@ux.center"]]],
   ];
   return (
     <footer className="px-5 pt-20 pb-12">

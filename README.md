@@ -115,6 +115,19 @@ docs/           product, architecture, roadmap
 Issues and pull requests are welcome. Every change has to work on macOS, Windows, Linux and the web;
 CI builds and tests all four.
 
+## Code signing policy
+
+Windows: free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+macOS: signed with our Apple Developer ID and notarized by Apple. Every release is built from this repository by
+[GitHub Actions](.github/workflows/release.yml) and approved by hand before it is signed.
+
+- Committers and reviewers: [Hüseyin Sezer Yıldırım](https://github.com/huseyinsezeryildirim)
+- Approvers: [Hüseyin Sezer Yıldırım](https://github.com/huseyinsezeryildirim)
+
+Privacy: Umi sends recordings nowhere unless you share them (then they go to Umi Cloud). It also checks GitHub for
+updates and downloads its on-device AI models from Hugging Face. See the [Privacy Policy](https://umi.cam/privacy)
+and the full [code signing policy](https://umi.cam/code-signing).
+
 ## License
 
 Umi is free software under the [GNU Affero General Public License v3.0](LICENSE). If you run a modified
