@@ -1,14 +1,15 @@
 # Umi brand
 
-The mark: sound bars around a record light. Every file here is SVG; the PNG/ICNS/ICO icons in
-`apps/desktop/src-tauri/icons` and `extension/icons` are exported from these, because operating
-systems and Chrome only take bitmap icons.
+The mark: a ring of dots, in one color (`#191A1A` on light, white on dark). Every file here is SVG;
+the PNG/ICNS/ICO icons in `apps/desktop/src-tauri/icons` and `extension/icons` are exported from
+these, because operating systems and Chrome only take bitmap icons.
 
-- `umi-mark.svg` — the mark, 15 bars, ink bars and a blue light. For large uses.
-- `umi-mark-mono.svg` — the same in one color (black), for single-color printing.
-- `umi-mark-small.svg` / `umi-mark-small-mono.svg` — 9 bolder bars, for 16–48 px (favicons, extension).
-- `app-icon.svg` — the app icon: the mark on a white rounded tile.
+- `umi-mark.svg` — the mark (`umi-mark-mono.svg` is the same file, kept for older references).
+- `umi-mark-white.svg` — the mark in white, for dark backgrounds.
+- `app-icon.svg` — the app icon: the mark on a white rounded tile (macOS icon grid, 1024 px).
+- The favicon and in-app image (`apps/site/public/umi-mark.svg`, `apps/desktop/public/umi-mark.svg`)
+  switch to white in dark mode.
 
-Colors: ink `#111827`, Umi blue `#116ff5`.
-
-Re-export the app icons: `cd apps/desktop && pnpm tauri icon <1024 px PNG of app-icon.svg> -o src-tauri/icons`.
+Re-export the icons: render `app-icon.svg` to a 1024 px PNG, then
+`cd apps/desktop && pnpm tauri icon <png> -o src-tauri/icons` (delete the android/ios folders it adds).
+The menu bar icon `src-tauri/icons/tray.png` is the mark in black at 44 px (a template image).
