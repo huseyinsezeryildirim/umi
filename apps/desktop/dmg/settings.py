@@ -1,10 +1,11 @@
 # dmgbuild settings for Umi's DMG: drag Umi onto Applications, over background.tiff
 # (background.png + @2x, rendered from background.html: 660 × 400, the arrow between the icons).
+# Run from the repository root:
 #   dmgbuild -s apps/desktop/dmg/settings.py -D app=path/to/Umi.app Umi Umi.dmg
 import os.path
 
 app = defines["app"]  # noqa: F821 (dmgbuild provides `defines`)
-here = os.path.dirname(os.path.abspath(__file__))
+here = "apps/desktop/dmg"  # dmgbuild runs this file without __file__
 
 format = "UDZO"
 files = [app]

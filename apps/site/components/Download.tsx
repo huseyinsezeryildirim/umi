@@ -49,6 +49,19 @@ const ICON: Record<string, React.ReactNode> = {
   ),
 };
 
+/** The top bar's button: downloads straight away when we know the computer; else shows every platform. */
+export function NavDownload() {
+  const key = usePlatform();
+  const p = key && key !== "chrome" ? PLATFORMS.find((x) => x.key === key) : null;
+  const icon = key?.startsWith("mac") ? ICON.mac : key === "windows" ? ICON.windows : null;
+  return (
+    <a href={p ? p.href : "#download"} className="btn-dark">
+      {icon}
+      Download
+    </a>
+  );
+}
+
 /** The main button: the right download for this computer, as a glass pill. */
 export function DownloadButton() {
   const key = usePlatform();
