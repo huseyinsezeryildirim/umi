@@ -132,13 +132,13 @@ jobs:
           ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/Umi.zip"
           xcrun notarytool submit "$RUNNER_TEMP/Umi.zip" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait --timeout 1h
           xcrun stapler staple "$APP"
+      # The window people see: Umi, an arrow, Applications (apps/desktop/dmg). dmgbuild writes the
+      # Finder layout itself, without driving Finder.
       - name: DMG
         run: |
-          stage="$RUNNER_TEMP/dmg"
-          mkdir -p "$stage"
-          ditto "$APP" "$stage/Umi.app"
-          ln -s /Applications "$stage/Applications"
-          hdiutil create -volname Umi -srcfolder "$stage" -ov -format UDZO "$DMG"
+          python3 -m venv "$RUNNER_TEMP/dmgbuild"
+          "$RUNNER_TEMP/dmgbuild/bin/pip" install --quiet dmgbuild==1.6.7
+          "$RUNNER_TEMP/dmgbuild/bin/dmgbuild" -s apps/desktop/dmg/settings.py -D app="$APP" Umi "$DMG"
           if [ "$APPLE_SIGNING_IDENTITY" != "-" ]; then codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$DMG"; fi
       - name: Notarize and staple the DMG
         if: env.HAS_CERTIFICATE == 'true' && env.CAN_NOTARIZE == 'true'
