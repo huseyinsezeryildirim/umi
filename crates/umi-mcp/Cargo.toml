@@ -5,6 +5,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[lib]
+name = "umi_mcp"
+path = "src/lib.rs"
+
 [[bin]]
 name = "umi-mcp"
 path = "src/main.rs"

@@ -557,15 +557,15 @@ export function Agents() {
 // ───── Agent kit ─────
 
 const KIT = [
-  { dot: "#7fb2f4", title: "One line to set up", text: "Point Claude Code, Cursor or Codex at Umi’s MCP server and it’s ready.", cmd: "$ claude mcp add umi -- umi-mcp" },
-  { dot: "#b9a4f7", title: "Answers come back as data", text: "Every tool returns JSON, so agents and scripts can chain them.", cmd: "→ list_recordings  [{ \"name\": … }]" },
-  { dot: "#7fd4ad", title: "Local only, zero secrets", text: "The server runs on your machine and reads your library. No keys pass through the model.", cmd: "$ umi-mcp" },
+  { dot: "#7fb2f4", title: "One line to set up", text: "The MCP server comes with the app. Point Claude Code, Cursor or Codex at it and it’s ready.", cmd: "$ claude mcp add umi -- /Applications/Umi.app/Contents/MacOS/umi-desktop --mcp" },
+  { dot: "#b9a4f7", title: "Answers come back as data", text: "Lengths, cuts and captions come back as JSON, so agents and scripts can chain them.", cmd: "→ describe_recording  { \"videoSeconds\": 61.9, … }" },
+  { dot: "#7fd4ad", title: "Local only, zero secrets", text: "The server runs on your machine and reads your library. No keys pass through the model.", cmd: "$ Umi --mcp" },
   { dot: "#f4b77f", title: "You stay in charge", text: "It edits and exports. It never records you or uploads anything on its own.", cmd: "list · describe · transcribe · edit · export" },
 ];
 
 const KIT_TABS = {
-  MCP: ['describe_recording { "recording": "Dashboard walkthrough" }', 'edit { "operations": [{ "op": "remove_fillers" }] }', 'export { "format": "mp4" }'],
-  Config: ['"mcpServers": {', '  "umi": { "command": "umi-mcp" }', "}"],
+  MCP: ['describe_recording { "recording": "Dashboard walkthrough" }', 'edit { "recording": …, "operations": [{ "op": "remove_fillers" }] }', 'export { "recording": …, "format": "mp4" }'],
+  Config: ['"mcpServers": {', '  "umi": {', '    "command": "/Applications/Umi.app/Contents/MacOS/umi-desktop",', '    "args": ["--mcp"]', '  }', "}"],
 } as const;
 
 export function AgentKit() {
@@ -603,7 +603,7 @@ export function AgentKit() {
               ))}
             </div>
             <div className="relative mt-5 min-h-36 rounded-2xl bg-[#0f1115] p-5 pr-12 font-mono text-[13px] leading-7 text-white/85">
-              {tab === "Config" && <CopyButton dark className="absolute top-3 right-3" text={'{\n  "mcpServers": {\n    "umi": { "command": "umi-mcp" }\n  }\n}'} />}
+              {tab === "Config" && <CopyButton dark className="absolute top-3 right-3" text={'{\n  "mcpServers": {\n    "umi": {\n      "command": "/Applications/Umi.app/Contents/MacOS/umi-desktop",\n      "args": ["--mcp"]\n    }\n  }\n}'} />}
               <AnimatePresence mode="wait">
                 <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
                   {KIT_TABS[tab].map((l) => (

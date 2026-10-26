@@ -9,10 +9,17 @@ Umi keeps each recording as a `.umi` folder in `~/Movies/Umi` (Windows: `Videos\
 Linux: `~/Videos/Umi`). The `umi` MCP server edits them with the same engine as the app;
 the app shows the changes the next time the recording is opened.
 
-Set it up once:
+The server comes with the app: it's the Umi program started with `--mcp`. Set it up once:
 
 ```bash
-claude mcp add umi -- /Applications/Umi.app/Contents/MacOS/umi-mcp
+# macOS
+claude mcp add umi -- /Applications/Umi.app/Contents/MacOS/umi-desktop --mcp
+# Windows
+claude mcp add umi -- "%LOCALAPPDATA%\Umi\umi-desktop.exe" --mcp
+# Linux (.deb)
+claude mcp add umi -- /usr/bin/umi-desktop --mcp
+# Linux (AppImage)
+claude mcp add umi -- /path/to/Umi_amd64.AppImage --mcp
 ```
 
 ## Tools

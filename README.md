@@ -62,6 +62,16 @@ and titles all run on your device. You only pay when we host things for you.
 2. Pick what to record and press Start (or ⌥⇧L / Alt+Shift+L from any app).
 3. Stop, and the editor opens with your recording already styled. Export the file, or press Share for a link.
 
+### With an AI agent
+
+The app is also an MCP server, so Claude Code, Cursor or Codex can list, transcribe, cut and export your recordings:
+
+```bash
+claude mcp add umi -- /Applications/Umi.app/Contents/MacOS/umi-desktop --mcp
+```
+
+On Windows the program is `%LOCALAPPDATA%\Umi\umi-desktop.exe`, on Linux `/usr/bin/umi-desktop` (or the AppImage). See [the skill](integrations/claude-code/umi/SKILL.md).
+
 ## Develop
 
 ```bash

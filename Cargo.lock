@@ -6713,7 +6713,7 @@ dependencies = [
 
 [[package]]
 name = "umi-ai"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "dirs 6.0.0",
  "image",
@@ -6731,7 +6731,7 @@ dependencies = [
 
 [[package]]
 name = "umi-capture"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "cpal",
  "crossbeam-channel",
@@ -6752,7 +6752,7 @@ dependencies = [
 
 [[package]]
 name = "umi-cloud"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -6762,7 +6762,7 @@ dependencies = [
 
 [[package]]
 name = "umi-desktop"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "arboard",
  "base64 0.22.1",
@@ -6789,6 +6789,7 @@ dependencies = [
  "umi-cloud",
  "umi-editor",
  "umi-engine",
+ "umi-mcp",
  "umi-media",
  "umi-project",
  "umi-recorder",
@@ -6800,7 +6801,7 @@ dependencies = [
 
 [[package]]
 name = "umi-editor"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -6810,7 +6811,7 @@ dependencies = [
 
 [[package]]
 name = "umi-engine"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "crossbeam-channel",
  "image",
@@ -6827,7 +6828,7 @@ dependencies = [
 
 [[package]]
 name = "umi-mcp"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "dirs 6.0.0",
  "serde",
@@ -6842,7 +6843,7 @@ dependencies = [
 
 [[package]]
 name = "umi-media"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "color_quant",
  "ffmpeg-next",
@@ -6856,7 +6857,7 @@ dependencies = [
 
 [[package]]
 name = "umi-project"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "chrono",
  "serde",
@@ -6867,7 +6868,7 @@ dependencies = [
 
 [[package]]
 name = "umi-recorder"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "chrono",
  "crossbeam-channel",
@@ -6881,7 +6882,7 @@ dependencies = [
 
 [[package]]
 name = "umi-render"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "bytemuck",
  "cosmic-text",
@@ -6898,7 +6899,7 @@ dependencies = [
 
 [[package]]
 name = "umi-web"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "getrandom 0.4.3",
  "gif",

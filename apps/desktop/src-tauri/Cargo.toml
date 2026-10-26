@@ -40,6 +40,7 @@ umi-ai = { path = "../../../crates/umi-ai" }
 umi-capture = { path = "../../../crates/umi-capture" }
 umi-recorder = { path = "../../../crates/umi-recorder" }
 umi-cloud = { path = "../../../crates/umi-cloud" }
+umi-mcp = { path = "../../../crates/umi-mcp" }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 arboard = { version = "3", default-features = false, features = ["image-data"] }
 
