@@ -137,7 +137,7 @@ export default function Page() {
         [
           "Privacy",
           <p>
-            Our [Privacy Policy] explains what personal data we process and why. Recording, editing and on-device AI features work locally; your recordings
+            Our <a className="underline" href="/privacy">Privacy Policy</a> explains what personal data we process and why. Recording, editing and on-device AI features work locally; your recordings
             reach our servers only when you create a share link or otherwise choose to upload them.
           </p>,
         ],
