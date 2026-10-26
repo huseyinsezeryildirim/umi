@@ -1,6 +1,6 @@
 import { Hero } from "@/components/Hero";
 import { Nav } from "@/components/Nav";
-import { AgentKit, Agents, Ai, Loom, Modes, Platforms, Testimonials } from "@/components/Sections";
+import { AgentKit, Agents, Ai, Loom, Modes, Platforms } from "@/components/Sections";
 import { EditorGrid, NotJust, Storage } from "@/components/Showcase";
 import { Ending, Faq, Footer, Privacy } from "@/components/Story";
 import { Pricing } from "@/components/Pricing";
@@ -22,7 +22,7 @@ export default function Home() {
         <AgentKit />
         <Storage />
         <Pricing />
-        <Testimonials />
+        {/* Testimonials: hidden until there are real quotes. */}
         <Loom />
         <Faq />
         <Ending />
