@@ -43,7 +43,7 @@ Then in the Cloudflare dashboard:
 - **Pages → umi-site → Custom domains**: add `umi.cam`. Production routes `umi.cam/v/*`, `/e/*`, `/api/*`,
   `/oembed*` and `/healthz` to the Worker (see `env.production.routes` in the umi-cloud repository's `wrangler.jsonc`); everything
   else is the site. Staging lives on `umi-web-staging.<your-subdomain>.workers.dev` and
-  `staging.umi-site-a2z.pages.dev`.
+  `staging.umi.cam` (a custom domain on the Pages project, its DNS CNAME pointing at `staging.umi-site-a2z.pages.dev`; `pages.dev` itself is blocked in Türkiye).
 - **My Profile → API Tokens → Create token** ("Edit Cloudflare Workers" template), with these permissions:
   Account · Workers Scripts · Edit, Account · D1 · Edit, Account · Cloudflare Pages · Edit,
   Account · Account Settings · Read, Zone (umi.cam) · Workers Routes · Edit. This is `CLOUDFLARE_API_TOKEN`.
