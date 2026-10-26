@@ -100,6 +100,7 @@ function Strip({ billing, setBilling }: { billing: Billing; setBilling: (b: Bill
             <p className="whitespace-nowrap">
               <Price value={PRICE[billing]} className="text-3xl font-semibold" />
               <span className="text-muted"> /mo</span>
+              <span className="block text-[12px] text-muted">plus local tax</span>
             </p>
             {onSale && (
               <a href={`/upgrade?cycle=${billing}`} className="btn-dark inline-flex whitespace-nowrap">

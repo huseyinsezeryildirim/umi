@@ -7,6 +7,7 @@ import { Shell } from "./AuthForm";
 import { Mark } from "./ui";
 
 const PRICE: Record<Cycle, string> = { monthly: "$12 a month", yearly: "$96 a year ($8 a month)" };
+// Prices are before tax: where the buyer's country has VAT or sales tax, Paddle adds it at checkout.
 
 /**
  * /upgrade?cycle=yearly: signs in if needed, then opens Paddle's checkout. Paddle tells Umi Cloud
@@ -98,7 +99,7 @@ export function Upgrade() {
       </Shell>
     );
   return (
-    <Shell title="Upgrade to Umi Pro" lead={`${PRICE[cycle]}. Links that stay up, 200 GB, insights and passwords. Cancel any time; full refund within 14 days.`}>
+    <Shell title="Upgrade to Umi Pro" lead={`${PRICE[cycle]}, plus local tax where it applies. Links that stay up, 200 GB, insights and passwords. Cancel any time; full refund within 14 days.`}>
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <button type="button" disabled={!account} onClick={() => account && void start(cycle, account)} className="btn-dark inline-flex disabled:opacity-60">
           Continue to payment
