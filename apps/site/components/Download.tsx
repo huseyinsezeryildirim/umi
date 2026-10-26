@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const RELEASES = "https://github.com/umi-cam/umi/releases/latest/download";
+const RELEASES = "https://github.com/huseyinsezeryildirim/umi/releases/latest/download";
 
 export const PLATFORMS = [
   { key: "mac-arm", name: "macOS", detail: "Apple silicon", label: "Download for Mac", href: `${RELEASES}/Umi_aarch64.dmg` },
@@ -55,7 +55,7 @@ export function DownloadButton() {
   const p = PLATFORMS.find((x) => x.key === key);
   const icon = key?.startsWith("mac") ? ICON.mac : key === "windows" ? ICON.windows : null;
   return (
-    <a href={p ? p.href : "https://github.com/umi-cam/umi/releases/latest"} className="btn-glass">
+    <a href={p ? p.href : "https://github.com/huseyinsezeryildirim/umi/releases/latest"} className="btn-glass">
       {icon}
       {p ? p.label : "Download Umi"}
     </a>

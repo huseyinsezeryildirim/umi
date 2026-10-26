@@ -2,7 +2,7 @@
 
 Free, open-source screen recorder for macOS, Windows, Linux and Chrome. Unlimited local
 recording and editing, commercial use included, AI that runs on your computer. Only hosted
-features (links, insights, teams) are paid.
+features (share links that stay up, insights) are paid.
 
 - Rust core (`crates/`): capture, recording, rendering (wgpu), media (FFmpeg), on-device AI
 - Desktop app (`apps/desktop`): Tauri 2 + Solid, UI kit in `packages/ui`
@@ -46,3 +46,9 @@ web/            Umi Cloud
 extension/      Chrome extension
 docs/           product, architecture, roadmap
 ```
+
+## License
+
+Umi is free software under the [GNU Affero General Public License v3.0](LICENSE). If you run a modified
+version as a network service, you must offer its source to its users. The Umi name and logo are not
+covered by the license.

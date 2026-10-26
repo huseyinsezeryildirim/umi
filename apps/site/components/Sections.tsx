@@ -393,9 +393,9 @@ export function Platforms() {
             <h3 className="text-[22px] font-semibold tracking-tight">Build it yourself</h3>
             <p className="mt-1 text-[15px] text-muted">Umi is open source. Read it, change it, ship your own.</p>
             <div className="relative mt-6 flex-1 rounded-2xl bg-[#0f1115] p-5 font-mono text-[13.5px] leading-7 text-white/85">
-              <CopyButton dark className="absolute top-3 right-3" text={"git clone https://github.com/umi-cam/umi\ncd umi\npnpm install\npnpm dev"} />
+              <CopyButton dark className="absolute top-3 right-3" text={"git clone https://github.com/huseyinsezeryildirim/umi\ncd umi\npnpm install\npnpm dev"} />
               <p>
-                <span className="text-white/35">$ </span>git clone https://github.com/umi-cam/umi
+                <span className="text-white/35">$ </span>git clone https://github.com/huseyinsezeryildirim/umi
               </p>
               <p>
                 <span className="text-white/35">$ </span>pnpm install
@@ -616,7 +616,7 @@ export function AgentKit() {
               </AnimatePresence>
             </div>
             <p className="mt-5 text-[15px] text-muted">Find a recording, read its transcript, cut it and export it from any agent that speaks MCP.</p>
-            <a href="https://github.com/umi-cam/umi" className="mt-6 inline-flex h-11 w-fit items-center rounded-xl bg-white px-5 text-[15px] font-medium shadow-[0_0_0_1px_rgb(17_24_39/0.08)] transition-transform duration-300 hover:-translate-y-0.5">
+            <a href="https://github.com/huseyinsezeryildirim/umi" className="mt-6 inline-flex h-11 w-fit items-center rounded-xl bg-white px-5 text-[15px] font-medium shadow-[0_0_0_1px_rgb(17_24_39/0.08)] transition-transform duration-300 hover:-translate-y-0.5">
               Read the MCP docs
             </a>
           </div>

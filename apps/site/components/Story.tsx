@@ -184,7 +184,7 @@ export function Ending() {
 export function Footer() {
   const cols: [string, [string, string][]][] = [
     ["Product", [["Download", "#download"], ["Pricing", "#pricing"], ["Questions", "#faq"]]],
-    ["Open source", [["GitHub", "https://github.com/umi-cam/umi"], ["Releases", "https://github.com/umi-cam/umi/releases"], ["Report a bug", "https://github.com/umi-cam/umi/issues"]]],
+    ["Open source", [["GitHub", "https://github.com/huseyinsezeryildirim/umi"], ["Releases", "https://github.com/huseyinsezeryildirim/umi/releases"], ["Report a bug", "https://github.com/huseyinsezeryildirim/umi/issues"]]],
     ["Platforms", [["macOS", "#download"], ["Windows", "#download"], ["Linux", "#download"], ["Browser", "/signup"]]],
     ["Legal", [["Terms", "/terms"], ["Copyright", "/copyright"]]],
   ];
