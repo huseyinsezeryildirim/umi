@@ -8,7 +8,7 @@ const LINKS = [
   ["Features", "#features"],
   ["Pricing", "#pricing"],
   ["Questions", "#faq"],
-  ["GitHub", "https://github.com/umi-cam/umi"],
+  ["GitHub", "https://github.com/huseyinsezeryildirim/umi"],
 ] as const;
 
 /** Full width at the top; once you scroll it tucks into a floating glass pill. */

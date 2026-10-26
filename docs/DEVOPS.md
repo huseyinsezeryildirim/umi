@@ -112,10 +112,10 @@ pnpm --filter @umi/desktop tauri signer generate -w ~/.tauri/umi.key
   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Back the key up in your password manager: **if it's lost, installed
   apps can never update again.**
 
-Installed apps check `https://github.com/umi-cam/umi/releases/latest/download/latest.json` five seconds
+Installed apps check `https://github.com/huseyinsezeryildirim/umi/releases/latest/download/latest.json` five seconds
 after launch and show "Umi x.y.z is available → Restart to update". Release assets have to be publicly
 downloadable for that, and for the download buttons on the site (`apps/site/components/Download.tsx`),
-which point at the same repository: publish the code at `github.com/umi-cam/umi` (public), or change both
+which point at the same repository: publish the code at `github.com/huseyinsezeryildirim/umi` (public), or change both
 URLs if releases come from somewhere else.
 
 ## 5. Apple (macOS signing + notarization)
