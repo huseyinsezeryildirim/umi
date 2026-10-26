@@ -10,7 +10,7 @@ export default function Page() {
   return (
     <LegalPage
       title="Terms of Service"
-      updated="October 25, 2026"
+      updated="October 26, 2026"
       intro={
         <>
           <p>
@@ -97,6 +97,21 @@ export default function Page() {
               Anyone can report a video from its page. We review reports and may hide or remove content, and suspend or close accounts, that we believe in
               good faith violate these Terms or the law. Where appropriate and lawful we will tell you what we did and why, and you may contact us to
               contest the decision.
+            </p>
+          </>,
+        ],
+        [
+          "Storage of your content",
+          <>
+            <p>
+              Umi is not a backup or archiving service and is under no obligation to store Your Content. Recordings stay on your device unless you
+              upload them; videos you share through Umi Cloud are kept only for as long as your plan provides, and may be removed when a link
+              expires, when a plan ends or changes, under these Terms, or for reasons of security, law or the integrity of the Service.
+            </p>
+            <p>
+              You are solely responsible for keeping your own copies of Your Content. To the extent permitted by law, we are not liable for any
+              loss, deletion, corruption or unavailability of Your Content, whatever its cause, including technical failures, outages, errors by
+              our providers, or actions taken under these Terms.
             </p>
           </>,
         ],
