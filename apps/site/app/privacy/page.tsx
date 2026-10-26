@@ -3,7 +3,7 @@ import { LegalPage } from "@/components/Legal";
 
 export const metadata: Metadata = { title: "Privacy Policy · Umi", description: "What personal data Umi processes, why, and your rights under KVKK and GDPR." };
 
-// Draft for legal review. Bracketed items ([…]) are to be filled in before publishing.
+// Draft for legal review.
 const CONTACT = "hi@ux.center";
 
 const Table = (props: { rows: [string, string, string][] }) => (
@@ -52,8 +52,8 @@ export default function Page() {
         [
           "Who is responsible",
           <p>
-            The data controller (veri sorumlusu) is [Legal entity name], [registered address], Türkiye, tax no. [—]. Contact us about privacy at{" "}
-            <a className="underline" href={`mailto:${CONTACT}`}>{CONTACT}</a>. [EU representative under GDPR Art. 27, if required: name and address.]
+            The data controller (veri sorumlusu) is Hüseyin Sezer Yıldırım (sole proprietorship), Akfırat Mah. 43. Sk., 34959 Tuzla, İstanbul, Türkiye. Contact us about privacy at{" "}
+            <a className="underline" href={`mailto:${CONTACT}`}>{CONTACT}</a>.
           </p>,
         ],
         [
@@ -99,7 +99,7 @@ export default function Page() {
             <ul className="list-disc space-y-1 pl-6">
               <li>Cloudflare, Inc. (USA) — hosting, storage of shared videos and our database, network security;</li>
               <li>Resend, Inc. (USA) — sending account emails;</li>
-              <li>[Paddle.com Market Ltd (UK)] — payments, as merchant of record (Paddle is an independent controller for the purchase);</li>
+              <li>our payment provider (named at checkout) — payments, as merchant of record and an independent controller for the purchase;</li>
               <li>GitHub, Inc. (USA) — distributing app downloads and updates (your app requests update information from GitHub).</li>
             </ul>
             <p>

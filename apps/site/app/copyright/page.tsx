@@ -3,7 +3,7 @@ import { LegalPage } from "@/components/Legal";
 
 export const metadata: Metadata = { title: "Copyright Policy · Umi", description: "How to report copyright infringement on Umi, and how to respond to a report." };
 
-// Draft for legal review. Bracketed items ([…]) are to be filled in before publishing.
+// Draft for legal review.
 const AGENT = "hi@ux.center";
 
 export default function Page() {
@@ -46,7 +46,7 @@ export default function Page() {
                 owner’s behalf.
               </li>
             </ol>
-            <p>Designated agent: [Legal entity name], Attn: Copyright Agent, [registered address], {AGENT}.</p>
+            <p>Designated agent: Hüseyin Sezer Yıldırım (sole proprietorship), Attn: Copyright Agent, Akfırat Mah. 43. Sk., 34959 Tuzla, İstanbul, Türkiye, {AGENT}.</p>
           </>,
         ],
         [

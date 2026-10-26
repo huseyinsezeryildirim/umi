@@ -3,7 +3,7 @@ import { LegalPage } from "@/components/Legal";
 
 export const metadata: Metadata = { title: "Terms of Service · Umi", description: "The terms for using Umi, the Umi apps and Umi Cloud." };
 
-// Draft for legal review. Bracketed items ([…]) are to be filled in before publishing.
+// Draft for legal review.
 const CONTACT = "hi@ux.center";
 
 export default function Page() {
@@ -14,7 +14,7 @@ export default function Page() {
       intro={
         <>
           <p>
-            These Terms of Service (the “Terms”) are a binding agreement between you and [Legal entity name], [registered address] (“Umi”, “we”, “us”), and
+            These Terms of Service (the “Terms”) are a binding agreement between you and Hüseyin Sezer Yıldırım (sole proprietorship), Akfırat Mah. 43. Sk., 34959 Tuzla, İstanbul, Türkiye (“Umi”, “we”, “us”), and
             govern your use of the Umi desktop apps, the Umi web app and browser extension, the website at umi.cam, and Umi Cloud, our hosted service for
             share links (together, the “Service”).
           </p>
@@ -119,7 +119,7 @@ export default function Page() {
           <>
             <p>
               Paid plans are billed in advance, monthly or yearly, and renew automatically until cancelled. Payments are processed by our reseller and
-              merchant of record, [Payment provider], whose terms also apply to your purchase; prices may include or add applicable taxes.
+              merchant of record (named at checkout), whose terms also apply to your purchase; prices may include or add applicable taxes.
             </p>
             <p>
               You can cancel at any time; your plan stays active until the end of the current period. Except where the law gives you a right of withdrawal
@@ -195,14 +195,14 @@ export default function Page() {
         [
           "Governing law and disputes",
           <p>
-            These Terms are governed by the laws of [Republic of Türkiye], without regard to conflict-of-law rules, and the courts of [Istanbul (Çağlayan)]
+            These Terms are governed by the laws of the Republic of Türkiye, without regard to conflict-of-law rules, and the courts and enforcement offices of Istanbul (Anadolu)
             have exclusive jurisdiction, except that consumers keep the protection of the mandatory laws and courts of the country where they live.
           </p>,
         ],
         [
           "Contact",
           <p>
-            [Legal entity name], [registered address]. Email: <a className="underline" href={`mailto:${CONTACT}`}>{CONTACT}</a>.
+            Hüseyin Sezer Yıldırım (sole proprietorship), Akfırat Mah. 43. Sk., 34959 Tuzla, İstanbul, Türkiye. Email: <a className="underline" href={`mailto:${CONTACT}`}>{CONTACT}</a>.
           </p>,
         ],
       ]}
