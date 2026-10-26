@@ -56,14 +56,22 @@ export function Tour() {
 
   let frame = 0;
   let waiting = 0;
+  /** The step's thing was just done: the card holds still until the next step (the window it
+   *  pointed into may reflow meanwhile). */
+  let held = false;
   const follow = () => {
+    frame = requestAnimationFrame(follow);
+    if (held) return;
     const s = step();
     const el = s?.target?.();
-    setRect(el ? el.getBoundingClientRect() : null);
-    frame = requestAnimationFrame(follow);
+    // A target that's briefly missing (a button that just changed its label, a closing window)
+    // keeps the card where it is instead of sending it to the middle and back.
+    if (el) setRect(el.getBoundingClientRect());
+    else if (!s?.target) setRect(null);
   };
   const go = (i: number) => {
     clearTimeout(waiting);
+    held = false;
     // The recording is done: on to the editor, where the tour carries on.
     if (onDesktop && i >= FIRST_EDITOR_STEP && i < STEPS.length) {
       setTimeout(() => location.replace(`?demo&open&tour&from=${i}`), 250);
@@ -88,6 +96,7 @@ export function Tour() {
       const t = e.target as Element;
       if (el && el.contains(t) && !t.closest(".demo-tour")) {
         const at = index();
+        held = true;
         setTimeout(() => index() === at && go(at + 1), s.text.startsWith("Press play") ? 400 : 450);
       }
     };
@@ -103,7 +112,8 @@ export function Tour() {
   const hint = () => {
     const r = rect();
     const W = 300;
-    if (!r) return { left: innerWidth / 2 - W / 2, top: innerHeight * 0.38 };
+    // Nothing to point at: low in the middle, clear of the countdown and the recording.
+    if (!r) return { left: innerWidth / 2 - W / 2, top: innerHeight - 250 };
     if (r.left > W + 40) return { left: r.left - W - 18, top: Math.min(Math.max(16, r.top + r.height / 2 - 50), innerHeight - 140) };
     const below = r.bottom + 120 < innerHeight;
     return { left: Math.min(Math.max(16, r.left + r.width / 2 - W / 2), innerWidth - W - 16), top: below ? r.bottom + 16 : r.top - 126 };

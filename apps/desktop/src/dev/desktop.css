@@ -112,11 +112,9 @@
     transform: translate3d(0, -10px, 0);
   }
 }
+/* Like the app: the whole screen dims and the number counts down in the middle. */
 .desk__countdown {
-  left: calc(50% - 120px);
-  top: calc(50% - 120px);
-  width: 240px;
-  height: 240px;
+  inset: 0;
 }
 /* On the left, as in the app. */
 .desk__controls {
