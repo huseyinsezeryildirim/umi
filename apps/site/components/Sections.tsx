@@ -581,11 +581,11 @@ export function AgentKit() {
                 <h3 className="mt-5 text-[22px] font-semibold tracking-tight">{k.title}</h3>
                 <p className="mt-2 flex-1 text-[15px] text-muted">{k.text}</p>
                 <div className={`mt-6 flex items-center gap-2 rounded-xl bg-white py-1.5 pl-4 font-mono text-[13px] text-ink shadow-[0_0_0_1px_rgb(17_24_39/0.06)] ${k.cmd.startsWith("$ ") ? "pr-1.5" : "pr-4"}`}>
-                  {/* One line always: the text gets smaller instead of wrapping. */}
-                  <FitLine className="min-w-0 flex-1 py-1.5">
+                  {/* Long commands wrap onto a second line (anywhere, so they take two lines, not three). */}
+                  <span className="min-w-0 flex-1 py-1.5 text-[12px] leading-relaxed break-all">
                     <span className="text-faint">{k.cmd.slice(0, 2).trim() === "$" || k.cmd.startsWith("→") ? k.cmd.slice(0, 2) : ""}</span>
                     {k.cmd.startsWith("$ ") || k.cmd.startsWith("→ ") ? k.cmd.slice(2) : k.cmd}
-                  </FitLine>
+                  </span>
                   {k.cmd.startsWith("$ ") && <CopyButton text={k.cmd.slice(2)} />}
                 </div>
               </div>
@@ -697,33 +697,5 @@ export function Loom() {
         </div>
       </Rise>
     </section>
-  );
-}
-
-/** One line of text that gets smaller (down to 8 px) until it fits its box, never wraps. */
-function FitLine({ className, children }: { className?: string; children: React.ReactNode }) {
-  const box = useRef<HTMLParagraphElement>(null);
-  const [size, setSize] = useState(13);
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const fit = () => {
-      // Text width grows with the font size: its width at 13 px, from the width now.
-      const now = parseFloat(getComputedStyle(el).fontSize) || 13;
-      const natural = (el.scrollWidth * 13) / now;
-      if (!el.clientWidth || !natural) return;
-      setSize(Math.max(8, Math.min(13, Math.floor(((13 * el.clientWidth) / natural) * 10) / 10)));
-    };
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(el);
-    // The monospace font may arrive after the first measurement.
-    void document.fonts?.ready.then(fit);
-    return () => ro.disconnect();
-  }, []);
-  return (
-    <p ref={box} className={`overflow-hidden whitespace-nowrap ${className ?? ""}`} style={{ fontSize: size }}>
-      {children}
-    </p>
   );
 }
