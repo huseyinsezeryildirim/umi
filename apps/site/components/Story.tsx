@@ -69,49 +69,6 @@ export function Privacy() {
 
 // ───── Pricing, questions, ending ─────
 
-export function Pricing() {
-  return (
-    <section id="pricing" className="px-4 pt-40 pb-10">
-      <Rise className="text-center">
-        <h2 className="h-display text-[clamp(36px,5.6vw,60px)]">Free. Not a trial.</h2>
-        <p className="lead mx-auto mt-4 max-w-lg">Everything that happens on your computer costs nothing, including for work. You only pay when we host things for you.</p>
-      </Rise>
-      <div className="mx-auto mt-16 grid max-w-4xl gap-px overflow-hidden rounded-[28px] bg-line md:grid-cols-2">
-        {[
-          {
-            name: "Umi",
-            price: "$0",
-            note: "forever",
-            items: ["Unlimited recordings, no watermark", "The whole editor, 4K and GIF export", "Captions, voiceover and clean-up on your computer", "Import from Loom", "3 share links at a time, up to 5 minutes, kept for a week"],
-          },
-          {
-            name: "Umi Pro",
-            price: "$8",
-            note: "a month billed yearly ($12 monthly) · launching soon",
-            items: ["Links that stay up as long as you like, up to 4 hours each", "200 GB of cloud storage", "Who watched, and for how long", "Passwords, expiry dates, your own domain, no Umi badge"],
-          },
-        ].map((p, k) => (
-          <Rise key={p.name} delay={k * 0.08} className="bg-white p-9">
-            <p className="text-[15px] font-medium text-muted">{p.name}</p>
-            <p className="mt-2 flex items-baseline gap-2">
-              <b className="text-5xl font-semibold tracking-tight">{p.price}</b>
-              <span className="text-muted">{p.note}</span>
-            </p>
-            <ul className="mt-7 grid gap-3 text-[15px] text-text">
-              {p.items.map((t) => (
-                <li key={t} className="flex gap-3">
-                  <span className="mt-[9px] size-1.5 shrink-0 rounded-full bg-accent" />
-                  {t}
-                </li>
-              ))}
-            </ul>
-          </Rise>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 const QUESTIONS: [string, string][] = [
   ["Is it really free?", "Yes. Recording, editing, exporting and everything that runs on your computer is free, with no time limit or watermark, for personal and commercial use. Share links are free for a week (3 at a time, up to 5 minutes); keeping them and longer videos are Umi Pro."],
   ["Does my video leave my computer?", "Only if you share a link. Captions, voiceover, noise removal and background removal all run locally."],
