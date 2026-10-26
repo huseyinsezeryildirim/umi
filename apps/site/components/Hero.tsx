@@ -37,6 +37,9 @@ export function Hero() {
   const p = useSpring(scrollYProgress, { stiffness: 140, damping: 32 });
   const scale = useTransform(p, [0, 1], [0.92, 1]);
   const y = useTransform(p, [0, 1], [60, 0]);
+  // Once the demo runs, the stage stops scaling with the scroll: re-rasterizing a live app at a
+  // new scale every frame makes it shimmer.
+  const [live, setLive] = useState(false);
 
   return (
     <section id="top" className="px-4 pt-36 text-center sm:pt-44">
@@ -77,8 +80,8 @@ export function Hero() {
         </div>
       </motion.div>
 
-      <motion.div ref={stage} style={{ scale, y }} className="mx-auto mt-16 max-w-6xl sm:mt-20">
-        <LiveDemo />
+      <motion.div ref={stage} style={live ? { scale: 1, y: 0 } : { scale, y }} className="mx-auto mt-16 max-w-6xl sm:mt-20">
+        <LiveDemo live={live} onStart={() => setLive(true)} />
       </motion.div>
     </section>
   );
@@ -88,8 +91,7 @@ export function Hero() {
  * The real Umi editor. A picture until asked; then the app itself loads in place (the
  * same interface, running in the browser on a sample recording).
  */
-function LiveDemo() {
-  const [live, setLive] = useState(false);
+function LiveDemo({ live, onStart }: { live: boolean; onStart: () => void }) {
   const [ready, setReady] = useState(false);
   // The app is laid out at a desktop size and scaled to fit, so it looks like the picture.
   const box = useRef<HTMLDivElement>(null);
@@ -126,7 +128,7 @@ function LiveDemo() {
             >
               <motion.button
                 type="button"
-                onClick={() => setLive(true)}
+                onClick={onStart}
                 className="btn-glass"
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
