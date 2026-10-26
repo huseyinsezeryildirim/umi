@@ -115,6 +115,18 @@ jobs:
       - name: Bundle FFmpeg into the app and sign again
         run: python3 apps/desktop/scripts/bundle-libs.py "$APP"
 
+      # The app is notarized and stapled first, so the copy inside the DMG opens without a network
+      # check too; then the DMG itself.
+      - name: Notarize and staple the app
+        if: env.HAS_CERTIFICATE == 'true' && env.CAN_NOTARIZE == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/Umi.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/Umi.zip" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait --timeout 1h
+          xcrun stapler staple "$APP"
       - name: DMG
         run: |
           stage="$RUNNER_TEMP/dmg"
@@ -123,7 +135,7 @@ jobs:
           ln -s /Applications "$stage/Applications"
           hdiutil create -volname Umi -srcfolder "$stage" -ov -format UDZO "$DMG"
           if [ "$APPLE_SIGNING_IDENTITY" != "-" ]; then codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$DMG"; fi
-      - name: Notarize and staple
+      - name: Notarize and staple the DMG
         if: env.HAS_CERTIFICATE == 'true' && env.CAN_NOTARIZE == 'true'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -132,8 +144,6 @@ jobs:
         run: |
           xcrun notarytool submit "$DMG" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait --timeout 1h
           xcrun stapler staple "$DMG"
-          # The ticket covers the app inside too; staple it for the update archive.
-          xcrun stapler staple "$APP"
           spctl --assess --type open --context context:primary-signature -v "$DMG"
 
       - name: Update archive (signed with the updater key)
