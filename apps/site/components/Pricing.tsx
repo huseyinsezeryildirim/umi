@@ -76,7 +76,7 @@ function Strip({ billing, setBilling }: { billing: Billing; setBilling: (b: Bill
           </div>
           <ul className="grid content-start gap-x-8 sm:grid-cols-2">
             {FREE.map((t) => (
-              <li key={t} className="flex gap-3 border-t border-line py-3.5 text-[15px] leading-snug text-text">
+              <li key={t} className="flex gap-3 border-t border-line py-3.5 text-[15px] leading-snug text-text first:border-t-0 first:pt-0 sm:nth-[2]:border-t-0 sm:nth-[2]:pt-0">
                 <Check />
                 {t}
               </li>
