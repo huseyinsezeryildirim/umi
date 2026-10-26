@@ -37,8 +37,12 @@ def linked(path):
 
 def main():
     os.makedirs(FRAMEWORKS, exist_ok=True)
-    # Every outside library, by the name it's loaded as (e.g. libavutil.61.dylib).
+    # Every outside library, by the name it's loaded as (e.g. libavutil.61.dylib), plus libraries the
+    # app opens itself at run time (UMI_EXTRA_DYLIBS, space-separated: ONNX Runtime on Intel Macs).
     todo, names = [EXE], {}
+    for extra in os.environ.get("UMI_EXTRA_DYLIBS", "").split():
+        names[os.path.basename(extra)] = os.path.realpath(extra)
+        todo.append(names[os.path.basename(extra)])
     while todo:
         for ref in linked(todo.pop()):
             name = os.path.basename(ref)

@@ -12,8 +12,22 @@ fn environment() -> Result<&'static Environment, AiError> {
     if let Some(env) = ENV.get() {
         return Ok(env);
     }
-    let env = ort::init().with_name("umi").with_telemetry(false).build().map_err(|e| AiError::Model(e.to_string()))?;
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    let init = ort::init_from(dylib()).map_err(|e| AiError::Model(e.to_string()))?;
+    #[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
+    let init = ort::init();
+    let env = init.with_name("umi").with_telemetry(false).build().map_err(|e| AiError::Model(e.to_string()))?;
     Ok(ENV.get_or_init(|| env))
+}
+
+/// Intel Macs: ONNX Runtime from the app bundle, or Homebrew's when running a development build.
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+fn dylib() -> std::path::PathBuf {
+    let bundled = std::env::current_exe().ok().and_then(|exe| Some(exe.parent()?.join("../Frameworks/libonnxruntime.dylib")));
+    match bundled {
+        Some(path) if path.exists() => path,
+        _ => "/usr/local/opt/onnxruntime/lib/libonnxruntime.dylib".into(),
+    }
 }
 
 /// Loads a model for inference.

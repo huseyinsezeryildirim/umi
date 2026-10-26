@@ -12,17 +12,24 @@ thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 ureq = "3"
-ort = { version = "=2.0.0-rc.15", features = ["ndarray"] }
 ndarray = "0.17"
 misaki-rs = { version = "0.6", default-features = false }
 dirs = "6"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 whisper-rs = { version = "0.16", features = ["metal"] }
+
+# ONNX Runtime: linked in (prebuilt) everywhere but Intel Macs, where there's no prebuilt build:
+# there the app loads the libonnxruntime.dylib it carries in Contents/Frameworks (from Homebrew).
+[target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
 ort = { version = "=2.0.0-rc.15", features = ["ndarray", "coreml"] }
+
+[target.'cfg(all(target_os = "macos", target_arch = "x86_64"))'.dependencies]
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "ndarray", "tracing", "coreml", "load-dynamic"] }
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 whisper-rs = "0.16"
+ort = { version = "=2.0.0-rc.15", features = ["ndarray"] }
 
 [dev-dependencies]
 image = { version = "0.25", default-features = false, features = ["png"] }

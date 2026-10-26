@@ -77,6 +77,11 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: brew install ffmpeg pkgconf
+      - name: ONNX Runtime (Intel Macs load it at run time; there's no prebuilt build to link)
+        if: matrix.arch == 'x64'
+        run: |
+          brew install onnxruntime
+          echo "UMI_EXTRA_DYLIBS=$(brew --prefix onnxruntime)/lib/libonnxruntime.dylib" >> "$GITHUB_ENV"
       - run: pnpm install --frozen-lockfile
 
       - name: Developer ID certificate into a temporary keychain
