@@ -1,7 +1,7 @@
 # Monthly dependency updates, grouped, minor and patch only (major versions are upgraded by hand).
-# Every PR runs the full CI matrix, and on a private repository macOS minutes count 10x and Windows 2x,
+# Every PR runs the full CI matrix (free on a public repository, but slow),
 # so this stays at one PR per ecosystem and month. Security updates still arrive whenever they're published.
-# Paused (open-pull-requests-limit: 0) while GitHub Actions is off; set it back to 1 to resume.
+# Paused (open-pull-requests-limit: 1) while GitHub Actions is off; set it back to 1 to resume.
 version: 2
 updates:
   - package-ecosystem: cargo
@@ -11,7 +11,7 @@ updates:
         update-types: ["version-update:semver-major"]
     schedule:
       interval: monthly
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 1
     groups:
       rust:
         patterns: ["*"]
@@ -24,7 +24,7 @@ updates:
         update-types: ["version-update:semver-major"]
     schedule:
       interval: monthly
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 1
     groups:
       js:
         patterns: ["*"]
@@ -32,7 +32,7 @@ updates:
   # The Cloudflare Worker (npm, web/package-lock.json).
   - package-ecosystem: npm
     directory: /web
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 1
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
@@ -46,7 +46,7 @@ updates:
     directory: /
     schedule:
       interval: monthly
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 1
     groups:
       actions:
         patterns: ["*"]
