@@ -2,7 +2,7 @@ name: Release
 
 # Builds the desktop app for every platform and attaches the installers to a draft GitHub release.
 # Asset names match the download site (apps/site/components/Download.tsx): Umi_aarch64.dmg, Umi_x64.dmg,
-# Umi_x64-setup.exe, Umi_amd64.AppImage. With the updater key set, the release also gets signed update
+# Umi_x64.exe, Umi_amd64.AppImage. With the updater key set, the release also gets signed update
 # archives and latest.json, which installed apps read once the draft is published.
 #
 # Signing is optional per platform; without its secrets a platform builds unsigned (docs/DEVOPS.md).
@@ -300,7 +300,7 @@ jobs:
           const kinds = [
             ["darwin-aarch64", /aarch64\.app\.tar\.gz$/],
             ["darwin-x86_64", /x64\.app\.tar\.gz$/],
-            ["windows-x86_64", /-setup\.exe$/],
+            ["windows-x86_64", /x64(-setup)?\.exe$/],
             ["linux-x86_64", /\.AppImage$/],
           ];
           const platforms = {};
