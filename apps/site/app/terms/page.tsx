@@ -41,7 +41,7 @@ export default function Page() {
         [
           "Open-source software",
           <p>
-            The Umi apps are open source. Your use of the source code is governed by its license ([AGPL-3.0 / license to be confirmed]), which prevails over
+            The Umi apps are open source. Your use of the source code is governed by its license (GNU Affero General Public License v3.0), which prevails over
             these Terms for the code itself. These Terms govern the hosted Service, our website and our brand. The Umi name and logo are our trademarks and
             are not licensed by the open-source license.
           </p>,
