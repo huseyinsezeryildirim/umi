@@ -20,3 +20,6 @@ apps/desktop/dist/
 /keys.env
 # Release-only Tauri settings written by .github/workflows/release.yml
 apps/desktop/src-tauri/release.conf.json
+
+# Umi Cloud lives in its own (private) repository, cloned here for local development.
+/web/

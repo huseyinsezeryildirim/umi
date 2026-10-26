@@ -6,11 +6,10 @@ Everything is automated in `.github/workflows/`. Until a step below is done, the
 | Workflow | When | What |
 |---|---|---|
 | `ci.yml` | every push and PR | build + test on macOS, Windows, Linux; typecheck + build the web |
-| `deploy-cloud.yml` | push to `main` touching `web/` → **staging**; tag `v*` → **production** | D1 migrations, then `wrangler deploy` of the share-link Worker, then `/healthz` |
 | `deploy-site.yml` | push to `main` → **staging**; tag `v*` → **production** | wasm engine + web editor + Next.js export → Cloudflare Pages |
 | `release.yml` | tag `v*` | signed installers for macOS (arm64, Intel), Windows, Linux → **draft** GitHub release + `latest.json` |
 | `health.yml` | every 3 hours | `/healthz` on staging and production; opens an issue on failure, closes it on recovery |
-| `dependabot.yml` | monthly | one grouped minor/patch PR each for cargo, pnpm, `web/` npm and GitHub Actions |
+| `dependabot.yml` | monthly | one grouped minor/patch PR each for cargo, pnpm and GitHub Actions |
 
 Both deploy workflows can also be run by hand (Actions → the workflow → **Run workflow** → staging or production).
 
@@ -30,37 +29,19 @@ hash-checked redirect to the identical npm file on jsDelivr (`apps/site/scripts/
 ## 2. Cloudflare, once (on your Mac)
 
 ```bash
-cd web && npm ci
 npx wrangler login
-
-# Storage for both environments.
-npx wrangler r2 bucket create umi-videos-staging
-npx wrangler r2 bucket create umi-videos
-npx wrangler d1 create umi-staging     # copy the printed database_id into env.staging in web/wrangler.jsonc
-npx wrangler d1 create umi             # copy the printed database_id into env.production in web/wrangler.jsonc
-
-# Worker secrets, per environment (typed at the prompt, never in a file or the shell history).
-openssl rand -base64 32 | npx wrangler secret put SIGNING_SECRET --env staging
-openssl rand -base64 32 | npx wrangler secret put SIGNING_SECRET --env production
-npx wrangler secret put RESEND_API_KEY --env production     # production sends email through Resend
-npx wrangler secret put ADMIN_PASSWORD --env production     # moderation panel at umi.cam/adagiris (sign in as ADMIN_EMAIL)
-npx wrangler secret put ADMIN_PASSWORD --env staging
-# Optional, for direct-to-R2 uploads (also set R2_S3_ENDPOINT in wrangler.jsonc):
-#   npx wrangler secret put R2_ACCESS_KEY_ID --env production
-#   npx wrangler secret put R2_SECRET_ACCESS_KEY --env production
-
-# Safety net for uploads that never finished (the Worker's hourly cleanup also aborts them).
-npx wrangler r2 bucket lifecycle add umi-videos-staging abort-unfinished --abort-multipart-days 2 -y
-npx wrangler r2 bucket lifecycle add umi-videos abort-unfinished --abort-multipart-days 2 -y
 
 # The site.
 npx wrangler pages project create umi-site --production-branch main
 ```
 
-Commit the two `database_id`s (they aren't secret). Then in the Cloudflare dashboard:
+Umi Cloud (the share-link Worker, its D1 database, R2 storage and secrets) lives in its own private
+repository, `umi-cloud`, cloned into `web/` for local development; its `DEPLOY.md` has those steps.
+
+Then in the Cloudflare dashboard:
 
 - **Pages → umi-site → Custom domains**: add `umi.cam`. Production routes `umi.cam/v/*`, `/e/*`, `/api/*`,
-  `/oembed*` and `/healthz` to the Worker (see `env.production.routes` in `web/wrangler.jsonc`); everything
+  `/oembed*` and `/healthz` to the Worker (see `env.production.routes` in the umi-cloud repository's `wrangler.jsonc`); everything
   else is the site. Staging lives on `umi-web-staging.<your-subdomain>.workers.dev` and
   `staging.umi-site.pages.dev`.
 - **My Profile → API Tokens → Create token** ("Edit Cloudflare Workers" template), with these permissions:
@@ -151,17 +132,15 @@ The release installs `trusted-signing-cli` and Tauri signs `umi-desktop.exe` and
    git tag v0.3.0
    git push origin main v0.3.0
    ```
-3. Actions: `Release` builds the draft; `Deploy Umi Cloud` and `Deploy site` wait for your approval
+3. Actions: `Release` builds the draft; `Deploy site` (and, in the umi-cloud repository, `Deploy Umi Cloud`) wait for your approval
    on the production environment → **Review deployments → Approve**.
 4. Releases → the draft → download and try the installers → edit the notes → **Publish**. Publishing is
    what makes `latest.json` and the site's download links point at the new version.
 
 ## 8. Monitoring and backups
 
-- **GitHub Actions minutes**: on a private repository macOS minutes count 10× and Windows 2×, and every
-  push and PR runs CI on all three. Settings → **Billing and plans** → set a spending limit you're happy with
-  (jobs that don't start say "spending limit needs to be increased"). Making the repository public makes
-  Actions free.
+- **GitHub Actions minutes**: free on this public repository. The private umi-cloud repository runs only
+  short Linux jobs (typecheck and deploy), well within the free 2,000 minutes a month.
 
 - **Health**: `health.yml` probes `/healthz` every three hours and opens an issue titled "Health check failing: …".
   GitHub emails you about new issues if you watch the repository.

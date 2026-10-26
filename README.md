@@ -74,7 +74,8 @@ cargo test --workspace --release
 Service keys baked into builds (Pexels) come from the environment or a git-ignored
 `keys.env` at the repository root (`UMI_PEXELS_KEY=…`).
 
-Cloud, locally: `cd web && npm run setup:local && npm run dev`, then `node scripts/e2e.mjs`.
+Umi Cloud (share links, accounts) is a separate private repository; with access, clone it into `web/`
+(`git clone git@github.com:huseyinsezeryildirim/umi-cloud.git web`), then `cd web && npm run setup:local && npm run dev`.
 
 `scripts/make-fixture.sh` builds a synthetic recording in `/tmp/umi-fixtures` for render tests.
 
@@ -94,7 +95,7 @@ crates/
 apps/desktop    the app
 apps/site       umi.cam
 packages/ui     design system
-web/            Umi Cloud
+umi-cloud       Umi Cloud (share links, accounts): a separate private repository
 extension/      Chrome extension
 docs/           product, architecture, roadmap
 ```
