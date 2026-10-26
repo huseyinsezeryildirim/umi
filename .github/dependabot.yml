@@ -1,7 +1,6 @@
 # Monthly dependency updates, grouped, minor and patch only (major versions are upgraded by hand).
 # Every PR runs the full CI matrix (free on a public repository, but slow),
 # so this stays at one PR per ecosystem and month. Security updates still arrive whenever they're published.
-# Paused (open-pull-requests-limit: 1) while GitHub Actions is off; set it back to 1 to resume.
 version: 2
 updates:
   - package-ecosystem: cargo
