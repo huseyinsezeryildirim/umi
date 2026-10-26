@@ -22,6 +22,14 @@ const { values: args } = parseArgs({
 const BASE = args.base.replace(/\/+$/, "");
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
+/** The moderation panel's password: UMI_ADMIN_PASSWORD, or ADMIN_PASSWORD from web/.dev.vars (never committed). */
+function adminPassword() {
+  if (process.env.UMI_ADMIN_PASSWORD) return process.env.UMI_ADMIN_PASSWORD;
+  const vars = join(root, ".dev.vars");
+  const line = existsSync(vars) ? readFileSync(vars, "utf8").split("\n").find((l) => l.startsWith("ADMIN_PASSWORD=")) : null;
+  return line ? line.slice("ADMIN_PASSWORD=".length).trim() : "";
+}
+
 let failures = 0;
 function check(cond, label) {
   console.log(`${cond ? "  ✓" : "  ✗"} ${label}`);
@@ -406,7 +414,7 @@ async function main() {
     fetch(`${BASE}/adagiris${path}`, { method: form ? "POST" : "GET", redirect: "manual", headers: cookie ? { cookie } : {}, body: form ? new URLSearchParams(form) : undefined });
   check((await admin("")).status === 200 && (await (await admin("")).text()).includes("Sign in"), "panel asks to sign in");
   check((await admin("/login", { email: "hi@ux.center", password: "wrong" })).status === 401, "wrong password → 401");
-  const signIn = await admin("/login", { email: "hi@ux.center", password: process.env.UMI_ADMIN_PASSWORD  });
+  const signIn = await admin("/login", { email: "hi@ux.center", password: adminPassword() });
   const adminCookie = (signIn.headers.get("set-cookie") ?? "").split(";")[0];
   check(signIn.status === 303 && adminCookie.startsWith("umi_admin="), "moderator signs in");
   const page = await (await admin("", null, adminCookie)).text();
