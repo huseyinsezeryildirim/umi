@@ -64,7 +64,7 @@ and Cap don't cross.
 |---|---|---|---|
 | Record (app and browser), any length, 4K | ✓ | ✓ | ✓ |
 | Full editor, zooms, captions, cut the ums, camera blur | ✓ | ✓ | ✓ |
-| Export MP4/GIF, your own storage, self-hosted cloud | ✓ | ✓ | ✓ |
+| Export MP4/GIF, your own storage | ✓ | ✓ | ✓ |
 | Commercial use | ✓ | ✓ | ✓ |
 | Share links on Umi Cloud | Unlimited links, **any length**, **10 GB** in total (about 5 hours of 1080p) | 1 TB | No limits |
 | Views, reactions, comments, password, expiry | ✓ | ✓ | ✓ |
@@ -77,7 +77,6 @@ Why these numbers:
 - **Free beats both:** Loom gives 25 videos of 5 minutes at 720p. Cap's free tier is personal use only, with 5-minute links. Umi gives unlimited links of any length up to 10 GB, and unlimited local recording for any use. At most that costs Umi $0.15 a month per free user.
 - **Pro is the cheapest paid plan:** it undercuts Cap Pro ($12) and Loom ($18). Most people never need more than Free, and that's fine: the free plan is the marketing.
 - **Team is where the money is,** as with Loom. Companies pay per seat for shared libraries and admin.
-- **Self-hosting stays free.** Later, enterprises can pay for support and an SLA (a contract, not a feature lock).
 
 Other income later, all optional:
 - a one-time "supporter" license;

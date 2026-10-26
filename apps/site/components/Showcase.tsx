@@ -571,7 +571,7 @@ const PLACES = [
   { name: "Your computer", line: "Every recording is a folder on your disk. Free, offline, yours.", icon: "M4 5h16v11H4zM8 20h8M12 16v4", tint: "#116ff5" },
   { name: "A file", line: "MP4, MOV or GIF, up to 4K. Send it anywhere.", icon: "M7 3h7l5 5v13H7zM14 3v5h5", tint: "#13a874" },
   { name: "Umi Cloud", line: "A link the moment you stop, with comments and insights.", icon: "M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z", tint: "#7c4dff" },
-  { name: "Self hosted", line: "Umi Cloud is open source: run it on your own account and bucket.", icon: "M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01", tint: "#e8590c" },
+  { name: "Embedded", line: "Paste the link in Notion, Slack or your site and the player shows up.", icon: "M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 6l-3 12", tint: "#e8590c" },
 ];
 
 export function Storage() {
@@ -607,7 +607,7 @@ export function Storage() {
       <Rise className="mx-auto max-w-3xl text-center">
         <p className="text-[15px] font-medium text-accent">Open source</p>
         <h2 className="h-display mt-3 text-[clamp(34px,5vw,60px)]">Your recordings. Actually yours.</h2>
-        <p className="lead mx-auto mt-4 max-w-xl">They live on your computer. Share them through Umi Cloud, or run the cloud yourself.</p>
+        <p className="lead mx-auto mt-4 max-w-xl">They live on your computer. Share them as a link, or embed them anywhere.</p>
       </Rise>
       <div ref={ref} className="mx-auto mt-14 grid max-w-6xl gap-3 rounded-[32px] bg-panel p-3 lg:grid-cols-[1.25fr_1fr]">
         <Rise className="relative self-center overflow-hidden rounded-[24px] bg-white">
