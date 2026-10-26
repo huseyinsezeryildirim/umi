@@ -23,7 +23,7 @@ jobs:
     outputs:
       id: ${{ steps.release.outputs.id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Tag matches the app version
         run: |
           version=$(node -p 'require("./apps/desktop/src-tauri/tauri.conf.json").version')
@@ -62,7 +62,7 @@ jobs:
       DMG: Umi_${{ matrix.arch }}.dmg
       UPDATE: Umi_${{ matrix.arch }}.app.tar.gz
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # ScreenCaptureKit's Metal bridge needs the macOS 26 SDK (Xcode 26).
       - uses: maxim-lobanov/setup-xcode@v1
         with:
@@ -71,8 +71,8 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -174,13 +174,13 @@ jobs:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       CAN_SIGN_UPDATES: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -243,7 +243,7 @@ jobs:
           JS
           cat apps/desktop/src-tauri/release.conf.json
 
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           UMI_PEXELS_KEY: ${{ secrets.UMI_PEXELS_KEY }}
@@ -266,7 +266,7 @@ jobs:
     env:
       CAN_SIGN_UPDATES: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: latest.json
         if: env.CAN_SIGN_UPDATES == 'true'
         run: |
@@ -308,7 +308,7 @@ jobs:
     needs: draft
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Pack the Chrome extension
         run: cd extension && zip -r ../umi-chrome.zip . -x "README.md"
       - run: gh release upload "$TAG" umi-chrome.zip --clobber
