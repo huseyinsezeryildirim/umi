@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
-import { forgotPassword, getToken, resetPassword, signIn, signUp, verifyEmail } from "@/lib/account";
+import { forgotPassword, getToken, me, resetPassword, signIn, signUp, verifyEmail } from "@/lib/account";
 import { Mark } from "./ui";
 
 const EASE = [0.25, 1, 0.5, 1] as const;
@@ -100,9 +100,13 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const { busy, error, run } = useAction();
   const signup = mode === "signup";
 
-  // Already signed in: straight on.
+  // On the way to buying Pro (/upgrade): say so.
+  const [forPro, setForPro] = useState(false);
+  useEffect(() => setForPro(nextPath().startsWith("/upgrade")), []);
+
+  // Already signed in (and the session still works): straight on.
   useEffect(() => {
-    if (getToken()) location.replace(nextPath());
+    if (getToken()) void me().then((a) => a && location.replace(nextPath()), () => {});
   }, []);
 
   const submit = run(async () => {
@@ -111,7 +115,16 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   });
 
   return (
-    <Shell title={signup ? "Create your account" : "Welcome back"} lead={signup ? "Record in your browser and share with a link." : "Sign in to record and edit."}>
+    <Shell
+      title={signup ? "Create your account" : "Welcome back"}
+      lead={
+        forPro
+          ? `${signup ? "Create" : "Sign in to"} your Umi account first. Paying for Pro comes right after.`
+          : signup
+            ? "Record in your browser and share with a link."
+            : "Sign in to record and edit."
+      }
+    >
       <form onSubmit={submit} className="mt-8 grid gap-3">
         <Field
           label="Email"

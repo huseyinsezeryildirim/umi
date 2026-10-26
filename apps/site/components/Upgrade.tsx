@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { type Account, me } from "@/lib/account";
 import { type Cycle, billingConfig, openCheckout, openPortal } from "@/lib/billing";
 import { Shell } from "./AuthForm";
+import { Mark } from "./ui";
 
 const PRICE: Record<Cycle, string> = { monthly: "$12 a month", yearly: "$96 a year ($8 a month)" };
 
@@ -24,7 +25,15 @@ export function Upgrade() {
     void (async () => {
       const config = await billingConfig();
       if (!config.enabled) return setState("off");
-      const a = await me().catch(() => null);
+      // Signed out (or the session ended): sign up or in first. Any other problem is shown, not
+      // retried, so the two pages never bounce between each other.
+      let a: Account | null;
+      try {
+        a = await me();
+      } catch (e) {
+        setError((e as Error).message);
+        return setState("ready");
+      }
       if (!a) return location.replace(`/signup?next=${encodeURIComponent(`/upgrade?cycle=${c}`)}`);
       setAccount(a);
       if (a.plan !== "free") return setState("already");
@@ -57,6 +66,13 @@ export function Upgrade() {
     setState("done");
   };
 
+  // Until we know who's here: no card that might vanish a moment later.
+  if (state === "loading")
+    return (
+      <main className="grid min-h-[100svh] place-items-center">
+        <Mark className="size-8 animate-pulse text-accent" />
+      </main>
+    );
   if (state === "off")
     return (
       <Shell title="Umi Pro is coming soon" lead="Until then, everything on your computer is free, and so are 3 share links at a time.">
@@ -85,7 +101,7 @@ export function Upgrade() {
     <Shell title="Upgrade to Umi Pro" lead={`${PRICE[cycle]}. Links that stay up, 200 GB, insights and passwords. Cancel any time; full refund within 14 days.`}>
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <button type="button" disabled={!account} onClick={() => account && void start(cycle, account)} className="btn-dark inline-flex disabled:opacity-60">
-          {state === "loading" ? "Loading…" : "Continue to payment"}
+          Continue to payment
         </button>
         <button type="button" onClick={() => setCycle(cycle === "yearly" ? "monthly" : "yearly")} className="text-[14px] font-medium text-accent">
           {cycle === "yearly" ? "Pay monthly instead" : "Pay yearly and save 33%"}
