@@ -46,7 +46,7 @@ export async function openPortal(): Promise<void> {
 type PaddleJs = {
   Environment: { set(env: string): void };
   Initialize(o: { token: string; eventCallback?: (e: { name: string }) => void }): void;
-  Checkout: { open(o: unknown): void };
+  Checkout: { open(o: unknown): void; close(): void };
 };
 
 let paddle: Promise<PaddleJs> | null = null;
@@ -57,7 +57,14 @@ function loadPaddle(c: Extract<BillingConfig, { enabled: true }>, onEvent: (name
     s.onload = () => {
       const P = (window as unknown as { Paddle: PaddleJs }).Paddle;
       if (c.environment === "sandbox") P.Environment.set("sandbox");
-      P.Initialize({ token: c.clientToken, eventCallback: (e) => onEvent(e.name) });
+      P.Initialize({
+        token: c.clientToken,
+        eventCallback: (e) => {
+          // Paddle's "thank you" screen doesn't close by itself: give it a moment, then our page takes over.
+          if (e.name === "checkout.completed") setTimeout(() => P.Checkout.close(), 1500);
+          onEvent(e.name);
+        },
+      });
       resolve(P);
     };
     s.onerror = () => reject(new Error("Couldn’t load the checkout. Check your connection and try again."));
