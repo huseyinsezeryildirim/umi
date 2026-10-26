@@ -30,6 +30,7 @@ export function Nav() {
       >
         <a href="#top" className="flex items-center gap-2 text-lg font-semibold tracking-tight" aria-label="Umi home">
           <Mark className="size-7" /> Umi
+          <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-accent uppercase">Beta</span>
         </a>
         <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
           {LINKS.map(([label, href]) => (
