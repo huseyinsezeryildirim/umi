@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { billingConfig } from "@/lib/billing";
 import { DownloadButton } from "./Download";
 import { Rise } from "./Sections";
 
@@ -61,6 +62,9 @@ function Heading({ children }: { children?: React.ReactNode }) {
 
 /** Free takes the stage, its features a plain two-column list; Pro is a strip under it. */
 function Strip({ billing, setBilling }: { billing: Billing; setBilling: (b: Billing) => void }) {
+  // On sale once Umi Cloud has a checkout set up; until then, "launching soon".
+  const [onSale, setOnSale] = useState(false);
+  useEffect(() => void billingConfig().then((c) => setOnSale(c.enabled)), []);
   return (
     <>
       <Heading />
@@ -87,7 +91,7 @@ function Strip({ billing, setBilling }: { billing: Billing; setBilling: (b: Bill
           <div className="flex-1">
             <p className="text-lg font-semibold">
               Need links that stay up? <span className="text-accent">Umi Pro</span>
-              <span className="ml-2 align-middle text-[12px] font-medium text-muted">launching soon</span>
+              {!onSale && <span className="ml-2 align-middle text-[12px] font-medium text-muted">launching soon</span>}
             </p>
             <p className="mt-1 text-[14px] text-muted">{PRO.join(" · ")}</p>
           </div>
@@ -97,6 +101,11 @@ function Strip({ billing, setBilling }: { billing: Billing; setBilling: (b: Bill
               <Price value={PRICE[billing]} className="text-3xl font-semibold" />
               <span className="text-muted"> /mo</span>
             </p>
+            {onSale && (
+              <a href={`/upgrade?cycle=${billing}`} className="btn-dark inline-flex whitespace-nowrap">
+                Upgrade
+              </a>
+            )}
           </div>
         </div>
       </Rise>

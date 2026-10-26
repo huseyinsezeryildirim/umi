@@ -143,7 +143,7 @@ export function Footer() {
     ["Product", [["Download", "#download"], ["Pricing", "#pricing"], ["Questions", "#faq"]]],
     ["Open source", [["GitHub", "https://github.com/huseyinsezeryildirim/umi"], ["Releases", "https://github.com/huseyinsezeryildirim/umi/releases"], ["Report a bug", "https://github.com/huseyinsezeryildirim/umi/issues"]]],
     ["Platforms", [["macOS", "#download"], ["Windows", "#download"], ["Linux", "#download"], ["Browser", "/signup"]]],
-    ["Legal", [["Terms", "/terms"], ["Privacy", "/privacy"], ["Copyright", "/copyright"]]],
+    ["Legal", [["Terms", "/terms"], ["Privacy", "/privacy"], ["Refunds", "/refunds"], ["Copyright", "/copyright"], ["Contact", "mailto:hi@ux.center"]]],
   ];
   return (
     <footer className="px-5 pt-20 pb-12">

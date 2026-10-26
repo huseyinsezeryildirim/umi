@@ -8,7 +8,7 @@ import { Mark } from "./ui";
 const EASE = [0.25, 1, 0.5, 1] as const;
 
 /** One quiet card on the sky, shared by every account page. */
-function Shell({ title, lead, children }: { title: string; lead: string; children: React.ReactNode }) {
+export function Shell({ title, lead, children }: { title: string; lead: string; children: React.ReactNode }) {
   return (
     <main className="relative grid min-h-[100svh] place-items-center overflow-hidden px-4 py-16">
       <img src="/photos/sky.jpg" alt="" className="absolute inset-0 size-full object-cover" />
@@ -85,6 +85,12 @@ function useAction() {
   return { busy, error, run };
 }
 
+/** Where to go after signing in: `?next=` when it's a page on this site, else the app. */
+const nextPath = () => {
+  const next = new URLSearchParams(location.search).get("next") ?? "";
+  return next.startsWith("/") && !next.startsWith("//") ? next : "/app";
+};
+
 const tokenFromUrl = () => new URLSearchParams(location.search).get("token") ?? "";
 
 /** Sign in and sign up. */
@@ -94,14 +100,14 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const { busy, error, run } = useAction();
   const signup = mode === "signup";
 
-  // Already signed in: straight to the app.
+  // Already signed in: straight on.
   useEffect(() => {
-    if (getToken()) location.replace("/app");
+    if (getToken()) location.replace(nextPath());
   }, []);
 
   const submit = run(async () => {
     await (signup ? signUp : signIn)(email, password);
-    location.assign("/app");
+    location.assign(nextPath());
   });
 
   return (
@@ -138,7 +144,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       </form>
       <Footer>
         {signup ? "Already have an account? " : "New to Umi? "}
-        <a href={signup ? "/login" : "/signup"} className="font-medium text-accent">
+        <a href={(signup ? "/login" : "/signup") + (typeof location === "undefined" ? "" : location.search)} className="font-medium text-accent">
           {signup ? "Sign in" : "Create an account"}
         </a>
       </Footer>

@@ -137,8 +137,9 @@ export default function Page() {
               merchant of record (named at checkout), whose terms also apply to your purchase; prices may include or add applicable taxes.
             </p>
             <p>
-              You can cancel at any time; your plan stays active until the end of the current period. Except where the law gives you a right of withdrawal
-              or a refund, fees already paid are not refundable. We will give at least 30 days’ notice of price changes, which apply from your next renewal.
+              You can cancel at any time; your plan stays active until the end of the current period. You can ask for a full refund within 14 days of any
+              payment, as described in our <a className="underline" href="/refunds">Refund Policy</a>. We will give at least 30 days’ notice of price
+              changes, which apply from your next renewal.
             </p>
           </>,
         ],

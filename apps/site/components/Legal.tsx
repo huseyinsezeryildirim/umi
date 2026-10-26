@@ -13,6 +13,7 @@ export function LegalPage(props: { title: string; updated: string; intro: React.
           <Link href="/terms" className="hover:text-text">Terms</Link>
           <Link href="/copyright" className="hover:text-text">Copyright</Link>
           <Link href="/privacy" className="hover:text-text">Privacy</Link>
+          <Link href="/refunds" className="hover:text-text">Refunds</Link>
         </nav>
       </header>
       <article className="legal mx-auto max-w-3xl pt-10">

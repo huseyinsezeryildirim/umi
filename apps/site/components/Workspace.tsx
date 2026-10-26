@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API, type Account, type Plan, deleteAccount, me, resendVerification, setPlanForTesting, signOut } from "@/lib/account";
+import { openPortal } from "@/lib/billing";
 import { saveTake } from "@/lib/library";
 import { Recorder } from "./Recorder";
 import { Mark } from "./ui";
@@ -144,6 +145,15 @@ function AccountMenu({ account, onChange, side = "right" }: { account: Account; 
                 ))}
               </div>
             </div>
+          )}
+          {account.plan === "free" ? (
+            <a href="/upgrade" className="block rounded-xl px-3 py-2 text-[14px] font-medium text-accent hover:bg-ink/5">
+              Upgrade to Pro
+            </a>
+          ) : (
+            <button type="button" onClick={() => void openPortal().catch((e) => alert(e.message))} className="w-full rounded-xl px-3 py-2 text-left text-[14px] hover:bg-ink/5">
+              Manage subscription
+            </button>
           )}
           <a href="/" className="block rounded-xl px-3 py-2 text-[14px] hover:bg-ink/5">
             Umi website
