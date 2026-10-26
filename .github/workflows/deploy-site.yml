@@ -91,10 +91,8 @@ jobs:
         id: deploy
         if: steps.ready.outputs.ok == 'true'
         run: |
-          # The wrangler pinned by web/ (run from the root so web/wrangler.jsonc, the Worker's config, stays out of it).
-          npm ci --prefix web
           branch=$([ "$TARGET" = production ] && echo main || echo staging)
-          web/node_modules/.bin/wrangler pages deploy apps/site/out --project-name "$PAGES_PROJECT" --branch "$branch" \
+          npx --yes wrangler@4.152.0 pages deploy apps/site/out --project-name "$PAGES_PROJECT" --branch "$branch" \
             --commit-hash "$GITHUB_SHA" --commit-message "${GITHUB_REF_NAME} ${GITHUB_SHA::7}" | tee "$RUNNER_TEMP/deploy.log"
           url=$(grep -Eo 'https://[^ ]+\.pages\.dev' "$RUNNER_TEMP/deploy.log" | tail -1)
           echo "url=$url" >> "$GITHUB_OUTPUT"

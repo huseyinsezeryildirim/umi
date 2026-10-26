@@ -67,8 +67,3 @@ jobs:
       - run: pnpm -r typecheck
       - name: Web editor and site
         run: pnpm --filter @umi/site build
-      - name: Umi Cloud backend
-        working-directory: web
-        run: |
-          npm ci
-          npx tsc --noEmit
