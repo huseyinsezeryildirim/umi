@@ -372,6 +372,7 @@ fn finish_live(bundle: PathBuf) -> Option<Video> {
         let read = |name: &str| std::fs::read(bundle.join(name)).ok().and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
         let mut ok = true;
         if let Some(project) = read(umi_project::project::PROJECT_FILE) {
+            send_images(&live.client, &live.link.video.id, &bundle, &project);
             ok &= live.client.put_raw_edit(&live.link.video.id, &project, read(umi_project::project::CURSOR_FILE).as_ref()).is_ok();
         }
         if let Some(jpeg) = poster {
@@ -425,7 +426,7 @@ pub async fn live_share(state: State<'_, AppState>, id: Option<String>, bundle: 
     .map_err(|e| e.to_string())?
 }
 
-/// The edit changed: a raw link shows the new look (just project.json goes up).
+/// The edit changed: a raw link shows the new look (project.json, plus any image it newly names).
 pub(crate) fn sync_edit(bundle: &Path) {
     let Some(video) = saved(bundle).filter(|v| v.kind.as_deref() == Some("raw")) else { return };
     let Ok(client) = client() else { return };
@@ -433,7 +434,52 @@ pub(crate) fn sync_edit(bundle: &Path) {
     std::thread::spawn(move || {
         let read = |name: &str| std::fs::read(bundle.join(name)).ok().and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
         if let Some(project) = read(umi_project::project::PROJECT_FILE) {
+            send_images(&client, &video.id, &bundle, &project);
             let _ = client.put_raw_edit(&video.id, &project, None);
         }
     });
+}
+
+/// Images already on a link (link id, name), so an edit doesn't send them again.
+static SENT_IMAGES: parking_lot::Mutex<Vec<(String, String)>> = parking_lot::Mutex::new(Vec::new());
+
+/// Sends the images the edit names (the background wallpaper, image overlays) to a raw link, as
+/// JPEG (PNG when transparent): they're files on this computer, and HEIC wallpapers aren't
+/// something browsers can show.
+fn send_images(client: &Client, id: &str, bundle: &Path, project: &serde_json::Value) {
+    let edit = &project["edit"];
+    let mut names: Vec<String> = vec![];
+    if let Some(bg) = edit["background"]["image"]["_0"].as_str() {
+        names.push(bg.to_string());
+    }
+    for overlay in edit["overlays"].as_array().into_iter().flatten() {
+        if let (true, Some(file)) = (overlay["kind"] == "image", overlay["file"].as_str()) {
+            names.push(file.to_string());
+        }
+    }
+    for name in names {
+        let key = (id.to_string(), name.clone());
+        if SENT_IMAGES.lock().contains(&key) {
+            continue;
+        }
+        let path = if Path::new(&name).is_absolute() { PathBuf::from(&name) } else { bundle.join(&name) };
+        let Some((bytes, content_type)) = browser_image(&path) else { continue };
+        if client.put_raw_asset(id, &name, &bytes, content_type).is_ok() {
+            SENT_IMAGES.lock().push(key);
+        }
+    }
+}
+
+/// An image file as JPEG (PNG if it has transparency), at most 3200 px on its long side.
+fn browser_image(path: &Path) -> Option<(Vec<u8>, &'static str)> {
+    let img = image::open(path).ok().or_else(|| image::open(umi_render::raster::convert_with_system(path, 3200)?).ok())?;
+    let img = if img.width().max(img.height()) > 3200 { img.resize(3200, 3200, image::imageops::FilterType::Triangle) } else { img };
+    let mut out = Vec::new();
+    if img.color().has_alpha() {
+        img.write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png).ok()?;
+        Some((out, "image/png"))
+    } else {
+        image::DynamicImage::ImageRgb8(img.to_rgb8()).write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Jpeg).ok()?;
+        Some((out, "image/jpeg"))
+    }
 }

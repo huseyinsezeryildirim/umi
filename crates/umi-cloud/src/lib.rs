@@ -435,6 +435,20 @@ impl Client {
         }
     }
 
+    /// An image the edit names (a background wallpaper, an image overlay), keyed by the exact name
+    /// the edit uses, as JPEG or PNG: the viewer's browser draws it.
+    pub fn put_raw_asset(&self, id: &str, name: &str, bytes: &[u8], content_type: &str) -> Result<(), CloudError> {
+        let url = format!("{}/api/videos/{id}/raw/asset", self.base);
+        let response = Self::agent()
+            .put(&url)
+            .query("name", name)
+            .header("Authorization", &format!("Bearer {}", self.token))
+            .header("Content-Type", content_type)
+            .send(bytes)
+            .map_err(|e| CloudError::Network(e.to_string()))?;
+        Self::read::<serde_json::Value>(response).map(|_| ())
+    }
+
     /// The owner shared the link: it's kept from now on (the plan's limits apply).
     pub fn share_raw(&self, id: &str) -> Result<Video, CloudError> {
         let done: VideoBody = self.send("PATCH", &format!("/api/videos/{id}"), Some(serde_json::json!({ "shared": true })))?;

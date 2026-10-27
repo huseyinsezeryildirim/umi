@@ -34,7 +34,8 @@ export type Moment = {
   overlays: { id: string; file: string; time: number }[];
 };
 
-const IMAGE = /\.(png|jpe?g|webp|gif|avif|bmp)$/i;
+// HEIC/TIFF: a Mac wallpaper named by a link made while recording (sent as JPEG).
+const IMAGE = /\.(png|jpe?g|webp|gif|avif|bmp|heic|heif|tiff?)$/i;
 
 /** A hidden video element showing one file, seekable to a time. */
 class Player {
@@ -188,12 +189,13 @@ export class Session {
     return this.current;
   }
 
-  /** A file was added to the recording (image, music, voiceover, face path). */
-  addFile(name: string, blob: Blob) {
+  /** A file was added to the recording (image, music, voiceover, face path). Resolves once an image is ready to draw. */
+  addFile(name: string, blob: Blob): Promise<void> {
     this.files.set(name, blob);
     this.sounds.delete(name);
-    void this.registerImages();
+    const images = this.registerImages();
     if (name === "camera-face.json") void this.attached.then(async () => this.wasm.setFaces(await blob.text()));
+    return images;
   }
 
   file(name: string) {

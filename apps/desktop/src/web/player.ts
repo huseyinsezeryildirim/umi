@@ -73,6 +73,14 @@ async function main() {
   try {
     await start();
     session = new Session(id, project.title ?? "Umi", project, cursor, project.duration ?? 0, new Map(), undefined, remote);
+    // The images the edit names (a wallpaper behind the video, image overlays) came along as JPEGs.
+    const names = [project.edit?.background?.image?._0, ...(project.edit?.overlays ?? []).filter((o: { kind?: string }) => o.kind === "image").map((o: { file: string }) => o.file)];
+    await Promise.all(
+      names.filter((n): n is string => typeof n === "string").map(async (name) => {
+        const r = await fetch(`${api}/v/${id}/raw/asset?name=${encodeURIComponent(name)}`).catch(() => null);
+        if (r?.ok) await session.addFile(name, await r.blob());
+      }),
+    );
     // Fails without WebGPU/WebGL: the plain recording plays below.
     await session.frame(0, 64, 64, false, false);
   } catch (e) {
@@ -297,6 +305,9 @@ function run(session: Session) {
   if (t0 > 0) at = Math.min(duration(), t0);
   tell("loadedmetadata", state());
   void draw();
+  // The first frame may be drawn before the recording has loaded (a file whose index is at its
+  // end takes a moment): draw it again a few times while nobody has pressed play.
+  for (const ms of [800, 2000, 4500]) setTimeout(() => !playing && void draw(), ms);
 }
 
 void main().catch((e) => {
