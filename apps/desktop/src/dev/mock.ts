@@ -136,45 +136,52 @@ function cameraPreview(camera: string | null, frames: { onmessage: (b: ArrayBuff
 }
 
 /** A drawing from the desktop chapter (see desktop.tsx): points are 0…1 of the app's screen. */
-export type DemoStroke = { tool: string; color: string; points: [number, number][]; width: number };
-/** What the visitor did while recording on the demo desktop, so the editor shows it. */
-const demoInk: DemoStroke[] = (() => {
+/** `from`/`until`: seconds into the demo recording the pen went down and lifted. */
+export type DemoStroke = { tool: string; color: string; points: [number, number][]; width: number; from: number; until: number };
+const stored = <T>(key: string, fallback: T): T => {
   try {
-    return JSON.parse(sessionStorage.getItem("umi.demo.ink") ?? "[]");
+    return JSON.parse(sessionStorage.getItem(key) ?? "null") ?? fallback;
   } catch {
-    return [];
+    return fallback;
   }
-})();
-const INK_FROM = 2.9;
-const INK_UNTIL = 6.2;
+};
+/**
+ * The visitor's recording on the demo desktop maps onto the sample one: at its own times when it
+ * fits, squeezed to the sample's length when it was longer.
+ */
+const demoScale = Math.min(1, state.recording.duration / stored("umi.demo.length", state.recording.duration));
+/** What the visitor drew while recording, so the editor shows it when they drew it. */
+const demoInk: DemoStroke[] = stored<DemoStroke[]>("umi.demo.ink", []).filter((s) => typeof s.from === "number");
+/** Like the real drawing: a stroke stays this long after the pen lifts, then fades (Ink.tsx). */
+const INK_HOLD = 2.5;
+const INK_FADE = 0.6;
 {
-  // The layout picked while recording: a scene from a little after the drawing to the end.
-  const picked = (() => {
-    try {
-      return sessionStorage.getItem("umi.demo.layout");
-    } catch {
-      return null;
-    }
-  })();
-  if (picked && picked !== "default" && new URLSearchParams(location.search).has("open")) {
-    state.edit.scenes = [{ id: crypto.randomUUID().toUpperCase(), start: 6.4, end: state.recording.duration, layout: picked as "splitScreen", transition: 0.5 } as EditSettings["scenes"][number]];
+  // The layouts picked while recording: each one a scene until the next pick (or the end).
+  const picks = stored<{ at: number; layout: string }[]>("umi.demo.layouts", []);
+  if (new URLSearchParams(location.search).has("open")) {
+    const end = state.recording.duration;
+    state.edit.scenes = picks
+      .map((p, i) => ({ id: crypto.randomUUID().toUpperCase(), start: p.at * demoScale, end: i + 1 < picks.length ? picks[i + 1].at * demoScale : end, layout: p.layout, transition: 0.5 }))
+      .filter((sc) => sc.layout !== "default" && sc.end - sc.start > 0.2) as EditSettings["scenes"];
   }
 }
 
 /** The visitor's drawings on the sample screen (`w`×`h`), shown for a few seconds, then fading. */
 function drawInk(g: OffscreenCanvasRenderingContext2D, time: number, w: number, h: number) {
-  if (!demoInk.length || time < INK_FROM || time > INK_UNTIL) return;
   g.save();
-  g.globalAlpha *= Math.min(1, (INK_UNTIL - time) / 0.5);
   g.lineCap = "round";
   g.lineJoin = "round";
   for (const s of demoInk) {
+    const [from, until] = [s.from * demoScale, s.until * demoScale];
+    const alpha = time < from ? 0 : 1 - Math.min(1, Math.max(0, (time - until - INK_HOLD) / INK_FADE));
+    if (alpha <= 0) continue;
     const p = s.points.map(([px, py]) => [px * w, py * h] as [number, number]);
     if (!p.length) continue;
     const k = w / s.width;
     g.strokeStyle = s.color;
     g.lineWidth = 5 * k;
     g.save();
+    g.globalAlpha *= alpha;
     if (s.tool === "highlighter") {
       g.globalAlpha *= 0.35;
       g.lineWidth = 22 * k;

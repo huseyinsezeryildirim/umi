@@ -77,6 +77,13 @@ export function Tour() {
     held = false;
     // The recording is done: on to the editor, where the tour carries on.
     if (onDesktop && i >= FIRST_EDITOR_STEP && i < STEPS.length) {
+      // How long the visitor recorded, so the editor lines their drawings and layouts up with it.
+      const start = (window as unknown as { __demoRecStart?: number }).__demoRecStart;
+      try {
+        if (start) sessionStorage.setItem("umi.demo.length", String((performance.now() - start) / 1000));
+      } catch {
+        // The editor then uses the sample's own length.
+      }
       setTimeout(() => location.replace(`?demo&open&tour&from=${i}`), 250);
       return;
     }

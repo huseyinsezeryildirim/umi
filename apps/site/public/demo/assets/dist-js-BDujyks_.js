@@ -1,0 +1,1 @@
+import{a as e}from"./core-CGCxZRWG.js";async function t(){await e(`plugin:process|restart`)}export{t as relaunch};

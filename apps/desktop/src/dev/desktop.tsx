@@ -59,9 +59,14 @@ export function DesktopDemo() {
   onCleanup(() => (removeEventListener("demo:window", onWindow), removeEventListener("demo:resize", onResize)));
   // The layout picked in the column on the right (the preview card follows it).
   const [layout, setLayout] = createSignal<Layout>("default");
+  // Seconds into the demo recording, so the editor shows things when they happened.
+  const now = () => (performance.now() - ((window as unknown as { __demoRecStart?: number }).__demoRecStart ?? performance.now())) / 1000;
+  let picks: { at: number; layout: Layout }[] = [];
   const offLayout = listen<Layout>("record:layout", (e) => {
     setLayout(e.payload);
-    keep("umi.demo.layout", e.payload);
+    if (!recording()) return;
+    picks = [...picks, { at: now(), layout: e.payload }];
+    keep("umi.demo.layouts", JSON.stringify(picks));
   });
   onCleanup(() => void offLayout.then((f) => f()));
 
@@ -81,7 +86,7 @@ export function DesktopDemo() {
   const down = (e: PointerEvent) => {
     // Only what's drawn on the ink layer (not clicks on the panels while a tool is on).
     if (!ink.drawing || !recording() || !(e.target as Element | null)?.closest?.(".ink")) return;
-    stroke = { tool: ink.tool, color: ink.color, points: [at(e)], width: app.getBoundingClientRect().width };
+    stroke = { tool: ink.tool, color: ink.color, points: [at(e)], width: app.getBoundingClientRect().width, from: now(), until: now() };
   };
   const move = (e: PointerEvent) => {
     if (!stroke) return;
@@ -92,6 +97,7 @@ export function DesktopDemo() {
     if (!stroke) return;
     const [a, b] = [stroke.points[0], stroke.points[stroke.points.length - 1]];
     // A tap isn't a drawing.
+    stroke.until = now();
     if (Math.hypot(b[0] - a[0], b[1] - a[1]) > 0.01) strokes.push(stroke);
     stroke = null;
     keep("umi.demo.ink", JSON.stringify(strokes.slice(-20)));
@@ -109,21 +115,34 @@ export function DesktopDemo() {
   // Steps (see tour.tsx): 0 menu bar, 1 camera, 2 start, 3 recording, 4–6 draw and layout, 7 stop.
   const launcher = () => tourIndex() >= 1 && tourIndex() <= 2;
 
+  // The countdown carries on when the visitor clicks ahead; going back before it stops it.
+  let timers: number[] = [];
+  const stopCountdown = () => {
+    timers.forEach(clearTimeout);
+    timers = [];
+    setCount(null);
+  };
+  onCleanup(stopCountdown);
   createEffect(
     on(tourIndex, (i) => {
-      if (i === 3 && !recording()) {
+      if (i < 3) stopCountdown();
+      if (i === 3 && !recording() && !timers.length) {
         setCount(3);
-        const a = setTimeout(() => setCount(2), 900);
-        const b = setTimeout(() => setCount(1), 1800);
-        const c = setTimeout(() => {
+        const a = window.setTimeout(() => setCount(2), 900);
+        const b = window.setTimeout(() => setCount(1), 1800);
+        const c = window.setTimeout(() => {
+          timers = [];
           setCount(null);
           // A new recording: nothing drawn or picked yet.
           keep("umi.demo.ink", null);
-          keep("umi.demo.layout", null);
+          keep("umi.demo.layouts", null);
+          keep("umi.demo.length", null);
+          strokes.length = 0;
+          picks = [];
           setRecording(true);
           (window as unknown as { __demoRecStart: number }).__demoRecStart = performance.now();
         }, 2700);
-        onCleanup(() => [a, b, c].forEach(clearTimeout));
+        timers = [a, b, c];
       }
     }),
   );
