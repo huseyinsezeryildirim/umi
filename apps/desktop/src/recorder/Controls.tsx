@@ -1,18 +1,14 @@
-import { invoke } from "@tauri-apps/api/core";
-import { emit, listen } from "@tauri-apps/api/event";
+import { emit } from "@tauri-apps/api/event";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
-import { Camera, CameraOff, Pause, PenLine, Play, RotateCcw, Trash2 } from "lucide-solid";
+import { Camera, CameraOff, Pause, Play, RotateCcw, Trash2 } from "lucide-solid";
 import { formatClock, recorder } from "./api";
-import { INK_COLORS } from "./Ink";
 
 /** The bar while recording, a column on the left like the web recorder's, in groups: stop and
- *  time · pause and start over · camera and pen · discard. Draggable. */
+ *  time · pause and start over · camera · discard. Draggable. (Drawing is along the bottom, Draw.tsx.) */
 export function Controls() {
   const [elapsed, setElapsed] = createSignal(0);
   const [paused, setPaused] = createSignal(false);
   const [confirm, setConfirm] = createSignal(false);
-  const [drawing, setDrawing] = createSignal(false);
-  const [color, setColor] = createSignal<string>(INK_COLORS[0]);
   /** Whether this recording has a camera, and whether it's showing. */
   const [hasCamera, setHasCamera] = createSignal(false);
   const [cameraOn, setCameraOn] = createSignal(true);
@@ -27,18 +23,8 @@ export function Controls() {
       setPaused(s.paused);
       setCameraOn(s.cameraVisible);
     }, 100);
-    const off = listen<{ drawing: boolean }>("ink:mode", (e) => setDrawing(e.payload.drawing));
-    onCleanup(() => {
-      window.clearInterval(timer);
-      void off.then((f) => f());
-    });
+    onCleanup(() => window.clearInterval(timer));
   });
-
-  const pen = (on: boolean) => void invoke("ink_set", { drawing: on, color: color() });
-  const nextColor = () => {
-    setColor(INK_COLORS[(INK_COLORS.indexOf(color() as (typeof INK_COLORS)[number]) + 1) % INK_COLORS.length]);
-    pen(true);
-  };
 
   const restart = async () => {
     await emit("record:discard");
@@ -91,14 +77,8 @@ export function Controls() {
               <Camera size={19} />
             </Show>
           </button>
+          <i class="controls__line" />
         </Show>
-        <button type="button" class="controls__btn" data-on={drawing() ? "true" : "false"} onClick={() => pen(!drawing())} title="Draw on screen (⌥⇧D) · Esc to stop">
-          <PenLine size={19} />
-        </button>
-        <Show when={drawing()}>
-          <button type="button" class="controls__swatch" onClick={nextColor} title="Pen color" style={{ background: color() }} />
-        </Show>
-        <i class="controls__line" />
         <button type="button" class="controls__btn controls__btn--danger" onClick={() => setConfirm(true)} title="Discard (⌥⇧C)">
           <Trash2 size={19} />
         </button>

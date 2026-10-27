@@ -839,6 +839,7 @@ pub fn run() {
             open_privacy_settings,
             windows::window_show,
             windows::ink_set,
+            windows::ink_spotlight,
             windows::window_hide,
             windows::window_resize,
             windows::resize_app_window,

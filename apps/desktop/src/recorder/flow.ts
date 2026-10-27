@@ -49,6 +49,9 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
       await recorder.show("controls");
       // With the camera: the layout column on the right (screen and bubble, side by side…).
       if (settings.cameraOn && !settings.cameraOnly) await recorder.show("layouts");
+      // The drawing tools along the bottom, starting with the pointer (clicks go to the apps).
+      await emit("ink:pick", { tool: "pointer" });
+      await recorder.show("draw");
     } catch (e) {
       await recorder.hide("countdown");
       await invoke("record_cancel").catch(() => {});
@@ -75,6 +78,9 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
       await recorder.hide("layouts");
       await recorder.hide("bubble");
       await recorder.hide("prompter");
+      await recorder.hide("draw");
+      await invoke("ink_spotlight", { on: false });
+      await emit("ink:action", { action: "clear" });
       await recorder.hide("ink");
       await emit("ink:mode", { drawing: false });
       const bundle = await invoke<string>("record_stop");
@@ -99,6 +105,9 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
     await recorder.hide("layouts");
     await recorder.hide("bubble");
     await recorder.hide("prompter");
+    await recorder.hide("draw");
+    await invoke("ink_spotlight", { on: false });
+    await emit("ink:action", { action: "clear" });
     await recorder.hide("ink");
     await emit("ink:mode", { drawing: false });
     await invoke("record_cancel");
@@ -149,7 +158,11 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
     if (e.payload === "record") void start();
     if (e.payload === "pause") void pause();
     if (e.payload === "discard") void discard();
-    if (e.payload === "draw") void recorder.status().then((s) => s.recording && invoke("ink_set", { drawing: !inking }));
+    // The draw shortcut: the pen, or back to the pointer.
+    if (e.payload === "draw")
+      void recorder.status().then((s) => {
+        if (s.recording) void emit("ink:pick", { tool: inking ? "pointer" : "pen" });
+      });
   });
   void listen<number>("recovered", (e) => toast(e.payload === 1 ? "Recovered a recording from last time" : `Recovered ${e.payload} recordings from last time`));
 }

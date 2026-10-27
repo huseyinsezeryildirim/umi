@@ -51,6 +51,7 @@ void ready.then(async () => {
     camera: () => import("./recorder/CameraMenu").then((m) => m.CameraMenu),
     controls: () => import("./recorder/Controls").then((m) => m.Controls),
     layouts: () => import("./recorder/Layouts").then((m) => m.Layouts),
+    draw: () => import("./recorder/Draw").then((m) => m.Draw),
     countdown: () => import("./recorder/Countdown").then((m) => m.Countdown),
     area: () => import("./recorder/AreaPicker").then((m) => m.AreaPicker),
     prompter: () => import("./recorder/Prompter").then((m) => m.Prompter),
