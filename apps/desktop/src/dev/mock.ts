@@ -480,6 +480,10 @@ const wallpaper = (a: string, b: string) => {
 };
 
 mockWindows("main");
+/** The desktop demo's layout (the column on the right while recording). */
+let demoLayout = "default";
+const spotlightMove = (e: PointerEvent) => void emit("ink:cursor", [e.clientX, e.clientY]);
+
 mockIPC(
   (cmd, payload) => {
     const p = (payload ?? {}) as Record<string, unknown>;
@@ -569,7 +573,21 @@ mockIPC(
       case "pexels_use":
         return `background-pexels-${p.id}.jpg`;
       case "ink_set":
-        void emit("ink:mode", { drawing: p.drawing, color: p.color });
+        void emit("ink:mode", { drawing: p.drawing, color: p.color, tool: p.tool });
+        return null;
+      // The spotlight follows the pointer (the app reads it from the system; here, the page).
+      case "ink_spotlight":
+        removeEventListener("pointermove", spotlightMove);
+        if (p.on) {
+          void emit("ink:mode", { drawing: false, tool: "spotlight" });
+          addEventListener("pointermove", spotlightMove);
+        } else void emit("ink:cursor", null);
+        return null;
+      case "record_layout":
+        demoLayout = String(p.layout);
+        demoCameraVisible = demoLayout !== "hideCamera";
+        dispatchEvent(new CustomEvent("demo:window", { detail: { view: "bubble", shown: demoCameraVisible } }));
+        void emit("record:layout", demoLayout);
         return null;
       case "copy_text_to_clipboard":
         return null;
@@ -598,7 +616,7 @@ mockIPC(
         return null;
       case "record_status":
         // The desktop demo starts its recording at `__demoRecStart`.
-        return { recording: true, paused: false, elapsed: (performance.now() - ((window as unknown as { __demoRecStart?: number }).__demoRecStart ?? 0)) / 1000, level: Math.abs(Math.sin(performance.now() / 300)) * 0.5, cameraVisible: demoCameraVisible };
+        return { recording: true, paused: false, elapsed: (performance.now() - ((window as unknown as { __demoRecStart?: number }).__demoRecStart ?? 0)) / 1000, level: Math.abs(Math.sin(performance.now() / 300)) * 0.5, cameraVisible: demoCameraVisible, layout: demoLayout };
       case "record_camera_preview":
         return cameraPreview(p.camera as string | null, p.frames as { onmessage: (b: ArrayBuffer) => void });
       // The desktop demo draws the app's floating windows itself; tell it what to show.

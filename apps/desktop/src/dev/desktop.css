@@ -94,6 +94,9 @@
 /* The app's floating windows use position: fixed; a transform makes them stay in their box. */
 .desk__launcher,
 .desk__controls,
+.desk__layouts,
+.desk__draw,
+.desk__ink,
 .desk__countdown {
   position: absolute;
   transform: translateZ(0);
@@ -169,4 +172,102 @@
 .desk__dock-umi img {
   width: 30px;
   height: 30px;
+}
+
+/* The ink layer over the whole desktop (the app's own; clicks pass through unless drawing). */
+.desk__ink {
+  inset: 0;
+  z-index: 5;
+}
+.desk__ink .ink[data-drawing="false"] {
+  pointer-events: none;
+}
+/* The layout column on the right and the drawing tools along the bottom, as in the app. */
+.desk__layouts {
+  right: 16px;
+  top: calc(50% - 118px);
+  width: 64px;
+  height: 236px;
+  animation: desk-drop 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.desk__draw {
+  left: calc(50% - 300px);
+  bottom: 84px;
+  width: 600px;
+  height: 68px;
+  animation: desk-drop 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+/* What viewers see, top right: screen and camera rearranged for the picked layout. */
+.desk__preview {
+  position: absolute;
+  top: 40px;
+  right: 96px;
+  width: 248px;
+  margin: 0;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #5b8def, #a3c4ff);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 14px 34px rgba(0, 0, 0, 0.28);
+  z-index: 6;
+  animation: desk-drop 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.desk__preview figcaption {
+  position: absolute;
+  left: 8px;
+  top: 7px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(17, 24, 39, 0.6);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+}
+.desk__preview img {
+  position: absolute;
+  object-fit: cover;
+  transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.desk__preview-screen {
+  left: 8%;
+  top: 12%;
+  width: 84%;
+  height: 76%;
+  border-radius: 6px;
+}
+.desk__preview-camera {
+  left: 70%;
+  top: 58%;
+  width: 22%;
+  aspect-ratio: 1;
+  height: auto;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #fff;
+}
+.desk__preview[data-layout="splitScreen"] .desk__preview-screen {
+  left: 5%;
+  width: 60%;
+}
+.desk__preview[data-layout="splitScreen"] .desk__preview-camera {
+  left: 68%;
+  top: 12%;
+  width: 27%;
+  height: 76%;
+  aspect-ratio: auto;
+  border-radius: 6px;
+}
+.desk__preview[data-layout="cameraOnly"] .desk__preview-screen {
+  opacity: 0;
+}
+.desk__preview[data-layout="cameraOnly"] .desk__preview-camera {
+  left: 8%;
+  top: 12%;
+  width: 84%;
+  height: 76%;
+  aspect-ratio: auto;
+  border-radius: 6px;
+}
+.desk__preview[data-layout="hideCamera"] .desk__preview-camera {
+  opacity: 0;
+  transform: scale(0.6);
 }

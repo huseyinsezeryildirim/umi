@@ -1,9 +1,17 @@
-// The website demo's first chapter: a Mac desktop where Umi records. The recorder card and
-// the control bar are the app's own components; the rest of the desktop is scenery.
+// The website demo's first chapter: a Mac desktop where Umi records. The recorder card, the
+// control bar, the layout column, the drawing tools and the ink layer are the app's own
+// components; the rest of the desktop is scenery. A small card shows what viewers will see as
+// the layout changes.
+import { listen } from "@tauri-apps/api/event";
 import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { Launcher } from "../recorder/Launcher";
 import { Controls } from "../recorder/Controls";
 import { Bubble } from "../recorder/Bubble";
+import { Layouts } from "../recorder/Layouts";
+import { Draw } from "../recorder/Draw";
+import { Ink } from "../recorder/Ink";
+import type { Layout } from "../recorder/api";
+import cameraFace from "./camera.jpg";
 import { tourIndex } from "./tour";
 import wallpaper from "./wallpaper.jpg";
 import screen from "./screen-a.jpg";
@@ -38,8 +46,12 @@ export function DesktopDemo() {
   addEventListener("demo:window", onWindow);
   addEventListener("demo:resize", onResize);
   onCleanup(() => (removeEventListener("demo:window", onWindow), removeEventListener("demo:resize", onResize)));
+  // The layout picked in the column on the right (the preview card follows it).
+  const [layout, setLayout] = createSignal<Layout>("default");
+  const offLayout = listen<Layout>("record:layout", (e) => setLayout(e.payload));
+  onCleanup(() => void offLayout.then((f) => f()));
   const [t, setT] = createSignal(0);
-  // Steps (see tour.tsx): 0 menu bar, 1 camera, 2 start, 3 recording, 4 stop.
+  // Steps (see tour.tsx): 0 menu bar, 1 camera, 2 start, 3 recording, 4–6 draw and layout, 7 stop.
   const launcher = () => tourIndex() >= 1 && tourIndex() <= 2;
 
   createEffect(
@@ -133,9 +145,24 @@ export function DesktopDemo() {
       </Show>
 
       <Show when={recording()}>
+        <div class="desk__ink">
+          <Ink />
+        </div>
         <div class="desk__controls">
           <Controls />
         </div>
+        <div class="desk__layouts">
+          <Layouts />
+        </div>
+        <div class="desk__draw">
+          <Draw />
+        </div>
+        {/* What viewers see: the screen and the camera in the picked layout. */}
+        <figure class="desk__preview" data-layout={layout()}>
+          <img class="desk__preview-screen" src={screen} alt="" />
+          <img class="desk__preview-camera" src={cameraFace} alt="" />
+          <figcaption>What viewers see</figcaption>
+        </figure>
       </Show>
 
       <div class="desk__dock">

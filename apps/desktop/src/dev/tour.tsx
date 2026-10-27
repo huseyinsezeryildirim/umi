@@ -22,7 +22,10 @@ const STEPS: Step[] = [
   { chapter: "Record", text: "Click Umi in the menu bar.", target: sel("#demo-umi") },
   { chapter: "Record", text: "Turn on your camera to be in the video too.", target: () => document.querySelectorAll(".rec-row")[1] ?? null },
   { chapter: "Record", text: "Press Start recording.", target: sel(".rec-start") },
-  { chapter: "Record", text: "Umi records your screen, camera and voice. Clicks are kept for the edit.", target: null, wait: 7200 },
+  { chapter: "Record", text: "Umi records your screen, camera and voice. Clicks are kept for the edit.", target: null, wait: 4200 },
+  { chapter: "Record", text: "Draw while you talk: pick the arrow.", target: sel('.draw__btn[aria-label="Arrow"]') },
+  { chapter: "Record", text: "Drag across the screen to point at something.", target: null, wait: 6000 },
+  { chapter: "Record", text: "Change the layout as you go: side by side.", target: sel('.layouts__btn[aria-label="Side by side"]') },
   { chapter: "Record", text: "Click Stop. The editor opens with the recording.", target: sel(".controls__stop") },
   { chapter: "Look", text: "Pick a background. The whole video changes at once.", target: sel('.umi-swatch[aria-label="dusk"]') },
   { chapter: "Look", text: "Press play. Umi zooms in wherever the cursor clicks.", target: sel(".ed-play") },
@@ -112,8 +115,9 @@ export function Tour() {
   const hint = () => {
     const r = rect();
     const W = 300;
-    // Nothing to point at: low in the middle, clear of the countdown and the recording.
-    if (!r) return { left: innerWidth / 2 - W / 2, top: innerHeight - 250 };
+    // Nothing to point at: low in the middle, clear of the countdown, the recording and the
+    // drawing tools along the bottom.
+    if (!r) return { left: innerWidth / 2 - W / 2, top: Math.max(80, innerHeight - 350) };
     if (r.left > W + 40) return { left: r.left - W - 18, top: Math.min(Math.max(16, r.top + r.height / 2 - 50), innerHeight - 140) };
     const below = r.bottom + 120 < innerHeight;
     return { left: Math.min(Math.max(16, r.left + r.width / 2 - W / 2), innerWidth - W - 16), top: below ? r.bottom + 16 : r.top - 126 };
