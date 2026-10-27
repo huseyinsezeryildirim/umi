@@ -118,6 +118,9 @@ class Player {
   }
 }
 
+/** Where a link's files are (on Umi Cloud) and how its sound tracks mix. */
+export type Remote = { url: (name: string) => string | null; gains?: number[] };
+
 export class Session {
   readonly wasm: Wasm;
   private canvas = new OffscreenCanvas(16, 16);
@@ -130,6 +133,9 @@ export class Session {
   hasCamera: boolean;
   /** The last state (kept so frames don't ask Rust for it each time). */
   current: EditorStateLike;
+  /** Recordings in the browser are WebM; a link made while recording on the Mac is MP4. */
+  private screenFile: string;
+  private cameraFile: string;
 
   constructor(
     readonly id: string,
@@ -139,9 +145,13 @@ export class Session {
     mediaDuration: number,
     private files: Map<string, Blob>,
     preset?: string,
+    /** Files read from Umi Cloud instead of memory (the player of a link made while recording). */
+    private remote?: Remote,
   ) {
     this.wasm = new Wasm(id, name, JSON.stringify(project), cursor ? JSON.stringify(cursor) : "", mediaDuration, preset);
-    this.hasCamera = files.has("camera.webm") && !!project.camera;
+    this.screenFile = remote ? "screen.mp4" : "screen.webm";
+    this.cameraFile = remote ? "camera.mp4" : "camera.webm";
+    this.hasCamera = (files.has(this.cameraFile) || !!remote?.url(this.cameraFile)) && !!project.camera;
     this.current = JSON.parse(this.wasm.state(undefined));
     this.attached = openGpu(this.canvas).then(async (gpu) => {
       this.wasm.attach(gpu);
@@ -194,7 +204,7 @@ export class Session {
     let url = this.urls.get(name);
     if (!url) {
       const blob = this.files.get(name);
-      if (!blob) return null;
+      if (!blob) return this.remote?.url(name) ?? null;
       url = URL.createObjectURL(blob);
       this.urls.set(name, url);
     }
@@ -242,8 +252,8 @@ export class Session {
 
   /** Uploads screen and camera for one clip set at recording time `t`. */
   private async uploadLayer(set: number, t: number, playing: boolean, speed: number) {
-    const screen = this.player(`screen#${set}`, "screen.webm");
-    const camera = this.hasCamera ? this.player(`camera#${set}`, "camera.webm") : null;
+    const screen = this.player(`screen#${set}`, this.screenFile);
+    const camera = this.hasCamera ? this.player(`camera#${set}`, this.cameraFile) : null;
     await Promise.all([screen?.show(t, playing, speed), camera?.show(t, playing, speed)]);
     let hasScreen = false;
     let hasCamera = false;
@@ -318,7 +328,7 @@ export class Session {
     const s = this.current;
     const key = JSON.stringify([s.placements, s.edit.sound, s.edit.music, s.edit.voiceovers, this.wasm.crossfade()]);
     if (this.mixer?.key === key) return this.mixer.mixer;
-    const screen = this.sound("screen.webm");
+    const screen = this.sound(this.screenFile);
     if (!screen) return null;
     const clicks = Array.from(this.wasm.clickTimes());
     const mixer = new Mixer((name) => this.sound(name), screen, s.placements, this.wasm.crossfade(), s.outputDuration, s.edit, clicks);
@@ -330,8 +340,9 @@ export class Session {
     let s = this.sounds.get(name);
     if (!s) {
       const blob = this.files.get(name);
-      if (!blob) return null;
-      s = new SoundFile(blob);
+      const url = blob ? null : this.remote?.url(name);
+      if (!blob && !url) return null;
+      s = blob ? new SoundFile(blob) : new SoundFile(url!, name === this.screenFile ? this.remote?.gains : undefined);
       this.sounds.set(name, s);
     }
     return s;

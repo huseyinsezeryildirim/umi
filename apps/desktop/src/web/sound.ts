@@ -1,37 +1,42 @@
 // The soundtrack in the browser, mixed like the Mac app's AudioMixer: every kept clip's sound
 // (crossfaded, at the clip's speed), the music bed (looped, faded out at the end), voiceovers
 // (everything else dips under them) and click sounds. 48 kHz stereo interleaved f32.
-import { ALL_FORMATS, AudioBufferSink, BlobSource, Input, type InputAudioTrack } from "mediabunny";
+import { ALL_FORMATS, AudioBufferSink, BlobSource, Input, type InputAudioTrack, UrlSource } from "mediabunny";
 
 export const RATE = 48000;
 
-/** Reads any stretch of a file's sound as 48 kHz stereo. */
+/**
+ * Reads any stretch of a file's sound as 48 kHz stereo: a file in memory, or one on Umi Cloud
+ * (read in ranges as it plays). `gains` mixes several tracks (a Mac recording keeps system sound
+ * and the microphone apart); without it the primary track plays.
+ */
 export class SoundFile {
-  private track: Promise<InputAudioTrack | null>;
-  private sink: Promise<AudioBufferSink | null>;
+  private sinks: Promise<{ sink: AudioBufferSink; gain: number }[]>;
   /** The last decoded stretch, so sequential reads don't decode twice. */
   private cache: { from: number; to: number; left: Float32Array; right: Float32Array } | null = null;
   duration: Promise<number>;
 
-  constructor(blob: Blob) {
-    const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
-    this.track = input.getPrimaryAudioTrack().catch(() => null);
-    this.sink = this.track.then((t) => (t ? new AudioBufferSink(t) : null));
-    this.duration = this.track.then(async (t) => (t ? await t.computeDuration() : 0)).catch(() => 0);
+  constructor(file: Blob | string, gains?: number[]) {
+    const input = new Input({ formats: ALL_FORMATS, source: typeof file === "string" ? new UrlSource(file) : new BlobSource(file) });
+    const tracks: Promise<{ track: InputAudioTrack; gain: number }[]> = gains
+      ? input.getAudioTracks().then((all) => all.map((track, i) => ({ track, gain: gains[i] ?? 1 })).filter((t) => t.gain > 0))
+      : input.getPrimaryAudioTrack().then((track) => (track ? [{ track, gain: 1 }] : []));
+    const safe = tracks.catch(() => []);
+    this.sinks = safe.then((ts) => ts.map(({ track, gain }) => ({ sink: new AudioBufferSink(track), gain })));
+    this.duration = safe.then(async (ts) => (ts[0] ? await ts[0].track.computeDuration() : 0)).catch(() => 0);
   }
 
   /** Decoded sound between `from` and `to` seconds (48 kHz), cached. */
   private async range(from: number, to: number) {
     const c = this.cache;
     if (c && from >= c.from && to <= c.to) return c;
-    const sink = await this.sink;
     // Decode a little ahead so the next chunks come from memory.
     const start = Math.max(0, from - 0.05);
     const end = Math.max(to, from + 4);
     const n = Math.ceil((end - start) * RATE);
     const left = new Float32Array(n);
     const right = new Float32Array(n);
-    if (sink) {
+    for (const { sink, gain } of await this.sinks) {
       for await (const { buffer, timestamp } of sink.buffers(start, end)) {
         const step = buffer.sampleRate / RATE;
         const l = buffer.getChannelData(0);
@@ -42,8 +47,8 @@ export class SoundFile {
           const at = first + i;
           if (at < 0 || at >= n) continue;
           const src = Math.floor(i * step);
-          left[at] = l[src];
-          right[at] = r[src];
+          left[at] += l[src] * gain;
+          right[at] += r[src] * gain;
         }
       }
     }
