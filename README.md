@@ -117,8 +117,8 @@ CI builds and tests all four.
 
 ## Code signing policy
 
-Windows: free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
-macOS: signed with our Apple Developer ID and notarized by Apple. Every release is built from this repository by
+macOS: signed with our Apple Developer ID and notarized by Apple. Windows: not code signed yet (SmartScreen may
+warn the first time; More info → Run anyway). Every release is built from this repository by
 [GitHub Actions](.github/workflows/release.yml) and approved by hand before it is signed.
 
 - Committers and reviewers: [Hüseyin Sezer Yıldırım](https://github.com/huseyinsezeryildirim)

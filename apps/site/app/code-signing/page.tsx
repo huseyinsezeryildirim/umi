@@ -21,8 +21,8 @@ export default function Page() {
         [
           "Windows",
           <p>
-            Free code signing provided by <a className="underline" href="https://signpath.io">SignPath.io</a>, certificate by{" "}
-            <a className="underline" href="https://signpath.org">SignPath Foundation</a>.
+            The Windows installer isn’t code signed yet, so Windows may say it “protected your PC” the first time you open it: click More info,
+            then Run anyway. It’s built from the same public source by GitHub Actions, and each release lists its files’ SHA-256 checksums.
           </p>,
         ],
         [
