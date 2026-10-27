@@ -132,9 +132,12 @@ export function Ending() {
             <DownloadButton />
           </div>
           <p className="mt-4 text-[15px] text-ink/60">Also for Windows, Linux and your browser</p>
-          <a href="/code-signing" className="mt-2 inline-block text-[13px] text-ink/50 underline-offset-2 hover:underline">
-            Code signing policy
-          </a>
+          <p className="mt-2 text-[13px] text-ink/50">
+            Windows code signing by SignPath Foundation ·{" "}
+            <a href="/code-signing" className="underline-offset-2 hover:underline">
+              Code signing policy
+            </a>
+          </p>
         </Rise>
       </div>
     </section>
