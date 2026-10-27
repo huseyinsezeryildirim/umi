@@ -12,6 +12,17 @@ import { Draw } from "../recorder/Draw";
 import { Ink } from "../recorder/Ink";
 import type { Layout } from "../recorder/api";
 import cameraFace from "./camera.jpg";
+import type { DemoStroke } from "./mock";
+
+/** Kept for the editor chapter (the next page); private browsing may refuse. */
+const keep = (key: string, value: string | null) => {
+  try {
+    if (value === null) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, value);
+  } catch {
+    // The editor then shows the sample as it is.
+  }
+};
 import { tourIndex } from "./tour";
 import wallpaper from "./wallpaper.jpg";
 import screen from "./screen-a.jpg";
@@ -48,8 +59,52 @@ export function DesktopDemo() {
   onCleanup(() => (removeEventListener("demo:window", onWindow), removeEventListener("demo:resize", onResize)));
   // The layout picked in the column on the right (the preview card follows it).
   const [layout, setLayout] = createSignal<Layout>("default");
-  const offLayout = listen<Layout>("record:layout", (e) => setLayout(e.payload));
+  const offLayout = listen<Layout>("record:layout", (e) => {
+    setLayout(e.payload);
+    keep("umi.demo.layout", e.payload);
+  });
   onCleanup(() => void offLayout.then((f) => f()));
+
+  // What the visitor draws, kept (0…1 of the app window) so the editor chapter shows it on the
+  // sample recording (mock.ts).
+  let app!: HTMLDivElement;
+  let ink = { drawing: false, tool: "pointer", color: "#ff4d4d" };
+  const strokes: DemoStroke[] = [];
+  let stroke: DemoStroke | null = null;
+  const offInk = listen<{ drawing: boolean; tool?: string; color?: string }>("ink:mode", (e) => {
+    ink = { drawing: e.payload.drawing, tool: e.payload.tool ?? ink.tool, color: e.payload.color ?? ink.color };
+  });
+  const at = (e: PointerEvent): [number, number] => {
+    const r = app.getBoundingClientRect();
+    return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height];
+  };
+  const down = (e: PointerEvent) => {
+    // Only what's drawn on the ink layer (not clicks on the panels while a tool is on).
+    if (!ink.drawing || !recording() || !(e.target as Element | null)?.closest?.(".ink")) return;
+    stroke = { tool: ink.tool, color: ink.color, points: [at(e)], width: app.getBoundingClientRect().width };
+  };
+  const move = (e: PointerEvent) => {
+    if (!stroke) return;
+    if (stroke.tool === "arrow" || stroke.tool === "box") stroke.points[1] = at(e);
+    else stroke.points.push(at(e));
+  };
+  const up = () => {
+    if (!stroke) return;
+    const [a, b] = [stroke.points[0], stroke.points[stroke.points.length - 1]];
+    // A tap isn't a drawing.
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) > 0.01) strokes.push(stroke);
+    stroke = null;
+    keep("umi.demo.ink", JSON.stringify(strokes.slice(-20)));
+  };
+  addEventListener("pointerdown", down, true);
+  addEventListener("pointermove", move, true);
+  addEventListener("pointerup", up, true);
+  onCleanup(() => {
+    void offInk.then((f) => f());
+    removeEventListener("pointerdown", down, true);
+    removeEventListener("pointermove", move, true);
+    removeEventListener("pointerup", up, true);
+  });
   const [t, setT] = createSignal(0);
   // Steps (see tour.tsx): 0 menu bar, 1 camera, 2 start, 3 recording, 4–6 draw and layout, 7 stop.
   const launcher = () => tourIndex() >= 1 && tourIndex() <= 2;
@@ -62,6 +117,9 @@ export function DesktopDemo() {
         const b = setTimeout(() => setCount(1), 1800);
         const c = setTimeout(() => {
           setCount(null);
+          // A new recording: nothing drawn or picked yet.
+          keep("umi.demo.ink", null);
+          keep("umi.demo.layout", null);
           setRecording(true);
           (window as unknown as { __demoRecStart: number }).__demoRecStart = performance.now();
         }, 2700);
@@ -112,7 +170,7 @@ export function DesktopDemo() {
         <span>Sat 9:41</span>
       </header>
 
-      <div class="desk__app">
+      <div class="desk__app" ref={app}>
         <img src={screen} alt="" />
         <Show when={recording()}>
           <svg viewBox="0 0 24 24" class="desk__cursor" style={{ left: `${cursor()[0]}%`, top: `${cursor()[1]}%` }}>

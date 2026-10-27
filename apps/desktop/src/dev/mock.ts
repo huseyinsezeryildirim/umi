@@ -135,6 +135,73 @@ function cameraPreview(camera: string | null, frames: { onmessage: (b: ArrayBuff
   return null;
 }
 
+/** A drawing from the desktop chapter (see desktop.tsx): points are 0…1 of the app's screen. */
+export type DemoStroke = { tool: string; color: string; points: [number, number][]; width: number };
+/** What the visitor did while recording on the demo desktop, so the editor shows it. */
+const demoInk: DemoStroke[] = (() => {
+  try {
+    return JSON.parse(sessionStorage.getItem("umi.demo.ink") ?? "[]");
+  } catch {
+    return [];
+  }
+})();
+const INK_FROM = 2.9;
+const INK_UNTIL = 6.2;
+{
+  // The layout picked while recording: a scene from a little after the drawing to the end.
+  const picked = (() => {
+    try {
+      return sessionStorage.getItem("umi.demo.layout");
+    } catch {
+      return null;
+    }
+  })();
+  if (picked && picked !== "default" && new URLSearchParams(location.search).has("open")) {
+    state.edit.scenes = [{ id: crypto.randomUUID().toUpperCase(), start: 6.4, end: state.recording.duration, layout: picked as "splitScreen", transition: 0.5 } as EditSettings["scenes"][number]];
+  }
+}
+
+/** The visitor's drawings on the sample screen (`w`×`h`), shown for a few seconds, then fading. */
+function drawInk(g: OffscreenCanvasRenderingContext2D, time: number, w: number, h: number) {
+  if (!demoInk.length || time < INK_FROM || time > INK_UNTIL) return;
+  g.save();
+  g.globalAlpha *= Math.min(1, (INK_UNTIL - time) / 0.5);
+  g.lineCap = "round";
+  g.lineJoin = "round";
+  for (const s of demoInk) {
+    const p = s.points.map(([px, py]) => [px * w, py * h] as [number, number]);
+    if (!p.length) continue;
+    const k = w / s.width;
+    g.strokeStyle = s.color;
+    g.lineWidth = 5 * k;
+    g.save();
+    if (s.tool === "highlighter") {
+      g.globalAlpha *= 0.35;
+      g.lineWidth = 22 * k;
+    }
+    g.beginPath();
+    if (s.tool === "box") {
+      const [[ax, ay], [bx, by]] = [p[0], p[p.length - 1]];
+      g.roundRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay), 10 * k);
+    } else if (s.tool === "arrow") {
+      const [[ax, ay], [bx, by]] = [p[0], p[p.length - 1]];
+      const angle = Math.atan2(by - ay, bx - ax);
+      const head = Math.min(26 * k, 10 * k + Math.hypot(bx - ax, by - ay) * 0.12);
+      g.moveTo(ax, ay);
+      g.lineTo(bx, by);
+      g.moveTo(bx - head * Math.cos(angle - 0.5), by - head * Math.sin(angle - 0.5));
+      g.lineTo(bx, by);
+      g.lineTo(bx - head * Math.cos(angle + 0.5), by - head * Math.sin(angle + 0.5));
+    } else {
+      g.moveTo(p[0][0], p[0][1]);
+      for (const [px, py] of p.slice(1)) g.lineTo(px, py);
+    }
+    g.stroke();
+    g.restore();
+  }
+  g.restore();
+}
+
 const history: EditSettings[] = [];
 const future: EditSettings[] = [];
 const uuid = () => crypto.randomUUID().toUpperCase();
@@ -180,9 +247,32 @@ function frameAt(output: number, width: number, height: number): ArrayBuffer {
     h = height - pad * 2;
     w = h * 1.6;
   }
-  const x = (width - w) / 2;
-  const y = (height - h) / 2;
+  let x = (width - w) / 2;
+  let y = (height - h) / 2;
   const radius = edit.cornerRadius * Math.min(w, h) * 0.9;
+
+  // A scene (side by side, camera only, screen only) eases in and out over its transition.
+  const scene = edit.scenes.find((sc) => time >= sc.start && time <= sc.end);
+  const tr = Math.max(scene?.transition ?? 0.4, 0.01);
+  const k = scene ? Math.min(1, (time - scene.start) / tr, (scene.end - time) / tr) : 0;
+  const ease = k * k * (3 - 2 * k);
+  const lerp = (a: number, b: number) => a + (b - a) * ease;
+  /** Where the camera goes in this scene (null: it stays the bubble). */
+  let cameraRect: [number, number, number, number] | null = null;
+  if (scene?.layout === "splitScreen") {
+    // The screen on the left, the camera beside it, both the same height.
+    const gap = pad * 0.6;
+    const sw = (width - pad * 2 - gap) * 0.64;
+    const sh = Math.min(sw / 1.6, height - pad * 2);
+    const sx = pad;
+    const sy = (height - sh) / 2;
+    cameraRect = [sx + sw + gap, sy, width - pad - (sx + sw + gap), sh];
+    [x, y, w, h] = [lerp(x, sx), lerp(y, sy), lerp(w, sw), lerp(h, sh)];
+  } else if (scene?.layout === "cameraOnly") {
+    cameraRect = [x, y, w, h];
+  }
+  const screenAlpha = scene?.layout === "cameraOnly" ? 1 - ease : 1;
+  const cameraAlpha = scene?.layout === "hideCamera" ? 1 - ease : 1;
 
   // Zoom: eased in and out over 0.6 s toward the cursor.
   const seg = state.zoomSegments.find((z) => time >= z.start && time <= z.end);
@@ -196,6 +286,7 @@ function frameAt(output: number, width: number, height: number): ArrayBuffer {
   }
 
   g.save();
+  g.globalAlpha = screenAlpha;
   g.shadowColor = `rgba(0,0,0,${0.45 * edit.shadow})`;
   g.shadowBlur = 50 * edit.shadow;
   g.shadowOffsetY = 18 * edit.shadow;
@@ -205,6 +296,7 @@ function frameAt(output: number, width: number, height: number): ArrayBuffer {
   g.fill();
   g.restore();
   g.save();
+  g.globalAlpha = screenAlpha;
   g.beginPath();
   g.roundRect(x, y, w, h, radius);
   g.clip();
@@ -217,6 +309,8 @@ function frameAt(output: number, width: number, height: number): ArrayBuffer {
   g.scale(scale, scale);
   g.translate(-sx, -sy);
   if (screen.complete) g.drawImage(screen, 0, 0, w, h);
+  // What the visitor drew on the desktop: on the screen, a few seconds, then fading.
+  drawInk(g, time, w, h);
   // Privacy masks: blur, pixelate, or dim everything but the highlighted spot.
   for (const m of edit.masks) {
     if (time < m.start || time > m.end) continue;
@@ -267,30 +361,39 @@ function frameAt(output: number, width: number, height: number): ArrayBuffer {
   // Camera bubble (a stock portrait stands in for the webcam).
   const cam = edit.camera;
   const face = images.get(cameraFace);
-  if (cam.visible && face?.complete) {
+  if (cam.visible && face?.complete && cameraAlpha > 0) {
     const d = Math.min(width, height) * (cam.size || 0.22) * 0.85;
     const [px, py] = cam.position ?? [0.9, 0.82];
-    const cx = Math.min(Math.max(px * width, d / 2 + 8), width - d / 2 - 8);
-    const cy = Math.min(Math.max(py * height, d / 2 + 8), height - d / 2 - 8);
-    const r = cam.shape === "circle" ? d / 2 : cam.shape === "squircle" ? d * 0.28 : d * 0.08;
+    const bx = Math.min(Math.max(px * width, d / 2 + 8), width - d / 2 - 8) - d / 2;
+    const by = Math.min(Math.max(py * height, d / 2 + 8), height - d / 2 - 8) - d / 2;
+    const br = cam.shape === "circle" ? d / 2 : cam.shape === "squircle" ? d * 0.28 : d * 0.08;
+    // The bubble, or (in a scene) on its way to the scene's panel.
+    const [cx, cy, cw, ch] = cameraRect ? [lerp(bx, cameraRect[0]), lerp(by, cameraRect[1]), lerp(d, cameraRect[2]), lerp(d, cameraRect[3])] : [bx, by, d, d];
+    const r = cameraRect ? lerp(br, radius) : br;
     g.save();
+    g.globalAlpha = cameraAlpha;
     g.shadowColor = "rgba(0,0,0,0.35)";
-    g.shadowBlur = d * 0.12;
-    g.shadowOffsetY = d * 0.04;
+    g.shadowBlur = Math.min(cw, ch) * 0.12;
+    g.shadowOffsetY = Math.min(cw, ch) * 0.04;
     g.beginPath();
-    g.roundRect(cx - d / 2 - 3, cy - d / 2 - 3, d + 6, d + 6, r + 3);
+    g.roundRect(cx - 3, cy - 3, cw + 6, ch + 6, r + 3);
     g.fillStyle = "#fff";
     g.fill();
     g.restore();
     g.save();
+    g.globalAlpha = cameraAlpha;
     g.beginPath();
-    g.roundRect(cx - d / 2, cy - d / 2, d, d, r);
+    g.roundRect(cx, cy, cw, ch, r);
     g.clip();
     if (cam.mirrored) {
-      g.translate(cx * 2, 0);
+      g.translate((cx + cw / 2) * 2, 0);
       g.scale(-1, 1);
     }
-    g.drawImage(webcam.readyState >= 2 ? webcam : face, cx - d / 2, cy - d / 2, d, d);
+    // Cover the panel: crop the webcam to its shape.
+    const src = webcam.readyState >= 2 ? webcam : face;
+    const [iw, ih] = src instanceof HTMLVideoElement ? [src.videoWidth, src.videoHeight] : [src.naturalWidth, src.naturalHeight];
+    const scale = Math.max(cw / iw, ch / ih);
+    g.drawImage(src, cx + (cw - iw * scale) / 2, cy + (ch - ih * scale) / 2, iw * scale, ih * scale);
     g.restore();
   }
 
