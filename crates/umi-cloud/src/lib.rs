@@ -65,6 +65,12 @@ pub struct Video {
     /// A free link: deleted at `expires_at` unless the account upgrades.
     #[serde(default)]
     pub kept_by_upgrade: bool,
+    /// "raw": made while recording; the viewer's browser plays the recording with its edit.
+    #[serde(default)]
+    pub kind: Option<String>,
+    /// False until shared: an unshared raw link is deleted after a day.
+    #[serde(default)]
+    pub shared: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -151,22 +157,7 @@ pub struct Country {
     pub count: u64,
 }
 
-/// A link made before its video exists (Instant mode copies it the moment recording stops).
-#[derive(Debug, Clone)]
-pub struct Reservation {
-    pub video: Video,
-    upload: UploadPlan,
-}
-
-/// What's known once the growing file is finished.
-pub struct Finished {
-    pub duration_ms: u64,
-    pub width: u32,
-    pub height: u32,
-    pub poster: Option<Vec<u8>>,
-    pub gif: Option<Vec<u8>>,
-}
-
+#[derive(Clone)]
 pub struct Client {
     pub base: String,
     token: String,
@@ -331,48 +322,65 @@ impl Client {
     }
 }
 
+// ───── Links made while recording ─────
+
+/// A raw link, reserved when recording starts: the recording uploads as it's written and the
+/// viewer's browser applies the edit, so the link plays the moment recording stops.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawLink {
+    pub video: Video,
+    #[serde(rename = "raw")]
+    info: RawInfo,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawInfo {
+    part_size: u64,
+    #[serde(default)]
+    thumbnail_url: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct PartUrls {
+    parts: Vec<Part>,
+}
+
+/// What the screen recording turned out to be (sent when it's complete).
+pub struct RawMeta {
+    pub duration_ms: u64,
+    pub width: u32,
+    pub height: u32,
+}
+
 impl Client {
-    /// Creates the link now; the video comes later through [`upload_growing`](Self::upload_growing).
-    /// The size isn't known yet, so it asks for room for a long video (the real size is
-    /// recorded when the upload completes).
-    pub fn reserve(&self, title: &str) -> Result<Reservation, CloudError> {
-        let mut last = None;
-        for hint in [4u64 << 30, 1 << 30, 256 << 20] {
-            let body = serde_json::json!({ "title": title, "sizeBytes": hint, "contentType": "video/mp4", "allowDownload": true });
-            match self.send::<Created>("POST", "/api/videos", Some(body)) {
-                Ok(c) => return Ok(Reservation { video: c.video, upload: c.upload }),
-                Err(e @ CloudError::Server { status: 413, .. }) => last = Some(e),
-                Err(e) => return Err(e),
-            }
-        }
-        Err(last.unwrap_or_else(|| CloudError::Network("couldn't reserve a link".into())))
+    /// Reserves a raw link for a recording that's starting (`camera`: a camera file will follow).
+    pub fn reserve_raw(&self, title: &str, camera: bool) -> Result<RawLink, CloudError> {
+        self.send("POST", "/api/videos", Some(serde_json::json!({ "raw": true, "title": title, "camera": camera })))
     }
 
-    /// Uploads `file` while it's still being written: whole parts go up as soon as they
-    /// exist; once `finished` returns details, the rest follows and the upload completes
-    /// (an error from `finished` stops it).
-    /// The first part goes last (the MP4 writer patches its first bytes when it finishes).
-    /// `progress` gets bytes sent so far.
-    pub fn upload_growing(
+    /// Uploads `file` (`"screen"` or `"camera"`) of a raw link while the recorder writes it: whole
+    /// parts go up as they appear, and once `finished` says so the rest follows and the file is
+    /// completed. The first part goes last (a writer may patch the start when it finishes). A
+    /// camera file that never appeared is dropped from the link. `progress` gets bytes sent.
+    pub fn upload_raw(
         &self,
-        reservation: &Reservation,
-        file: &Path,
-        finished: &dyn Fn() -> Option<Result<Finished, String>>,
+        link: &RawLink,
+        file: &str,
+        path: &Path,
+        finished: &dyn Fn() -> Option<Result<RawMeta, String>>,
         progress: &dyn Fn(u64),
-    ) -> Result<Video, CloudError> {
-        let plan = &reservation.upload;
-        let part_size = plan.part_size;
-        let url = |n: u32| -> Result<&str, CloudError> {
-            plan.parts.iter().find(|p| p.part_number == n).map(|p| p.url.as_str()).ok_or_else(|| CloudError::Server {
-                status: 413,
-                code: "too_large".into(),
-                message: "This recording is longer than one link can hold.".into(),
-            })
+    ) -> Result<(), CloudError> {
+        let id = &link.video.id;
+        let part_size = link.info.part_size;
+        let url = |n: u32| -> Result<String, CloudError> {
+            let urls: PartUrls = self.send("POST", &format!("/api/videos/{id}/raw/parts"), Some(serde_json::json!({ "file": file, "partNumbers": [n] })))?;
+            urls.parts.into_iter().next().map(|p| p.url).ok_or_else(|| CloudError::Network("no upload URL".into()))
         };
         let read = |n: u32, len: u64| -> Result<Vec<u8>, CloudError> {
-            let mut f = std::fs::File::open(file)?;
-            let offset = (n as u64 - 1) * part_size;
-            f.seek(SeekFrom::Start(offset))?;
+            let mut f = std::fs::File::open(path)?;
+            f.seek(SeekFrom::Start((n as u64 - 1) * part_size))?;
             let mut buf = Vec::with_capacity(len as usize);
             f.take(len).read_to_end(&mut buf)?;
             Ok(buf)
@@ -380,36 +388,54 @@ impl Client {
         let mut etags: Vec<(u32, String)> = vec![];
         let mut next = 2u32;
         let mut sent = 0u64;
-        let details = loop {
+        let meta = loop {
             let done = finished().transpose().map_err(CloudError::Aborted)?;
-            let len = std::fs::metadata(file).map(|m| m.len()).unwrap_or(0);
-            // Whole parts after the first; when done, also the partial last one.
+            let len = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
             while (next as u64) * part_size <= len || (done.is_some() && (next as u64 - 1) * part_size < len) {
                 let size = part_size.min(len - (next as u64 - 1) * part_size);
                 let bytes = read(next, size)?;
-                etags.push((next, Self::put(url(next)?, &bytes, "video/mp4")?));
+                etags.push((next, Self::put(&url(next)?, &bytes, "video/mp4")?));
                 sent += bytes.len() as u64;
                 progress(sent);
                 next += 1;
             }
-            if let Some(d) = done {
-                let first = read(1, part_size.min(len))?;
-                etags.insert(0, (1, Self::put(url(1)?, &first, "video/mp4")?));
-                progress(sent + first.len() as u64);
-                break d;
+            if let Some(meta) = done {
+                if len > 0 {
+                    let first = read(1, part_size.min(len))?;
+                    etags.insert(0, (1, Self::put(&url(1)?, &first, "video/mp4")?));
+                    progress(sent + first.len() as u64);
+                }
+                break meta;
             }
-            std::thread::sleep(std::time::Duration::from_millis(250));
+            std::thread::sleep(std::time::Duration::from_millis(500));
         };
-        if let (Some(url), Some(jpeg)) = (&plan.thumbnail_url, &details.poster) {
-            Self::put(url, jpeg, "image/jpeg")?;
-        }
-        if let (Some(url), Some(gif)) = (&plan.gif_url, &details.gif) {
-            Self::put(url, gif, "image/gif")?;
-        }
         let parts: Vec<serde_json::Value> = etags.iter().map(|(n, e)| serde_json::json!({ "partNumber": n, "etag": e })).collect();
-        let body =
-            serde_json::json!({ "parts": parts, "durationMs": details.duration_ms, "width": details.width, "height": details.height });
-        let done: VideoBody = self.send("POST", &format!("/api/videos/{}/complete", reservation.video.id), Some(body))?;
+        let body = serde_json::json!({ "file": file, "parts": parts, "durationMs": meta.duration_ms, "width": meta.width, "height": meta.height });
+        let _: VideoBody = self.send("POST", &format!("/api/videos/{id}/raw/complete"), Some(body))?;
+        Ok(())
+    }
+
+    /// The edit (`project.json`) and cursor track of a raw link: at stop and whenever the look changes.
+    pub fn put_raw_edit(&self, id: &str, project: &serde_json::Value, cursor: Option<&serde_json::Value>) -> Result<(), CloudError> {
+        let mut body = serde_json::json!({ "project": project });
+        if let Some(cursor) = cursor {
+            body["cursor"] = cursor.clone();
+        }
+        let _: serde_json::Value = self.send("PUT", &format!("/api/videos/{id}/raw/edit"), Some(body))?;
+        Ok(())
+    }
+
+    /// The poster for unfurls (JPEG).
+    pub fn put_raw_poster(&self, link: &RawLink, jpeg: &[u8]) -> Result<(), CloudError> {
+        match &link.info.thumbnail_url {
+            Some(url) => Self::put(url, jpeg, "image/jpeg").map(|_| ()),
+            None => Ok(()),
+        }
+    }
+
+    /// The owner shared the link: it's kept from now on (the plan's limits apply).
+    pub fn share_raw(&self, id: &str) -> Result<Video, CloudError> {
+        let done: VideoBody = self.send("PATCH", &format!("/api/videos/{id}"), Some(serde_json::json!({ "shared": true })))?;
         Ok(done.video)
     }
 }

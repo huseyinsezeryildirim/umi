@@ -118,6 +118,7 @@ impl EditorSession {
         project.edit = Some(ed.doc.edit.clone());
         Bundle::new(&self.bundle).write_project(&project).map_err(|e| e.to_string())?;
         ed.dirty = false;
+        crate::share::sync_edit(&self.bundle);
         Ok(())
     }
 

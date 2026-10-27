@@ -19,6 +19,10 @@ interface Video {
   durationMs?: number | null;
   /** A free link: it's deleted at `expiresAt` unless you upgrade. */
   keptByUpgrade?: boolean;
+  /** "raw": made while recording, so there's nothing to prepare or upload. */
+  kind?: string;
+  /** False until shared: an unshared raw link is deleted after a day. */
+  shared?: boolean;
 }
 interface Insights {
   views: number;
@@ -61,7 +65,14 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
         const status = await invoke<{ connected: boolean; server: string }>("cloud_status");
         setConnected(status.connected);
         setServer(status.server);
-        const shared = await invoke<Video | null>("share_state", { id: ed.state().id });
+        let shared = await invoke<Video | null>("share_state", { id: ed.state().id });
+        // Made while recording: the link is already there; opening Share keeps it.
+        if (shared?.kind === "raw" && shared.shared === false) {
+          shared = await invoke<Video | null>("live_share", { id: ed.state().id }).catch((e) => {
+            toast(String(e));
+            return shared;
+          });
+        }
         setVideo(shared);
         setInsights(null);
         if (shared?.status === "ready") invoke<Insights | null>("share_insights", { id: ed.state().id }).then(setInsights, () => {});

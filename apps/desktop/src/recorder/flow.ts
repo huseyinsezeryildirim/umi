@@ -5,12 +5,15 @@ import { recorder } from "./api";
 
 /**
  * Runs in the main window: starting (countdown while the sources warm up), pausing,
- * stopping (open the editor, or export and copy in Instant mode) and discarding, whether
+ * stopping (open the editor, or copy the link in Instant mode) and discarding, whether
  * asked from the launcher, the control bar, the tray or a global shortcut.
+ *
+ * Connected to Umi Cloud, every recording uploads while it's made (`live_start`), so its link
+ * plays the moment recording stops; nothing is rendered on this computer for it.
  */
 export function installRecordingFlow(openRecording: (bundle: string) => void) {
   let busy = false;
-  /** The Instant link being reserved for the current recording (null: none). */
+  /** The link being reserved for the current recording (null: not connected). */
   let reserved: Promise<string | null> = Promise.resolve(null);
 
   const start = async () => {
@@ -42,7 +45,7 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
       await prepared;
       if (failed) throw failed;
       await invoke("record_begin");
-      if (settings.flow === "instant") reserved = invoke<string | null>("instant_reserve").catch(() => null);
+      reserved = invoke<string | null>("live_start", { camera: !!(settings.cameraOn || settings.cameraOnly) }).catch(() => null);
       await recorder.show("controls");
     } catch (e) {
       await recorder.hide("countdown");
@@ -72,8 +75,11 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
       await recorder.hide("ink");
       await emit("ink:mode", { drawing: false });
       const bundle = await invoke<string>("record_stop");
+      await reserved;
+      reserved = Promise.resolve(null);
+      const live = await invoke<{ url: string } | null>("live_finish", { bundle }).catch(() => null);
       if (settings.flow === "instant") {
-        await instant(bundle);
+        await instant(bundle, live?.url ?? null);
       } else {
         await recorder.show("main");
         openRecording(bundle);
@@ -93,7 +99,7 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
     await emit("ink:mode", { drawing: false });
     await invoke("record_cancel");
     reserved = Promise.resolve(null);
-    void invoke("instant_release");
+    void invoke("live_cancel");
     toast("Recording discarded");
   };
 
@@ -103,36 +109,31 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
   };
 
   /**
-   * Instant: a polished 1080p MP4 with the default look. With Umi Cloud the link (reserved
-   * when recording started) is copied at once and the video uploads while it's made;
-   * otherwise the file itself is copied to the clipboard.
+   * Instant: with Umi Cloud the link (uploaded while recording) is copied at once and plays in
+   * seconds; otherwise a 1080p MP4 is made and the file itself is copied to the clipboard.
    */
-  const instant = async (bundle: string) => {
+  const instant = async (bundle: string, link: string | null) => {
     await recorder.show("main");
-    const link = await reserved;
-    reserved = Promise.resolve(null);
     if (link) {
       await invoke("copy_text_to_clipboard", { text: link });
-      toast("Link copied — it plays as soon as the upload finishes");
-    } else toast("Preparing your video…");
+      // Copying it is sharing it: the link is kept (within the plan's limits).
+      const kept = await invoke("live_share", { bundle }).then(
+        () => true,
+        (e) => (toast(String(e)), false),
+      );
+      if (kept) toast("Link copied — paste it anywhere");
+      openRecording(bundle);
+      return;
+    }
+    toast("Preparing your video…");
     const state = await invoke<{ id: string; name: string }>("open_editor", { path: bundle });
     const destination = await invoke<string>("export_default_path", { name: state.name, extension: "mp4" });
     const { Channel } = await import("@tauri-apps/api/core");
-    if (link) {
-      try {
-        await invoke("instant_share", { id: state.id, destination, progress: new Channel() });
-        toast("Your video is live");
-      } catch (e) {
-        toast(`Upload failed: ${e}. The video is saved in Exports.`);
-      }
-    } else {
-      await invoke("editor_export", { id: state.id, request: { format: "mp4", resolution: 1080, fps: 60, destination }, progress: new Channel<number>() });
-      await invoke("copy_file_to_clipboard", { path: destination });
-      toast("Video copied — paste it anywhere");
-    }
+    await invoke("editor_export", { id: state.id, request: { format: "mp4", resolution: 1080, fps: 60, destination }, progress: new Channel<number>() });
+    await invoke("copy_file_to_clipboard", { path: destination });
+    toast("Video copied — paste it anywhere");
     openRecording(bundle);
   };
-
 
   void listen("record:start", () => void start());
   void listen("record:stop", () => void stop());

@@ -12,10 +12,10 @@ fn shares_a_video_end_to_end() {
     }
     let client = Client::new(&base, "umi_dev_token");
     client.check().unwrap();
-    // A free account can't share.
-    let free = Client::new(&base, "umi_free_token");
     let media = Media { video, title: "Rust upload test".into(), duration_ms: 10_000, width: 1920, height: 1080, poster: None, gif: None };
-    assert!(free.share(&media, &|_| {}, &|_| {}).unwrap_err().needs_plan());
+    // Free links hold up to 5 minutes.
+    let long = Media { video, title: "Too long".into(), duration_ms: 6 * 60_000, width: 1920, height: 1080, poster: None, gif: None };
+    assert!(Client::new(&base, "umi_free_token").share(&long, &|_| {}, &|_| {}).unwrap_err().needs_plan());
     assert!(Client::new(&base, "nope").check().unwrap_err().unauthorized());
 
     let link = std::sync::Mutex::new(String::new());
@@ -48,14 +48,14 @@ fn shares_a_video_end_to_end() {
     assert!(client.video(&done.id).is_err() || client.video(&done.id).unwrap().status == "deleted");
 }
 
-/// Instant mode: the link exists before the video; the file is uploaded while it's
-/// written, and its first bytes change at the very end (like an MP4 writer patching mdat).
+/// Links made while recording: the link exists before the recording ends; the file is uploaded
+/// while it's written (its first bytes change at the very end, like an MP4 writer finishing).
 #[test]
-fn uploads_a_file_while_it_grows() {
+fn uploads_a_recording_while_it_grows() {
     let Ok(base) = std::env::var("UMI_CLOUD_TEST") else { return };
     let client = Client::new(&base, "umi_dev_token");
-    let reservation = client.reserve("Growing upload test").unwrap();
-    assert_eq!(reservation.video.status, "uploading");
+    let link = client.reserve_raw("Growing upload test", true).unwrap();
+    assert_eq!((link.video.status.as_str(), link.video.kind.as_deref(), link.video.shared), ("uploading", Some("raw"), Some(false)));
 
     // 25 MiB of pseudo-random bytes: three parts at the server's 10 MiB part size.
     let mut data = vec![0u8; 25 * 1024 * 1024 + 123];
@@ -70,7 +70,7 @@ fn uploads_a_file_while_it_grows() {
     std::fs::write(&path, b"").unwrap();
     let done = std::sync::atomic::AtomicBool::new(false);
     let sent = std::sync::atomic::AtomicU64::new(0);
-    let video = std::thread::scope(|scope| {
+    std::thread::scope(|scope| {
         scope.spawn(|| {
             use std::io::{Seek, SeekFrom, Write};
             let mut f = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
@@ -86,44 +86,45 @@ fn uploads_a_file_while_it_grows() {
             f.flush().unwrap();
             done.store(true, std::sync::atomic::Ordering::SeqCst);
         });
+        let finished = || done.load(std::sync::atomic::Ordering::SeqCst).then(|| Ok(umi_cloud::RawMeta { duration_ms: 42_000, width: 1920, height: 1080 }));
         client
-            .upload_growing(
-                &reservation,
-                &path,
-                &|| {
-                    done.load(std::sync::atomic::Ordering::SeqCst)
-                        .then(|| Ok(umi_cloud::Finished { duration_ms: 42_000, width: 1920, height: 1080, poster: None, gif: None }))
-                },
-                &|n| {
-                    // Parts go up before the file is finished.
-                    if !done.load(std::sync::atomic::Ordering::SeqCst) {
-                        sent.store(n, std::sync::atomic::Ordering::SeqCst);
-                    }
-                },
-            )
-            .unwrap()
+            .upload_raw(&link, "screen", &path, &finished, &|n| {
+                // Parts go up before the file is finished.
+                if !done.load(std::sync::atomic::Ordering::SeqCst) {
+                    sent.store(n, std::sync::atomic::Ordering::SeqCst);
+                }
+            })
+            .unwrap();
+        // The camera never started: the link is the screen alone.
+        let missing = std::env::temp_dir().join("umi-no-camera.bin");
+        let _ = std::fs::remove_file(&missing);
+        client.upload_raw(&link, "camera", &missing, &finished, &|_| {}).unwrap();
     });
     assert!(sent.load(std::sync::atomic::Ordering::SeqCst) >= 10 * 1024 * 1024, "nothing uploaded while writing");
+    assert_eq!(client.video(&link.video.id).unwrap().status, "uploading", "not ready before the edit");
+    client.put_raw_edit(&link.video.id, &serde_json::json!({ "version": 1 }), Some(&serde_json::json!([]))).unwrap();
+    let video = client.video(&link.video.id).unwrap();
     assert_eq!(video.status, "ready");
     assert_eq!((video.duration_ms, video.width, video.height), (Some(42_000), Some(1920), Some(1080)));
     assert_eq!(video.size_bytes, Some(data.len() as u64));
-    let mut served = ureq::get(&format!("{}/video.mp4", video.url)).call().unwrap();
+    let mut served = ureq::get(&format!("{}/raw/screen.mp4", video.url)).call().unwrap();
     let bytes = served.body_mut().with_config().limit(64 * 1024 * 1024).read_to_vec().unwrap();
     assert!(bytes == data, "served file differs");
+    assert_eq!(client.share_raw(&video.id).unwrap().shared, Some(true));
     client.delete(&video.id).unwrap();
     let _ = std::fs::remove_file(&path);
 }
 
 #[test]
-fn stops_when_the_file_fails() {
+fn stops_when_the_recording_fails() {
     let Ok(base) = std::env::var("UMI_CLOUD_TEST") else { return };
     let client = Client::new(&base, "umi_dev_token");
-    let reservation = client.reserve("Failing upload test").unwrap();
+    let link = client.reserve_raw("Failing upload test", false).unwrap();
     let path = std::env::temp_dir().join("umi-failing-upload.bin");
     std::fs::write(&path, vec![1u8; 1000]).unwrap();
-    let err = client.upload_growing(&reservation, &path, &|| Some(Err("export failed".into())), &|_| {}).unwrap_err();
-    assert_eq!(err.to_string(), "export failed");
-    client.delete(&reservation.video.id).unwrap();
+    let err = client.upload_raw(&link, "screen", &path, &|| Some(Err("recording failed".into())), &|_| {}).unwrap_err();
+    assert_eq!(err.to_string(), "recording failed");
+    client.delete(&link.video.id).unwrap();
 }
 
 #[test]
@@ -140,17 +141,12 @@ fn team_workspace_round_trip() {
     let me = members.iter().find(|m| m.you).unwrap().id.clone();
 
     // A video shared into the team shows up for the member.
-    let reservation = owner.reserve("Team video").unwrap();
+    let link = owner.reserve_raw("Team video", false).unwrap();
     let path = std::env::temp_dir().join("umi-team-video.bin");
     std::fs::write(&path, vec![7u8; 2000]).unwrap();
-    let video = owner
-        .upload_growing(
-            &reservation,
-            &path,
-            &|| Some(Ok(umi_cloud::Finished { duration_ms: 1000, width: 640, height: 360, poster: None, gif: None })),
-            &|_| {},
-        )
-        .unwrap();
+    owner.upload_raw(&link, "screen", &path, &|| Some(Ok(umi_cloud::RawMeta { duration_ms: 1000, width: 640, height: 360 })), &|_| {}).unwrap();
+    owner.put_raw_edit(&link.video.id, &serde_json::json!({ "version": 1 }), None).unwrap();
+    let video = owner.video(&link.video.id).unwrap();
     let moved = owner.update(&video.id, &Settings { workspace_id: Some(Some(ws.id.clone())), ..Default::default() }).unwrap();
     assert_eq!(moved.workspace_id.as_deref(), Some(ws.id.as_str()));
     let videos = member.team_videos(&ws.id).unwrap();

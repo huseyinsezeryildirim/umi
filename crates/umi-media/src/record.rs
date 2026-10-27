@@ -67,7 +67,9 @@ unsafe impl Send for StreamWriter {}
 impl StreamWriter {
     pub fn create(path: &Path, s: &WriterSettings) -> Result<Self, MediaError> {
         crate::init();
-        let mut output = ff::format::output_as(path, "mov").map_err(|e| MediaError::open(path, e))?;
+        // MP4 (the file is still called screen.mov): every browser plays it, so a link made while
+        // recording can stream the file as it is.
+        let mut output = ff::format::output_as(path, "mp4").map_err(|e| MediaError::open(path, e))?;
         let global_header = output.format().flags().contains(ff::format::Flags::GLOBAL_HEADER);
         let bit_rate = if s.bit_rate > 0 {
             s.bit_rate

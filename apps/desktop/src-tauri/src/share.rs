@@ -278,128 +278,162 @@ pub fn copy_text_to_clipboard(text: String) {
     copy_text(&text);
 }
 
-// ───── Instant mode: the link before the video ─────
+// ───── Links made while recording (Loom-style) ─────
+//
+// When connected to Umi Cloud, every recording reserves a raw link as it starts, and the screen
+// (and camera) files upload while they're written: nothing is rendered on this computer. At stop
+// the edit (project.json) and cursor follow, so the link plays at once in the viewer's browser,
+// which applies the edit; later changes in the editor are sent again (just the edit). A link
+// nobody shares is deleted by Umi Cloud after a day.
 
-/// The link reserved when an Instant recording starts (one recording at a time).
-static RESERVED: parking_lot::Mutex<Option<(Client, umi_cloud::Reservation)>> = parking_lot::Mutex::new(None);
-
-/// Reserves a link for the recording that's starting, when connected to Umi Cloud
-/// (`None` otherwise: Instant then copies the file instead).
-#[tauri::command]
-pub async fn instant_reserve() -> Result<Option<String>, String> {
-    let Ok(client) = client() else { return Ok(None) };
-    tauri::async_runtime::spawn_blocking(move || {
-        let title = format!("Recording {}", chrono::Local::now().format("%b %-d, %Y %H:%M"));
-        match client.reserve(&title) {
-            Ok(r) => {
-                let url = r.video.url.clone();
-                if let Some((old_client, old)) = RESERVED.lock().replace((client, r)) {
-                    let _ = old_client.delete(&old.video.id);
-                }
-                Ok(Some(url))
-            }
-            // No plan or offline: Instant still works locally.
-            Err(_) => Ok(None),
-        }
-    })
-    .await
-    .map_err(|e| e.to_string())?
+struct Live {
+    client: Client,
+    link: umi_cloud::RawLink,
+    bundle: PathBuf,
+    /// Set at stop (the screen's size and length) or when the recording is thrown away.
+    finished: std::sync::Arc<parking_lot::Mutex<Option<Result<umi_cloud::RawMeta, String>>>>,
+    uploads: Vec<std::thread::JoinHandle<Result<(), String>>>,
 }
 
-/// The recording was discarded: give the reserved link back.
-#[tauri::command]
-pub async fn instant_release() {
-    let taken = RESERVED.lock().take();
-    if let Some((client, r)) = taken {
-        let _ = tauri::async_runtime::spawn_blocking(move || client.delete(&r.video.id)).await;
+static LIVE: parking_lot::Mutex<Option<Live>> = parking_lot::Mutex::new(None);
+
+fn take_finished(slot: &parking_lot::Mutex<Option<Result<umi_cloud::RawMeta, String>>>) -> Option<Result<umi_cloud::RawMeta, String>> {
+    match &*slot.lock() {
+        None => None,
+        Some(Ok(m)) => Some(Ok(umi_cloud::RawMeta { duration_ms: m.duration_ms, width: m.width, height: m.height })),
+        Some(Err(e)) => Some(Err(e.clone())),
     }
 }
 
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InstantProgress {
-    exported: f64,
-    uploaded_bytes: u64,
-}
-
-/// Exports the polished video to `destination` and uploads it to the reserved link at the
-/// same time (parts go up while the export is still writing). The link was copied at stop.
+/// The recording just began: reserve its link and start uploading its files as they grow.
+/// `None` when not connected (or the plan has no links): the recording stays on this computer.
 #[tauri::command]
-pub async fn instant_share(
-    state: State<'_, AppState>,
-    id: String,
-    destination: PathBuf,
-    progress: Channel<InstantProgress>,
-) -> Result<Video, String> {
-    let taken = RESERVED.lock().take();
-    let (client, reservation) = taken.ok_or("No link was reserved for this recording.")?;
-    let editor = state.editor(&id)?;
-    let gpu = state.gpu()?;
-    let bundle = editor.bundle.clone();
+pub async fn live_start(state: State<'_, AppState>, camera: bool) -> Result<Option<String>, String> {
+    let Some(bundle) = state.recorder.current.lock().as_ref().map(|r| r.bundle.clone()) else { return Ok(None) };
+    let Ok(client) = client() else { return Ok(None) };
     tauri::async_runtime::spawn_blocking(move || {
-        remember(&bundle, &reservation.video);
-        let exported = parking_lot::Mutex::new(0.0f64);
-        let uploaded = std::sync::atomic::AtomicU64::new(0);
-        let send = || {
-            let _ = progress
-                .send(InstantProgress { exported: *exported.lock(), uploaded_bytes: uploaded.load(std::sync::atomic::Ordering::Relaxed) });
+        let title = format!("Recording {}", chrono::Local::now().format("%b %-d, %Y %H:%M"));
+        let Ok(link) = client.reserve_raw(&title, camera) else { return Ok(None) };
+        let url = link.video.url.clone();
+        let finished = std::sync::Arc::new(parking_lot::Mutex::new(None));
+        let mut uploads = vec![];
+        let files: &[(&str, &str)] = if camera {
+            &[("screen", umi_project::project::SCREEN_FILE), ("camera", umi_project::project::CAMERA_FILE)]
+        } else {
+            &[("screen", umi_project::project::SCREEN_FILE)]
         };
-        let finished = parking_lot::Mutex::new(None::<Result<umi_cloud::Finished, String>>);
-        let folder = std::env::temp_dir().join(format!("umi-instant-{}", std::process::id()));
-        let _ = std::fs::create_dir_all(&folder);
-        let _ = std::fs::remove_file(&destination);
-        let result = std::thread::scope(|scope| {
-            scope.spawn(|| {
-                let cancel = std::sync::atomic::AtomicBool::new(false);
-                let settings = share_settings(umi_engine::Format::StreamingMp4);
-                let outcome = editor
-                    .export(
-                        gpu,
-                        &settings,
-                        &destination,
-                        &|p| {
-                            *exported.lock() = p;
-                            send();
-                        },
-                        &cancel,
-                    )
-                    .and_then(|_| {
-                        let mut decoder = umi_media::VideoDecoder::open(&destination, false).map_err(|e| e.to_string())?;
-                        let info = decoder.info();
-                        Ok(umi_cloud::Finished {
-                            duration_ms: (info.duration * 1000.0) as u64,
-                            width: info.width,
-                            height: info.height,
-                            poster: poster(&mut decoder, info.duration),
-                            gif: gif_preview(&mut decoder, info.duration, &folder),
-                        })
-                    });
-                *finished.lock() = Some(outcome);
-            });
-            // Waits for the export to create the file, then follows it.
-            while !destination.exists() && finished.lock().is_none() {
-                std::thread::sleep(std::time::Duration::from_millis(100));
-            }
-            client
-                .upload_growing(&reservation, &destination, &|| finished.lock().take(), &|bytes| {
-                    uploaded.store(bytes, std::sync::atomic::Ordering::Relaxed);
-                    send();
-                })
-                .map_err(|e| e.to_string())
-        });
-        let _ = std::fs::remove_dir_all(&folder);
-        match result {
-            Ok(video) => {
-                remember(&bundle, &video);
-                Ok(video)
-            }
-            Err(e) => {
-                let _ = client.delete(&reservation.video.id);
-                let _ = std::fs::remove_file(share_file(&bundle));
-                Err(e)
-            }
+        for &(kind, name) in files {
+            let (client, link, finished, path) = (client.clone(), link.clone(), finished.clone(), bundle.join(name));
+            uploads.push(std::thread::spawn(move || {
+                // The camera file appears with its first frame (or never, if the camera fails).
+                while !path.exists() && finished.lock().is_none() {
+                    std::thread::sleep(std::time::Duration::from_millis(250));
+                }
+                client.upload_raw(&link, kind, &path, &|| take_finished(&finished), &|_| {}).map_err(|e| e.to_string())
+            }));
         }
+        remember(&bundle, &link.video);
+        let previous = LIVE.lock().replace(Live { client, link, bundle, finished, uploads });
+        if let Some(old) = previous {
+            *old.finished.lock() = Some(Err("replaced".into()));
+            let _ = old.client.delete(&old.link.video.id);
+        }
+        Ok(Some(url))
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// The recording stopped: the rest of the files, the edit and a poster go up in the background.
+/// Returns the link right away (it plays as soon as the last bytes arrive).
+#[tauri::command]
+pub async fn live_finish(bundle: PathBuf) -> Option<Video> {
+    tauri::async_runtime::spawn_blocking(move || finish_live(bundle)).await.ok().flatten()
+}
+
+fn finish_live(bundle: PathBuf) -> Option<Video> {
+    let live = LIVE.lock().take()?;
+    if live.bundle != bundle {
+        *live.finished.lock() = Some(Err("another recording".into()));
+        return None;
+    }
+    let screen = bundle.join(umi_project::project::SCREEN_FILE);
+    let (meta, poster) = match umi_media::VideoDecoder::open(&screen, false) {
+        Ok(mut decoder) => {
+            let info = decoder.info();
+            let poster = poster(&mut decoder, info.duration);
+            (Ok(umi_cloud::RawMeta { duration_ms: (info.duration * 1000.0) as u64, width: info.width, height: info.height }), poster)
+        }
+        Err(e) => (Err(e.to_string()), None),
+    };
+    *live.finished.lock() = Some(meta);
+    let video = live.link.video.clone();
+    std::thread::spawn(move || {
+        let read = |name: &str| std::fs::read(bundle.join(name)).ok().and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
+        let mut ok = true;
+        if let Some(project) = read(umi_project::project::PROJECT_FILE) {
+            ok &= live.client.put_raw_edit(&live.link.video.id, &project, read(umi_project::project::CURSOR_FILE).as_ref()).is_ok();
+        }
+        if let Some(jpeg) = poster {
+            let _ = live.client.put_raw_poster(&live.link, &jpeg);
+        }
+        for upload in live.uploads {
+            ok &= matches!(upload.join(), Ok(Ok(())));
+        }
+        match live.client.video(&live.link.video.id) {
+            Ok(v) if ok => remember(&bundle, &v),
+            // Didn't make it: the recording is still here, and Share uploads it the usual way.
+            _ => {
+                let _ = live.client.delete(&live.link.video.id);
+                let _ = std::fs::remove_file(share_file(&bundle));
+            }
+        }
+    });
+    Some(video)
+}
+
+/// The recording was thrown away: stop uploading and give the link back.
+#[tauri::command]
+pub fn live_cancel() {
+    if let Some(live) = LIVE.lock().take() {
+        *live.finished.lock() = Some(Err("cancelled".into()));
+        std::thread::spawn(move || {
+            for upload in live.uploads {
+                let _ = upload.join();
+            }
+            let _ = live.client.delete(&live.link.video.id);
+        });
+    }
+}
+
+/// The owner shares the recording's link (copied it, or pressed Share): it's kept from now on.
+#[tauri::command]
+pub async fn live_share(state: State<'_, AppState>, id: Option<String>, bundle: Option<PathBuf>) -> Result<Option<Video>, String> {
+    let bundle = match (id, bundle) {
+        (Some(id), _) => state.editor(&id)?.bundle.clone(),
+        (None, Some(bundle)) => bundle,
+        _ => return Ok(None),
+    };
+    let Some(video) = saved(&bundle).filter(|v| v.kind.as_deref() == Some("raw")) else { return Ok(None) };
+    let client = client()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let video = client.share_raw(&video.id).map_err(|e| e.to_string())?;
+        remember(&bundle, &video);
+        Ok(Some(video))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// The edit changed: a raw link shows the new look (just project.json goes up).
+pub(crate) fn sync_edit(bundle: &Path) {
+    let Some(video) = saved(bundle).filter(|v| v.kind.as_deref() == Some("raw")) else { return };
+    let Ok(client) = client() else { return };
+    let bundle = bundle.to_path_buf();
+    std::thread::spawn(move || {
+        let read = |name: &str| std::fs::read(bundle.join(name)).ok().and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
+        if let Some(project) = read(umi_project::project::PROJECT_FILE) {
+            let _ = client.put_raw_edit(&video.id, &project, None);
+        }
+    });
 }
