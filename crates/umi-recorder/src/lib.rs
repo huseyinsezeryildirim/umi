@@ -19,7 +19,8 @@ use umi_capture::screen::{self, ScreenOptions, ScreenSession};
 use umi_capture::{AudioSink, CaptureError, Clock, Frame, Target, VideoSink};
 use umi_media::{Pixels, StreamWriter, VideoCodec, WriterSettings};
 use umi_project::edit::Camera as CameraStyle;
-use umi_project::project::{AudioInfo, CameraInfo, ScreenInfo, WindowSpan};
+use umi_project::edit::SceneLayout;
+use umi_project::project::{AudioInfo, CameraInfo, LayoutSpan, ScreenInfo, WindowSpan};
 use umi_project::{Bundle, RecordingProject, Rect};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -210,6 +211,13 @@ fn writer_thread(path: PathBuf, settings: Option<WriterSettings>, fps: u32, rx: 
 }
 
 /// A recording in progress.
+/// Layouts while recording: the stretches so far and the current one (since when).
+struct Layouts {
+    past: Vec<LayoutSpan>,
+    since: f64,
+    current: SceneLayout,
+}
+
 pub struct Recording {
     pub bundle: PathBuf,
     clock: Clock,
@@ -227,8 +235,9 @@ pub struct Recording {
     size: (u32, u32),
     capture_rect: (f64, f64, f64, f64),
     audio: AudioInfo,
-    /// Spans with the camera turned off (the camera keeps recording; the edit hides it).
-    camera_off: parking_lot::Mutex<(Vec<(f64, f64)>, Option<f64>)>,
+    /// The layout picked while recording (from the panel, or the camera button), with the
+    /// stretches before it; the camera keeps recording whatever the layout.
+    layouts: parking_lot::Mutex<Layouts>,
     /// The window in front, read once a second (names the recording).
     windows: parking_lot::Mutex<Option<WindowWatch>>,
 }
@@ -356,7 +365,7 @@ impl Recording {
             size,
             capture_rect: rect,
             audio,
-            camera_off: parking_lot::Mutex::new((Vec::new(), None)),
+            layouts: parking_lot::Mutex::new(Layouts { past: vec![], since: 0.0, current: SceneLayout::Default }),
             windows: parking_lot::Mutex::new(None),
         };
 
@@ -442,22 +451,36 @@ impl Recording {
         }
     }
 
-    /// Turns the camera off or on in the video from now (the camera keeps recording).
-    pub fn set_camera_visible(&self, visible: bool) {
+    /// The video's layout from now: screen and bubble, side by side, camera only or screen only.
+    pub fn set_layout(&self, layout: SceneLayout) {
         let now = self.clock.elapsed();
-        let mut off = self.camera_off.lock();
-        match (visible, off.1) {
-            (false, None) => off.1 = Some(now),
-            (true, Some(since)) => {
-                off.0.push((since, now));
-                off.1 = None;
-            }
+        let mut l = self.layouts.lock();
+        if l.current == layout {
+            return;
+        }
+        let span = LayoutSpan { start: l.since, end: now, layout: l.current };
+        if span.layout != SceneLayout::Default && span.end > span.start {
+            l.past.push(span);
+        }
+        l.since = now;
+        l.current = layout;
+    }
+
+    pub fn layout(&self) -> SceneLayout {
+        self.layouts.lock().current
+    }
+
+    /// Turns the camera off (screen only) or back on in the video from now.
+    pub fn set_camera_visible(&self, visible: bool) {
+        match (visible, self.layout()) {
+            (false, _) => self.set_layout(SceneLayout::HideCamera),
+            (true, SceneLayout::HideCamera) => self.set_layout(SceneLayout::Default),
             _ => {}
         }
     }
 
     pub fn camera_visible(&self) -> bool {
-        self.camera_off.lock().1.is_none()
+        self.layout() != SceneLayout::HideCamera
     }
 
     /// Microphone peak level, 0…1 (for the control bar's meter).
@@ -518,12 +541,14 @@ impl Recording {
             edit: None,
             camera_only: self.options.camera_only.then_some(true),
             title: None,
-            camera_off: {
-                let mut off = self.camera_off.lock();
-                if let Some(since) = off.1.take() {
-                    off.0.push((since, duration));
+            camera_off: None,
+            layouts: {
+                self.set_layout(SceneLayout::Default);
+                let mut spans = std::mem::take(&mut self.layouts.lock().past);
+                for span in &mut spans {
+                    span.end = span.end.min(duration);
                 }
-                (has_camera && !off.0.is_empty()).then(|| off.0.clone())
+                (has_camera && !spans.is_empty()).then_some(spans)
             },
             title_auto: None,
             windows,
@@ -634,6 +659,7 @@ pub fn recover(library: &Path) -> Vec<PathBuf> {
             camera_only: None,
             title: None,
             camera_off: None,
+            layouts: None,
             title_auto: None,
             windows: None,
         };

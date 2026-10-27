@@ -295,6 +295,48 @@ html.umi-overlay body {
 
 /* ───── Control bar ───── */
 /* A column on the left of the screen, the same as the web recorder's bar. */
+/* The layout column on the right while recording. */
+.layouts {
+  position: fixed;
+  inset: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 0 0 1px rgba(17, 24, 39, 0.08), 0 10px 30px rgba(17, 24, 39, 0.16);
+  backdrop-filter: blur(16px);
+  cursor: grab;
+}
+.layouts__btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.layouts__btn:hover {
+  background: rgba(17, 24, 39, 0.06);
+  color: #111827;
+}
+.layouts__btn:active {
+  transform: scale(0.94);
+}
+.layouts__btn[data-on="true"] {
+  background: rgba(17, 111, 245, 0.1);
+  color: #116ff5;
+  box-shadow: inset 0 0 0 1.5px rgba(17, 111, 245, 0.35);
+}
+
 .controls {
   position: fixed;
   inset: 6px;

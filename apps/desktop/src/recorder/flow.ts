@@ -47,6 +47,8 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
       await invoke("record_begin");
       reserved = invoke<string | null>("live_start", { camera: !!(settings.cameraOn || settings.cameraOnly) }).catch(() => null);
       await recorder.show("controls");
+      // With the camera: the layout column on the right (screen and bubble, side by side…).
+      if (settings.cameraOn && !settings.cameraOnly) await recorder.show("layouts");
     } catch (e) {
       await recorder.hide("countdown");
       await invoke("record_cancel").catch(() => {});
@@ -70,6 +72,7 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
     try {
       const settings = await recorder.settings();
       await recorder.hide("controls");
+      await recorder.hide("layouts");
       await recorder.hide("bubble");
       await recorder.hide("prompter");
       await recorder.hide("ink");
@@ -93,6 +96,7 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
 
   const discard = async () => {
     await recorder.hide("controls");
+    await recorder.hide("layouts");
     await recorder.hide("bubble");
     await recorder.hide("prompter");
     await recorder.hide("ink");

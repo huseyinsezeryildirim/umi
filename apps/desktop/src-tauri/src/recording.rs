@@ -149,6 +149,8 @@ pub struct Status {
     level: f32,
     /// The camera is shown in the video now (it can be turned off and on while recording).
     camera_visible: bool,
+    /// The video's layout now (picked from the layout column while recording).
+    layout: umi_project::edit::SceneLayout,
 }
 
 #[tauri::command]
@@ -164,6 +166,7 @@ pub fn record_status(state: State<'_, AppState>) -> Status {
         elapsed: current.as_ref().map_or(0.0, |r| r.elapsed()),
         level,
         camera_visible: current.as_ref().is_none_or(|r| r.camera_visible()),
+        layout: current.as_ref().map_or(umi_project::edit::SceneLayout::Default, |r| r.layout()),
     }
 }
 
@@ -350,12 +353,29 @@ pub fn record_pause(app: AppHandle, state: State<'_, AppState>, paused: bool) {
 pub fn record_camera(app: AppHandle, state: State<'_, AppState>, visible: bool) -> Result<(), String> {
     if let Some(r) = state.recorder.current.lock().as_ref() {
         r.set_camera_visible(visible);
+        // The layout column follows.
+        let _ = app.emit("record:layout", r.layout());
     }
     if visible {
         crate::windows::show(&app, &crate::windows::BUBBLE, None).map_err(|e| e.to_string())?;
     } else {
         crate::windows::hide(&app, "bubble");
     }
+    Ok(())
+}
+
+/// The video's layout from now (the layout column): the bubble steps aside for screen only.
+#[tauri::command]
+pub fn record_layout(app: AppHandle, state: State<'_, AppState>, layout: umi_project::edit::SceneLayout) -> Result<(), String> {
+    if let Some(r) = state.recorder.current.lock().as_ref() {
+        r.set_layout(layout);
+    }
+    if layout == umi_project::edit::SceneLayout::HideCamera {
+        crate::windows::hide(&app, "bubble");
+    } else {
+        crate::windows::show(&app, &crate::windows::BUBBLE, None).map_err(|e| e.to_string())?;
+    }
+    let _ = app.emit("record:layout", layout);
     Ok(())
 }
 

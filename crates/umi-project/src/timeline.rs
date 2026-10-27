@@ -553,10 +553,25 @@ mod tests {
             camera_only: None,
             title: None,
             camera_off: None,
+            layouts: None,
             title_auto: None,
             windows: None,
         };
         Document::new(project, EditSettings::default(), CursorData::default(), duration)
+    }
+
+    #[test]
+    fn layouts_picked_while_recording_become_scenes() {
+        let mut project = doc(10.0).project;
+        project.layouts = Some(vec![
+            crate::project::LayoutSpan { start: 2.0, end: 4.0, layout: crate::edit::SceneLayout::SplitScreen },
+            crate::project::LayoutSpan { start: 4.0, end: 4.1, layout: crate::edit::SceneLayout::CameraOnly },
+            crate::project::LayoutSpan { start: 6.0, end: 12.0, layout: crate::edit::SceneLayout::HideCamera },
+        ]);
+        let scenes = project.default_edit(None).scenes;
+        // A flick shorter than 0.2 s is left out; the last one ends with the recording.
+        let got: Vec<_> = scenes.iter().map(|s| (s.start, s.end, s.layout)).collect();
+        assert_eq!(got, vec![(2.0, 4.0, crate::edit::SceneLayout::SplitScreen), (6.0, 10.0, crate::edit::SceneLayout::HideCamera)]);
     }
 
     #[test]

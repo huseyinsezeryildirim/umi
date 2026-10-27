@@ -257,6 +257,7 @@ mod tests {
             camera_only: None,
             title: None,
             camera_off: None,
+            layouts: None,
             title_auto: None,
             windows: None,
         };

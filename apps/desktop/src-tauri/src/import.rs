@@ -43,6 +43,7 @@ pub fn import_file(library: &Path, file: &Path, name: Option<&str>) -> Result<Pa
             camera_only: None,
             title: None,
             camera_off: None,
+            layouts: None,
             title_auto: None,
             windows: None,
         };

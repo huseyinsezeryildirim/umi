@@ -67,7 +67,12 @@ export interface Status {
   level: number;
   /** The camera shows in the video now (it can be turned off and on while recording). */
   cameraVisible: boolean;
+  /** The video's layout now (the layout column while recording). */
+  layout: Layout;
 }
+
+/** How screen and camera share the video: screen and bubble, side by side, camera only, screen only. */
+export type Layout = "default" | "splitScreen" | "cameraOnly" | "hideCamera";
 
 export const recorder = {
   settings: () => invoke<RecordSettings>("record_settings"),
@@ -77,6 +82,8 @@ export const recorder = {
   status: () => invoke<Status>("record_status"),
   /** Camera off/on while recording (the bubble hides; the video hides the camera there). */
   camera: (visible: boolean) => invoke("record_camera", { visible }),
+  /** The video's layout from now (the bubble hides for screen only). */
+  layout: (layout: Layout) => invoke("record_layout", { layout }),
   cameraPreview: (camera: string | null, onFrame: (jpeg: ArrayBuffer) => void) => {
     const frames = new Channel<ArrayBuffer>();
     frames.onmessage = onFrame;

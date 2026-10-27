@@ -58,6 +58,10 @@ pub struct RecordingProject {
     /// starts with the camera hidden there.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub camera_off: Option<Vec<(f64, f64)>>,
+    /// Layouts picked while recording (screen and bubble, side by side, camera only, screen
+    /// only), each from `start` to `end` in recording time: the video starts with these scenes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layouts: Option<Vec<LayoutSpan>>,
     /// Which window was in front while recording (its app and title, from each time in
     /// seconds): names the recording after what was on screen.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -165,8 +169,16 @@ impl RecordingProject {
                 layout: SceneLayout::CameraOnly,
                 transition: 0.0,
             }];
+        } else if let Some(layouts) = &self.layouts {
+            // Layouts picked while recording: those scenes, starting where they were picked.
+            for span in layouts {
+                let (start, end) = (span.start.max(0.0), span.end.min(self.duration));
+                if end - start >= 0.2 && span.layout != SceneLayout::Default {
+                    edit.scenes.push(SceneSegment { id: new_id(), start, end, layout: span.layout, transition: 0.3 });
+                }
+            }
         } else {
-            // Camera turned off for a while during the recording: hidden there in the video.
+            // Camera turned off for a while during the recording (older recordings): hidden there.
             for &(start, end) in self.camera_off.iter().flatten() {
                 let (start, end) = (start.max(0.0), end.min(self.duration));
                 if end - start >= 0.2 {
@@ -181,6 +193,14 @@ impl RecordingProject {
     pub fn effective_edit(&self, preset: Option<&StylePreset>) -> EditSettings {
         self.edit.clone().unwrap_or_else(|| self.default_edit(preset))
     }
+}
+
+/// A stretch of a recording shown with one layout (`Default` stretches aren't kept).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct LayoutSpan {
+    pub start: f64,
+    pub end: f64,
+    pub layout: SceneLayout,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
