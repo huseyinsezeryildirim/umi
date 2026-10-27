@@ -1,9 +1,8 @@
-// Share links from the web editor, the same way the desktop app makes them: the video is drawn
-// at 1080p30 (~4 Mb/s), uploaded in parts to Umi Cloud with a poster, and the link is copied as
-// soon as it exists. Uses the website's sign-in (the same account and plan limits).
+// Share links from the web editor, the same way the desktop app makes them: the recording and its
+// edit go up as they are (nothing is rendered here) and the viewer's browser draws the look; the
+// link is copied as soon as it exists. Uses the website's sign-in (the same account and plan limits).
 import { ALL_FORMATS, BlobSource, CanvasSink, Input } from "mediabunny";
 import type { Session } from "./engine";
-import { exportVideo } from "./exporter";
 
 const q = new URLSearchParams(location.search);
 // The website passes its API address; it's kept for the rest of the visit.
@@ -96,59 +95,100 @@ async function put(url: string, body: Blob, type: string): Promise<string> {
   }
 }
 
-type Created = { video: Video; upload: { partSize: number; parts: { partNumber: number; url: string }[]; thumbnailUrl?: string } };
+type RawLink = { video: Video; raw: { partSize: number; thumbnailUrl?: string } };
 
-export async function shareStart(session: Session, id: string, title: string, progress: Progress<ShareProgress>): Promise<Video> {
+/**
+ * Like the Mac app: the recording itself goes up (no video is made in this browser), with its edit,
+ * and the viewer's browser draws the look. The plan is checked first, so a long recording on Free
+ * is told at once; the link is copied as soon as it exists.
+ */
+export async function shareStart(session: Session, id: string, title: string, cursor: unknown, progress: Progress<ShareProgress>): Promise<Video> {
   if (!sessionToken()) throw new CloudError("Sign in to share links.");
   const send = (stage: string, value: number, video?: Video) => progress.onmessage({ stage, value, video });
-  send("export", 0);
-  const blob = await exportVideo(
-    session,
-    { format: "mp4", resolution: 1080, fps: 30, bitrate: 4_000_000, destination: "share.mp4" },
-    (v) => send("export", v),
-    new AbortController().signal,
-    null,
-  );
-  if (!blob) throw new CloudError("The video couldn't be made.");
-  const duration = session.wasm.duration();
-  const [width, height] = session.wasm.frameSize(0, 1080);
-
-  const created = await call<Created>("POST", "/api/videos", {
+  const screen = session.file("screen.webm");
+  if (!screen) throw new CloudError("The recording's file is missing.");
+  const camera = session.hasCamera ? session.file("camera.webm") : null;
+  const durationMs = Math.round(session.wasm.duration() * 1000);
+  const link = await call<RawLink>("POST", "/api/videos", {
+    raw: true,
     title,
-    sizeBytes: blob.size,
-    contentType: "video/mp4",
-    durationMs: Math.round(duration * 1000),
-    width,
-    height,
-    allowDownload: true,
+    camera: !!camera,
+    durationMs,
+    contentType: screen.type.includes("mp4") ? "video/mp4" : "video/webm",
   });
-  remember(id, created.video);
-  void navigator.clipboard?.writeText(created.video.url).catch(() => {});
-  send("link", 0, created.video);
+  // Sharing it applies the plan (length, number of links) before anything is uploaded.
+  let shared: Video;
+  try {
+    shared = (await call<{ video: Video }>("PATCH", `/api/videos/${link.video.id}`, { shared: true })).video;
+  } catch (e) {
+    await call("DELETE", `/api/videos/${link.video.id}`).catch(() => {});
+    throw e;
+  }
+  remember(id, shared);
+  void navigator.clipboard?.writeText(shared.url).catch(() => {});
+  send("link", 0, shared);
 
-  const image = await poster(blob, duration);
-  if (image && created.upload.thumbnailUrl) await put(created.upload.thumbnailUrl, image, "image/jpeg").catch(() => "");
-
-  // Video parts, three at a time.
-  const { partSize, parts } = created.upload;
-  const queue = [...parts];
-  const etags: { partNumber: number; etag: string }[] = [];
+  const total = screen.size + (camera?.size ?? 0);
   let sent = 0;
-  await Promise.all(
-    Array.from({ length: 3 }, async () => {
-      for (let part = queue.shift(); part; part = queue.shift()) {
-        const chunk = blob.slice((part.partNumber - 1) * partSize, part.partNumber * partSize);
-        etags.push({ partNumber: part.partNumber, etag: await put(part.url, chunk, "video/mp4") });
-        sent += chunk.size;
-        send("upload", (sent / blob.size) * 0.98);
-      }
-    }),
-  );
-  etags.sort((a, b) => a.partNumber - b.partNumber);
-  const done = (await call<{ video: Video }>("POST", `/api/videos/${created.video.id}/complete`, { parts: etags })).video;
+  const upload = async (file: "screen" | "camera", blob: Blob) => {
+    const size = link.raw.partSize;
+    const count = Math.max(1, Math.ceil(blob.size / size));
+    const numbers = Array.from({ length: count }, (_, i) => i + 1);
+    const etags: { partNumber: number; etag: string }[] = [];
+    // URLs a hundred at a time, parts three at a time.
+    for (let k = 0; k < numbers.length; k += 100) {
+      const { parts } = await call<{ parts: { partNumber: number; url: string }[] }>("POST", `/api/videos/${link.video.id}/raw/parts`, { file, partNumbers: numbers.slice(k, k + 100) });
+      const queue = [...parts];
+      await Promise.all(
+        Array.from({ length: 3 }, async () => {
+          for (let part = queue.shift(); part; part = queue.shift()) {
+            const chunk = blob.slice((part.partNumber - 1) * size, part.partNumber * size);
+            etags.push({ partNumber: part.partNumber, etag: await put(part.url, chunk, blob.type || "video/webm") });
+            sent += chunk.size;
+            send("upload", (sent / total) * 0.97);
+          }
+        }),
+      );
+    }
+    etags.sort((a, b) => a.partNumber - b.partNumber);
+    const [width, height] = file === "screen" ? session.wasm.frameSize(0, 1080) : [0, 0];
+    await call("POST", `/api/videos/${link.video.id}/raw/complete`, { file, parts: etags, durationMs, width, height });
+  };
+  await upload("screen", screen);
+  if (camera) await upload("camera", camera);
+
+  const image = await poster(screen, session.wasm.duration());
+  if (image && link.raw.thumbnailUrl) await put(link.raw.thumbnailUrl, image, "image/jpeg").catch(() => "");
+  await sendImages(session, link.video.id);
+  await call("PUT", `/api/videos/${link.video.id}/raw/edit`, { project: JSON.parse(session.wasm.project()), cursor: cursor ?? undefined });
+  const done = (await call<{ video: Video }>("GET", `/api/videos/${link.video.id}`)).video;
   remember(id, done);
   send("done", 1, done);
   return done;
+}
+
+/** Images the edit names (background, overlays), from this browser's copy of the recording. */
+async function sendImages(session: Session, linkId: string) {
+  const edit = JSON.parse(session.wasm.project()).edit ?? {};
+  const names: unknown[] = [edit.background?.image?._0, ...(edit.overlays ?? []).filter((o: { kind?: string }) => o.kind === "image").map((o: { file: string }) => o.file)];
+  for (const name of names) {
+    if (typeof name !== "string") continue;
+    const blob = session.file(name);
+    if (!blob || !/^image\/(jpeg|png)$/.test(blob.type)) continue;
+    await fetch(`${apiBase()}/api/videos/${linkId}/raw/asset?name=${encodeURIComponent(name)}`, {
+      method: "PUT",
+      headers: { authorization: `Bearer ${sessionToken()}`, "content-type": blob.type },
+      body: blob,
+    }).catch(() => {});
+  }
+}
+
+/** The edit changed: a link made from this recording shows the new look (just the edit goes up). */
+export async function syncEdit(session: Session, id: string) {
+  const video = saved(id);
+  if (!video || video.kind !== "raw") return;
+  await sendImages(session, video.id);
+  await call("PUT", `/api/videos/${video.id}/raw/edit`, { project: JSON.parse(session.wasm.project()) }).catch(() => {});
 }
 
 export async function shareUpdate(id: string, settings: Record<string, unknown>): Promise<Video> {

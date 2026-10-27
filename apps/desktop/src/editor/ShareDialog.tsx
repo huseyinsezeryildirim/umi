@@ -98,7 +98,9 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
       if (p.video) setVideo(p.video);
       if (p.stage === "link") toast("Link copied — it works as soon as the upload finishes");
     };
-    setJob({ stage: "export", value: 0 });
+    // Links made from the recording itself go straight to uploading (an older recording on the Mac
+    // says "export" first).
+    setJob({ stage: "upload", value: 0 });
     try {
       setVideo(await invoke<Video>("share_start", { id: ed.state().id, progress: channel }));
     } catch (e) {
