@@ -86,7 +86,10 @@ fn uploads_a_recording_while_it_grows() {
             f.flush().unwrap();
             done.store(true, std::sync::atomic::Ordering::SeqCst);
         });
-        let finished = || done.load(std::sync::atomic::Ordering::SeqCst).then(|| Ok(umi_cloud::RawMeta { duration_ms: 42_000, width: 1920, height: 1080 }));
+        let finished = || {
+            done.load(std::sync::atomic::Ordering::SeqCst)
+                .then(|| Ok(umi_cloud::RawMeta { duration_ms: 42_000, width: 1920, height: 1080 }))
+        };
         client
             .upload_raw(&link, "screen", &path, &finished, &|n| {
                 // Parts go up before the file is finished.
@@ -144,7 +147,9 @@ fn team_workspace_round_trip() {
     let link = owner.reserve_raw("Team video", false).unwrap();
     let path = std::env::temp_dir().join("umi-team-video.bin");
     std::fs::write(&path, vec![7u8; 2000]).unwrap();
-    owner.upload_raw(&link, "screen", &path, &|| Some(Ok(umi_cloud::RawMeta { duration_ms: 1000, width: 640, height: 360 })), &|_| {}).unwrap();
+    owner
+        .upload_raw(&link, "screen", &path, &|| Some(Ok(umi_cloud::RawMeta { duration_ms: 1000, width: 640, height: 360 })), &|_| {})
+        .unwrap();
     owner.put_raw_edit(&link.video.id, &serde_json::json!({ "version": 1 }), None).unwrap();
     let video = owner.video(&link.video.id).unwrap();
     let moved = owner.update(&video.id, &Settings { workspace_id: Some(Some(ws.id.clone())), ..Default::default() }).unwrap();

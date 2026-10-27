@@ -375,7 +375,8 @@ impl Client {
         let id = &link.video.id;
         let part_size = link.info.part_size;
         let url = |n: u32| -> Result<String, CloudError> {
-            let urls: PartUrls = self.send("POST", &format!("/api/videos/{id}/raw/parts"), Some(serde_json::json!({ "file": file, "partNumbers": [n] })))?;
+            let urls: PartUrls =
+                self.send("POST", &format!("/api/videos/{id}/raw/parts"), Some(serde_json::json!({ "file": file, "partNumbers": [n] })))?;
             urls.parts.into_iter().next().map(|p| p.url).ok_or_else(|| CloudError::Network("no upload URL".into()))
         };
         let read = |n: u32, len: u64| -> Result<Vec<u8>, CloudError> {
@@ -410,7 +411,8 @@ impl Client {
             std::thread::sleep(std::time::Duration::from_millis(500));
         };
         let parts: Vec<serde_json::Value> = etags.iter().map(|(n, e)| serde_json::json!({ "partNumber": n, "etag": e })).collect();
-        let body = serde_json::json!({ "file": file, "parts": parts, "durationMs": meta.duration_ms, "width": meta.width, "height": meta.height });
+        let body =
+            serde_json::json!({ "file": file, "parts": parts, "durationMs": meta.duration_ms, "width": meta.width, "height": meta.height });
         let _: VideoBody = self.send("POST", &format!("/api/videos/{id}/raw/complete"), Some(body))?;
         Ok(())
     }
