@@ -93,6 +93,13 @@ export function ExportDialog(props: { editor: Editor; open: boolean; onClose: ()
                   { value: 60, label: "60 fps" },
                 ]}
               />
+              <Show when={resolution() === 2160 || (resolution() === 1440 && fps() === 60)}>
+                {/* 4K at 60 is eight times the work of 1080p at 30. */}
+                <div class="umi-section__hint">
+                  {resolution() === 2160 ? "4K" : `${resolution()}p`} at {fps()} fps takes a while and works your computer hard. 1080p is sharp on any screen, and
+                  sharing a link needs no export at all.
+                </div>
+              </Show>
             </Show>
             <div class="umi-field-label">Save to</div>
             <button type="button" class="ed-export__file" onClick={() => void choose()} title={destination()}>

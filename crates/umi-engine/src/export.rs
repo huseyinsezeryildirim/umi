@@ -90,6 +90,7 @@ pub fn export(
         let source = &mut source;
         // Moved in, so the channel closes when decoding ends.
         let decode = scope.spawn(move || {
+            background_priority();
             for i in 0..frames {
                 if cancel.load(Ordering::Relaxed) || failed.load(Ordering::Relaxed) {
                     break;
@@ -101,6 +102,7 @@ pub fn export(
             }
         });
         let encode = scope.spawn(|| -> Result<(), EngineError> {
+            background_priority();
             let samples_per_frame = SAMPLE_RATE as f64 / fps as f64;
             let mut audio = vec![];
             let mut audio_done = 0usize;
@@ -163,4 +165,25 @@ pub fn export(
         let _ = std::fs::remove_file(destination);
     }
     result
+}
+
+/// Lowers the calling thread's priority: an export uses every core it can, and anything the
+/// person does meanwhile (typing, a call, the app itself) should still come first.
+#[allow(unsafe_code)]
+fn background_priority() {
+    // SAFETY: each call only changes the calling thread's own scheduling and takes plain values.
+    #[cfg(target_os = "macos")]
+    unsafe {
+        libc::pthread_set_qos_class_self_np(libc::qos_class_t::QOS_CLASS_UTILITY, 0);
+    }
+    // Linux: a thread's nice value is its own (who = 0 is the calling thread).
+    #[cfg(all(unix, not(target_os = "macos")))]
+    unsafe {
+        libc::setpriority(libc::PRIO_PROCESS, 0, 10);
+    }
+    #[cfg(windows)]
+    unsafe {
+        use windows_sys::Win32::System::Threading::{GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_BELOW_NORMAL};
+        SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+    }
 }

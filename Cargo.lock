@@ -6815,6 +6815,7 @@ version = "0.2.2"
 dependencies = [
  "crossbeam-channel",
  "image",
+ "libc",
  "nnnoiseless",
  "parking_lot",
  "serde_json",
@@ -6824,6 +6825,7 @@ dependencies = [
  "umi-project",
  "umi-render",
  "uuid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
