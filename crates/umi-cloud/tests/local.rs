@@ -54,7 +54,7 @@ fn shares_a_video_end_to_end() {
 fn uploads_a_recording_while_it_grows() {
     let Ok(base) = std::env::var("UMI_CLOUD_TEST") else { return };
     let client = Client::new(&base, "umi_dev_token");
-    let link = client.reserve_raw("Growing upload test", true).unwrap();
+    let link = client.reserve_raw("Growing upload test", true, None).unwrap();
     assert_eq!((link.video.status.as_str(), link.video.kind.as_deref(), link.video.shared), ("uploading", Some("raw"), Some(false)));
 
     // 25 MiB of pseudo-random bytes: three parts at the server's 10 MiB part size.
@@ -122,7 +122,7 @@ fn uploads_a_recording_while_it_grows() {
 fn stops_when_the_recording_fails() {
     let Ok(base) = std::env::var("UMI_CLOUD_TEST") else { return };
     let client = Client::new(&base, "umi_dev_token");
-    let link = client.reserve_raw("Failing upload test", false).unwrap();
+    let link = client.reserve_raw("Failing upload test", false, None).unwrap();
     let path = std::env::temp_dir().join("umi-failing-upload.bin");
     std::fs::write(&path, vec![1u8; 1000]).unwrap();
     let err = client.upload_raw(&link, "screen", &path, &|| Some(Err("recording failed".into())), &|_| {}).unwrap_err();
@@ -144,7 +144,7 @@ fn team_workspace_round_trip() {
     let me = members.iter().find(|m| m.you).unwrap().id.clone();
 
     // A video shared into the team shows up for the member.
-    let link = owner.reserve_raw("Team video", false).unwrap();
+    let link = owner.reserve_raw("Team video", false, None).unwrap();
     let path = std::env::temp_dir().join("umi-team-video.bin");
     std::fs::write(&path, vec![7u8; 2000]).unwrap();
     owner

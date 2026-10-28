@@ -370,8 +370,76 @@ pub struct RawMeta {
 
 impl Client {
     /// Reserves a raw link for a recording that's starting (`camera`: a camera file will follow).
-    pub fn reserve_raw(&self, title: &str, camera: bool) -> Result<RawLink, CloudError> {
-        self.send("POST", "/api/videos", Some(serde_json::json!({ "raw": true, "title": title, "camera": camera })))
+    /// `duration_ms`, when known (a finished recording), lets the plan be checked up front.
+    pub fn reserve_raw(&self, title: &str, camera: bool, duration_ms: Option<u64>) -> Result<RawLink, CloudError> {
+        let mut body = serde_json::json!({ "raw": true, "title": title, "camera": camera });
+        if let Some(ms) = duration_ms {
+            body["durationMs"] = ms.into();
+        }
+        self.send("POST", "/api/videos", Some(body))
+    }
+
+    /// Uploads a finished file (`"screen"` or `"camera"`) of a raw link, a few parts at a time.
+    /// `progress` gets the bytes sent so far.
+    pub fn upload_raw_file(
+        &self,
+        link: &RawLink,
+        file: &str,
+        path: &Path,
+        meta: &RawMeta,
+        progress: &(dyn Fn(u64) + Sync),
+    ) -> Result<(), CloudError> {
+        let id = &link.video.id;
+        let part_size = link.info.part_size;
+        let len = std::fs::metadata(path)?.len();
+        let count = len.div_ceil(part_size).max(1) as u32;
+        let sent = std::sync::atomic::AtomicU64::new(0);
+        let next = std::sync::atomic::AtomicU32::new(1);
+        let etags = std::sync::Mutex::new(Vec::<(u32, String)>::new());
+        let failed = std::sync::Mutex::new(None::<CloudError>);
+        std::thread::scope(|scope| {
+            for _ in 0..4 {
+                scope.spawn(|| {
+                    loop {
+                        let n = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        if n > count || failed.lock().is_ok_and(|f| f.is_some()) {
+                            return;
+                        }
+                        let result = (|| -> Result<(), CloudError> {
+                            let urls: PartUrls = self.send(
+                                "POST",
+                                &format!("/api/videos/{id}/raw/parts"),
+                                Some(serde_json::json!({ "file": file, "partNumbers": [n] })),
+                            )?;
+                            let url =
+                                urls.parts.into_iter().next().map(|p| p.url).ok_or_else(|| CloudError::Network("no upload URL".into()))?;
+                            let mut f = std::fs::File::open(path)?;
+                            f.seek(SeekFrom::Start((n as u64 - 1) * part_size))?;
+                            let mut buf = Vec::with_capacity(part_size as usize);
+                            f.take(part_size).read_to_end(&mut buf)?;
+                            let etag = Self::put(&url, &buf, "video/mp4")?;
+                            etags.lock().unwrap_or_else(|e| e.into_inner()).push((n, etag));
+                            progress(sent.fetch_add(buf.len() as u64, std::sync::atomic::Ordering::SeqCst) + buf.len() as u64);
+                            Ok(())
+                        })();
+                        if let Err(e) = result {
+                            *failed.lock().unwrap_or_else(|e| e.into_inner()) = Some(e);
+                            return;
+                        }
+                    }
+                });
+            }
+        });
+        if let Some(e) = failed.into_inner().unwrap_or_else(|e| e.into_inner()) {
+            return Err(e);
+        }
+        let mut etags = etags.into_inner().unwrap_or_else(|e| e.into_inner());
+        etags.sort_by_key(|(n, _)| *n);
+        let parts: Vec<serde_json::Value> = etags.iter().map(|(n, e)| serde_json::json!({ "partNumber": n, "etag": e })).collect();
+        let body =
+            serde_json::json!({ "file": file, "parts": parts, "durationMs": meta.duration_ms, "width": meta.width, "height": meta.height });
+        let _: VideoBody = self.send("POST", &format!("/api/videos/{id}/raw/complete"), Some(body))?;
+        Ok(())
     }
 
     /// Uploads `file` (`"screen"` or `"camera"`) of a raw link while the recorder writes it: whole

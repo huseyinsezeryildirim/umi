@@ -14,7 +14,7 @@ fn uploads_a_recording_while_it_is_written() {
         return;
     }
     let client = umi_cloud::Client::new(&base, "umi_dev_token");
-    let link = client.reserve_raw("Live link test", false).unwrap();
+    let link = client.reserve_raw("Live link test", false, None).unwrap();
     let screen = std::fs::read(bundle.join(umi_project::project::SCREEN_FILE)).unwrap();
     let growing = std::env::temp_dir().join("umi-live-link-test.mov");
     std::fs::write(&growing, b"").unwrap();

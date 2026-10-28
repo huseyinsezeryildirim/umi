@@ -206,14 +206,20 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
           <Match when={job()}>
             {(j) => (
               <>
-                <div class="umi-section__hint">{stageLabel(j())}</div>
-                <Progress value={j().stage === "export" ? j().value * 0.5 : 0.5 + j().value * 0.5} />
                 <Show when={video()}>
                   <div class="ed-share__link">
                     <Link2 size={15} />
                     <span>{video()!.url}</span>
+                    <Button size="sm" variant="ink" onClick={() => void copy(video()!.url, "link")}>
+                      <Show when={copied() === "link"} fallback={<><Copy size={14} /> Copy link</>}>
+                        <Check size={14} /> Copied
+                      </Show>
+                    </Button>
                   </div>
+                  <div class="umi-section__hint">The link works now: it plays as soon as the upload below finishes. You can close this.</div>
                 </Show>
+                <div class="umi-section__hint">{stageLabel(j())}</div>
+                <Progress value={j().stage === "export" ? j().value * 0.5 : j().stage === "raw" ? j().value : 0.5 + j().value * 0.5} />
               </>
             )}
           </Match>

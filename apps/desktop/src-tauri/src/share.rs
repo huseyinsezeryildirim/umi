@@ -137,12 +137,30 @@ fn share_settings(format: umi_engine::Format) -> umi_engine::ExportSettings {
 
 /// Exports (1080p MP4), creates the link (copied at once), uploads poster, GIF preview and
 /// the video, then completes it.
+/// Whether the viewer's browser can play this edit from the recording itself: everything but
+/// added sound and video (music, voiceovers, video overlays) and camera background effects,
+/// which are files or models only this computer has.
+fn plays_from_recording(edit: &umi_project::EditSettings) -> bool {
+    edit.music.is_none()
+        && edit.voiceovers.is_empty()
+        && edit.overlays.iter().all(|o| o.kind != umi_project::edit::MediaKind::Video)
+        && edit.camera.background == umi_project::edit::CameraBackground::Original
+}
+
 #[tauri::command]
 pub async fn share_start(state: State<'_, AppState>, id: String, progress: Channel<ShareProgress>) -> Result<Video, String> {
     let editor = state.editor(&id)?;
     let gpu = state.gpu()?;
     let bundle = editor.bundle.clone();
     let client = client()?;
+    // Like Loom: the link right away, the recording's own files uploading behind it, the edit
+    // applied in the viewer's browser. Nothing is rendered here.
+    if plays_from_recording(&editor.doc().edit) {
+        editor.save()?;
+        return tauri::async_runtime::spawn_blocking(move || share_recording(&client, &bundle, &progress))
+            .await
+            .map_err(|e| e.to_string())?;
+    }
     tauri::async_runtime::spawn_blocking(move || {
         let send = |stage: &str, value: f64, video: Option<Video>| {
             let _ = progress.send(ShareProgress { stage: stage.into(), value, video });
@@ -185,6 +203,75 @@ pub async fn share_start(state: State<'_, AppState>, id: String, progress: Chann
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Shares a finished recording as a raw link: reserved and copied first, then its files, edit,
+/// cursor, images and poster go up. Progress is "raw" (0…1 of the bytes).
+fn share_recording(client: &Client, bundle: &Path, progress: &Channel<ShareProgress>) -> Result<Video, String> {
+    let send = |stage: &str, value: f64, video: Option<Video>| {
+        let _ = progress.send(ShareProgress { stage: stage.into(), value, video });
+    };
+    let screen = bundle.join(umi_project::project::SCREEN_FILE);
+    let camera = bundle.join(umi_project::project::CAMERA_FILE);
+    let mut decoder = umi_media::VideoDecoder::open(&screen, false).map_err(|e| e.to_string())?;
+    let info = decoder.info();
+    let meta = umi_cloud::RawMeta { duration_ms: (info.duration * 1000.0) as u64, width: info.width, height: info.height };
+    let read = |name: &str| std::fs::read(bundle.join(name)).ok().and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
+    let project = read(umi_project::project::PROJECT_FILE).ok_or("Couldn't read the recording.")?;
+    let title = umi_project::Bundle::new(bundle).name();
+
+    let link = client.reserve_raw(&title, camera.exists(), Some(meta.duration_ms)).map_err(plan_error)?;
+    // Kept (shared) from the start: the plan's limits are checked before anything uploads.
+    let video = client.share_raw(&link.video.id).map_err(plan_error)?;
+    copy_text(&video.url);
+    remember(bundle, &video);
+    send("link", 0.0, Some(video.clone()));
+
+    let result = (|| -> Result<(), String> {
+        client.put_raw_edit(&link.video.id, &project, read(umi_project::project::CURSOR_FILE).as_ref()).map_err(|e| e.to_string())?;
+        send_images(client, &link.video.id, bundle, &project);
+        if let Some(jpeg) = poster(&mut decoder, info.duration) {
+            let _ = client.put_raw_poster(&link, &jpeg);
+        }
+        let files: Vec<(&str, &Path)> =
+            [("screen", screen.as_path()), ("camera", camera.as_path())].into_iter().filter(|(_, p)| p.exists()).collect();
+        let total: u64 = files.iter().map(|(_, p)| std::fs::metadata(p).map(|m| m.len()).unwrap_or(0)).sum::<u64>().max(1);
+        let sent: Vec<std::sync::atomic::AtomicU64> = files.iter().map(|_| std::sync::atomic::AtomicU64::new(0)).collect();
+        let report = || {
+            let done: u64 = sent.iter().map(|s| s.load(std::sync::atomic::Ordering::Relaxed)).sum();
+            send("raw", done as f64 / total as f64, None);
+        };
+        std::thread::scope(|scope| {
+            let jobs: Vec<_> = files
+                .iter()
+                .zip(&sent)
+                .map(|((kind, path), counter)| {
+                    let (link, meta, report) = (&link, &meta, &report);
+                    scope.spawn(move || {
+                        client.upload_raw_file(link, kind, path, meta, &|bytes| {
+                            counter.store(bytes, std::sync::atomic::Ordering::Relaxed);
+                            report();
+                        })
+                    })
+                })
+                .collect();
+            jobs.into_iter().try_for_each(|j| j.join().map_err(|_| "upload crashed".to_string())?.map_err(|e| e.to_string()))
+        })
+    })();
+    if let Err(e) = result {
+        // The link would never play: give it back (Share can be pressed again).
+        let _ = client.delete(&link.video.id);
+        let _ = std::fs::remove_file(share_file(bundle));
+        return Err(e);
+    }
+    let video = client.video(&link.video.id).unwrap_or(video);
+    remember(bundle, &video);
+    send("done", 1.0, Some(video.clone()));
+    Ok(video)
+}
+
+fn plan_error(e: umi_cloud::CloudError) -> String {
+    if e.needs_plan() { "Sharing links needs an Umi Cloud plan.".to_string() } else { e.to_string() }
 }
 
 /// A JPEG of the video at 1 s (or its middle if shorter).
@@ -330,7 +417,7 @@ pub async fn live_start(state: State<'_, AppState>, camera: bool) -> Result<Opti
     let Ok(client) = client() else { return Ok(None) };
     tauri::async_runtime::spawn_blocking(move || {
         let title = format!("Recording {}", chrono::Local::now().format("%b %-d, %Y %H:%M"));
-        let Ok(link) = client.reserve_raw(&title, camera) else { return Ok(None) };
+        let Ok(link) = client.reserve_raw(&title, camera, None) else { return Ok(None) };
         let url = link.video.url.clone();
         let finished = std::sync::Arc::new(parking_lot::Mutex::new(None));
         let mut uploads = vec![];

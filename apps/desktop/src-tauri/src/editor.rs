@@ -90,7 +90,7 @@ impl EditorSession {
     }
 
     /// The document, locked.
-    fn doc(&self) -> parking_lot::MappedMutexGuard<'_, Document> {
+    pub(crate) fn doc(&self) -> parking_lot::MappedMutexGuard<'_, Document> {
         parking_lot::MutexGuard::map(self.ed.lock(), |e| &mut e.doc)
     }
 
