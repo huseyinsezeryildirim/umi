@@ -619,6 +619,9 @@ mockIPC(
         return state;
       case "editor_apply":
         return apply(p.op as Record<string, unknown>);
+      case "editor_revert":
+        // The edit the demo opened with (history's first entry), captions kept.
+        return apply({ op: "setEdit", edit: { ...(history[0] ?? state.edit), captions: state.edit.captions } });
       case "editor_frame":
         return loaded.then(() => frameAt(p.time as number, p.width as number, p.height as number));
       case "editor_layout":

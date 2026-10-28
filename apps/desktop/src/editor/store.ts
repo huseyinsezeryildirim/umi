@@ -170,6 +170,16 @@ export function createEditor(initial: EditorState) {
     gestureStart: () => apply({ op: "beginGesture" }),
     gestureEnd: () => apply({ op: "endGesture" }),
     undo: () => apply({ op: "undo" }),
+    /** Back to the recording as it first opened (one step: Undo brings the edits back). */
+    revert: async () => {
+      const next = await invoke<EditorState>("editor_revert", { id: state().id });
+      batch(() => {
+        setState(next);
+        if (time() > next.outputDuration) setTime(next.outputDuration);
+      });
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(() => invoke("editor_save", { id: next.id }), 500);
+    },
     redo: () => apply({ op: "redo" }),
     split: () => apply({ op: "split", time: time() }),
     previousEdge: () => setTime(Math.max(0, ...edges().filter((e) => e < time() - 0.05))),

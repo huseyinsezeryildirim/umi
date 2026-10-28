@@ -115,10 +115,23 @@ impl VideoDecoder {
         if let Some(frame) = self.pending.take() {
             return Ok(Some(frame));
         }
+        match self.next_raw()? {
+            Some(frame) => Ok(Some(Arc::new(self.convert(&frame)?))),
+            None => Ok(None),
+        }
+    }
+
+    fn pts_of(&self, frame: &ff::frame::Video) -> f64 {
+        frame.pts().or(frame.timestamp()).unwrap_or(0) as f64 * self.time_base
+    }
+
+    /// The next decoded frame as it comes out of the decoder (still on the GPU when the
+    /// hardware decodes): nothing is copied until it's converted.
+    fn next_raw(&mut self) -> Result<Option<ff::frame::Video>, MediaError> {
         let mut frame = ff::frame::Video::empty();
         loop {
             match self.decoder.receive_frame(&mut frame) {
-                Ok(()) => return Ok(Some(Arc::new(self.convert(&frame)?))),
+                Ok(()) => return Ok(Some(frame)),
                 Err(ff::Error::Other { errno }) if errno == ff::util::error::EAGAIN => {}
                 Err(ff::Error::Eof) => return Ok(None),
                 Err(e) => return Err(e.into()),
@@ -152,24 +165,51 @@ impl VideoDecoder {
         if behind || far {
             self.seek(t)?;
         }
+        // A frame kept back from last time comes first.
+        if let Some(frame) = self.pending.take() {
+            if frame.pts > t + frame_duration * 0.5 && self.current.is_some() {
+                self.pending = Some(frame);
+                return Ok(self.current.clone());
+            }
+            self.current = Some(frame);
+        }
+        // Then decode forward. Only the frame that shows at `t` is converted (downloaded and
+        // copied): skipping ahead over a cut decodes the frames in between but nothing more.
+        // Screen recordings have frames only when something changed, so the one showing is
+        // the last one at or before `t`, however long ago.
+        let mut held: Option<ff::frame::Video> = None;
         loop {
-            // Is the frame after the current one still in the future? Then current is it.
-            if let Some(current) = &self.current
+            if held.is_none()
+                && let Some(current) = &self.current
                 && t < current.pts + frame_duration * 0.5
                 && t >= current.pts - frame_duration * 0.5
             {
                 break;
             }
-            match self.next()? {
+            match self.next_raw()? {
                 Some(frame) => {
-                    if frame.pts > t + frame_duration * 0.5 && self.current.is_some() {
-                        // Overshot: keep it for later and show the current one.
-                        self.pending = Some(frame);
+                    let pts = self.pts_of(&frame);
+                    if pts > t + frame_duration * 0.5 && (held.is_some() || self.current.is_some()) {
+                        // Overshot: the held one (or the current one) shows; this one is next.
+                        if let Some(h) = held.take() {
+                            self.current = Some(Arc::new(self.convert(&h)?));
+                        }
+                        self.pending = Some(Arc::new(self.convert(&frame)?));
                         break;
                     }
-                    self.current = Some(frame);
+                    if pts >= t - frame_duration * 0.5 {
+                        self.current = Some(Arc::new(self.convert(&frame)?));
+                        held = None;
+                        break;
+                    }
+                    held = Some(frame);
                 }
-                None => break,
+                None => {
+                    if let Some(h) = held.take() {
+                        self.current = Some(Arc::new(self.convert(&h)?));
+                    }
+                    break;
+                }
             }
         }
         Ok(self.current.clone())
@@ -177,7 +217,7 @@ impl VideoDecoder {
 
     /// Downloads a hardware frame if needed and normalizes it to NV12 (or RGBA).
     fn convert(&mut self, frame: &ff::frame::Video) -> Result<DecodedFrame, MediaError> {
-        let pts = frame.pts().or(frame.timestamp()).unwrap_or(0) as f64 * self.time_base;
+        let pts = self.pts_of(frame);
         let downloaded;
         let frame = if hw::is_hardware(frame) {
             downloaded = hw::download(frame)?;

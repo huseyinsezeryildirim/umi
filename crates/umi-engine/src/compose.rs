@@ -26,7 +26,22 @@ pub struct FrameSource {
     pub schedule: Schedule,
     has_camera: bool,
     camera: CameraFeed,
+    /// The next clip's decoders, being moved to its start on another thread.
+    warming: Option<Warming>,
+    /// The clip last got ready that way (once per clip).
+    warmed: Option<usize>,
 }
+
+/// Decoders for one clip set, taken out to decode up to the next clip's first frame while the
+/// current clip plays: a cut then shows at once instead of waiting for the decoder to find
+/// its way (the last keyframe, then every frame after it).
+struct Warming {
+    set: usize,
+    thread: std::thread::JoinHandle<Vec<(String, umi_media::VideoDecoder)>>,
+}
+
+/// How far ahead (seconds) the next clip starts getting ready.
+const WARM_AHEAD: f64 = 1.5;
 
 /// Which camera picture the edit asks for (falling back to the original while an effect
 /// hasn't been made yet).
@@ -80,8 +95,67 @@ fn cut_out(camera: &DecodedFrame, matte: &DecodedFrame) -> Option<DecodedFrame> 
 }
 
 impl FrameSource {
+    /// The files (and decoder keys) a clip set reads.
+    fn set_files(&self, set: usize) -> Vec<(&'static str, String)> {
+        let key = |file: &'static str| if set == 0 { (file, file.to_string()) } else { (file, format!("{file}#1")) };
+        let mut files = vec![if set == 0 { (SCREEN, SCREEN.to_string()) } else { (SCREEN, "screen#1".to_string()) }];
+        if self.has_camera {
+            match self.camera {
+                CameraFeed::Original => files.push(key(CAMERA)),
+                CameraFeed::Blurred => files.push(key(CAMERA_BLUR)),
+                CameraFeed::Cutout => files.extend([key(CAMERA), key(CAMERA_MATTE)]),
+            }
+        }
+        files
+    }
+
+    /// Takes back decoders that were getting ready, when `set` is about to be read.
+    fn settle(&mut self, set: usize) {
+        if self.warming.as_ref().is_some_and(|w| w.set == set)
+            && let Some(w) = self.warming.take()
+            && let Ok(decoders) = w.thread.join()
+        {
+            for (key, decoder) in decoders {
+                self.sources.put(&key, decoder);
+            }
+        }
+    }
+
+    /// Starts getting the next clip ready when it's close (not during a dissolve, which reads
+    /// both sets).
+    fn warm_next(&mut self, moment: &Moment) {
+        let next = moment.layer.clip + 1;
+        if self.warming.is_some() || moment.dissolve.is_some() || self.warmed == Some(next) {
+            return;
+        }
+        let Some(p) = self.schedule.placements.get(next) else { return };
+        let ahead = p.output_start - moment.output_time;
+        if !(0.0..=WARM_AHEAD).contains(&ahead) {
+            return;
+        }
+        let (set, start) = (next % 2, p.clip.start);
+        let mut decoders = vec![];
+        for (file, key) in self.set_files(set) {
+            if let Some(d) = self.sources.take(file, &key) {
+                decoders.push((key, d));
+            }
+        }
+        let thread = std::thread::spawn(move || {
+            for (_, d) in decoders.iter_mut() {
+                let _ = d.frame_at(start);
+            }
+            decoders
+        });
+        self.warming = Some(Warming { set, thread });
+        self.warmed = Some(next);
+    }
+
     pub fn prepare(&mut self, t: f64) -> Result<Prepared, MediaError> {
         let moment = self.schedule.moment(t);
+        self.settle(moment.layer.clip % 2);
+        if let Some((layer, _)) = moment.dissolve {
+            self.settle(layer.clip % 2);
+        }
         let a = self.layer(moment.layer.clip % 2, moment.layer.source_time)?;
         let b = match moment.dissolve {
             Some((layer, _)) => Some(self.layer(layer.clip % 2, layer.source_time)?),
@@ -99,6 +173,7 @@ impl FrameSource {
                 overlays.push((*id, frame));
             }
         }
+        self.warm_next(&moment);
         Ok(Prepared { moment, a, b, overlays })
     }
 
@@ -174,6 +249,11 @@ impl Composer {
     pub fn set_edit(&mut self, edit: EditSettings) {
         let media_duration = self.source.sources.video_duration(SCREEN).unwrap_or(self.project.duration);
         let document = Document::new(self.project.clone(), edit.clone(), self.cursor.clone(), media_duration);
+        // Decoders getting ready for the old clips come back first.
+        for set in 0..2 {
+            self.source.settle(set);
+        }
+        self.source.warmed = None;
         self.source.schedule = Schedule::new(&edit, document.total());
         self.source.camera = camera_feed(&mut self.source.sources, &edit);
         self.renderer.set_edit(edit);
@@ -205,5 +285,5 @@ pub fn open_source(
     let document = Document::new(project.clone(), edit.clone(), cursor.clone(), media_duration);
     let schedule = Schedule::new(edit, document.total());
     let camera = camera_feed(&mut sources, edit);
-    Ok((FrameSource { sources, schedule, has_camera, camera }, project, cursor))
+    Ok((FrameSource { sources, schedule, has_camera, camera, warming: None, warmed: None }, project, cursor))
 }

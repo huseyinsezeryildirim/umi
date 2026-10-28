@@ -129,6 +129,11 @@ fn editor_apply(state: State<'_, AppState>, id: String, op: Op) -> Result<Editor
 }
 
 #[tauri::command]
+fn editor_revert(state: State<'_, AppState>, id: String) -> Result<EditorState, String> {
+    Ok(state.editor(&id)?.revert())
+}
+
+#[tauri::command]
 fn editor_save(state: State<'_, AppState>, id: String) -> Result<(), String> {
     state.editor(&id)?.save()
 }
@@ -784,6 +789,7 @@ pub fn run() {
             recording_rename,
             open_editor,
             editor_apply,
+            editor_revert,
             editor_save,
             editor_frame,
             editor_close,

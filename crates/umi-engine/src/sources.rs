@@ -57,6 +57,21 @@ impl Sources {
         }
     }
 
+    /// Takes the decoder `key` (for `file`, opened first) out, to get it ready on another
+    /// thread; [`put`](Self::put) gives it back. Meanwhile `key` would open a new one.
+    pub fn take(&mut self, file: &str, key: &str) -> Option<VideoDecoder> {
+        if key == file {
+            self.decoder(file);
+        } else {
+            self.alias(file, key);
+        }
+        self.decoders.remove(key).flatten()
+    }
+
+    pub fn put(&mut self, key: &str, decoder: VideoDecoder) {
+        self.decoders.insert(key.to_owned(), Some(decoder));
+    }
+
     pub fn has(&mut self, file: &str) -> bool {
         self.decoder(file).is_some()
     }

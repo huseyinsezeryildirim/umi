@@ -108,6 +108,19 @@ impl EditorSession {
         self.state(selection)
     }
 
+    /// The edit the recording first opened with (cuts, zooms, looks all gone), keeping its
+    /// transcript. Applied as one change, so Undo brings the edits back.
+    pub fn revert(&self) -> EditorState {
+        let mut original = {
+            let doc = self.doc();
+            let mut project = doc.project.clone();
+            project.edit = None;
+            project.effective_edit(crate::presets::load().default_preset())
+        };
+        original.captions = self.doc().edit.captions.clone();
+        self.apply(Op::SetEdit { edit: Box::new(original) })
+    }
+
     /// Writes the edit to project.json if it changed since the last save.
     pub fn save(&self) -> Result<(), String> {
         let mut ed = self.ed.lock();

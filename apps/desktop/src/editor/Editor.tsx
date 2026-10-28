@@ -2,13 +2,14 @@ import { EditableTitle } from "../EditableTitle";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
-import { Button, IconButton, Kbd, Toaster } from "@umi/ui";
+import { Button, IconButton, Kbd, Toaster, toast } from "@umi/ui";
 import {
   ArrowLeft,
   Link,
   Pause,
   Play,
   Redo2,
+  RotateCcw,
   Scissors,
   SkipBack,
   SkipForward,
@@ -30,6 +31,10 @@ import "./editor.css";
 
 export function Editor(props: { editor: EditorModel; onBack: () => void }) {
   const ed = props.editor;
+  const revert = async () => {
+    await ed.revert();
+    toast("Back to the original recording. Undo brings your edits back.");
+  };
   const [exporting, setExporting] = createSignal(false);
   const [commanding, setCommanding] = createSignal(false);
   const [sharing, setSharing] = createSignal((import.meta.env.DEV || import.meta.env.VITE_DEMO) && new URLSearchParams(location.search).has("share"));
@@ -44,6 +49,7 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
       { title: "Cut tool", group: "Edit", shortcut: "B", keywords: "blade scissors", run: () => ed.setBlade(true) },
       { title: "Undo", group: "Edit", shortcut: "⌘Z", run: () => void ed.undo() },
       { title: "Redo", group: "Edit", shortcut: "⇧⌘Z", run: () => void ed.redo() },
+      { title: "Revert to original", group: "Edit", keywords: "reset raw start over undo all", run: () => void revert() },
       { title: "Add zoom", group: "Add", shortcut: "Z", run: () => void ed.apply({ op: "addZoom", time: at() }) },
       { title: "Add blur", group: "Add", keywords: "privacy hide mask", run: () => void ed.apply({ op: "addMask", time: at(), style: "blur" }) },
       { title: "Add spotlight", group: "Add", keywords: "highlight focus dim", run: () => void ed.apply({ op: "addMask", time: at(), style: "highlight" }) },
@@ -152,6 +158,9 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
           </IconButton>
           <IconButton label="Redo" shortcut="⇧⌘Z" disabled={!ed.state().canRedo} onClick={() => void ed.redo()}>
             <Redo2 size={17} />
+          </IconButton>
+          <IconButton label="Revert to the original recording" onClick={() => void revert()}>
+            <RotateCcw size={17} />
           </IconButton>
           <PresetsMenu editor={ed} />
           <div class="umi-divider umi-divider--vertical" />
