@@ -80,13 +80,30 @@ pub async fn cloud_connect(server: String, token: String) -> Result<CloudStatus,
         Client::new(&server, &token)
             .check()
             .map_err(|e| if e.unauthorized() { "That token wasn't accepted.".to_string() } else { e.to_string() })?;
-        keyring::Entry::new(KEYCHAIN_SERVICE, "token").and_then(|e| e.set_password(&token)).map_err(|e| e.to_string())?;
-        let json = serde_json::to_vec(&CloudConfig { server: Some(server.clone()) }).map_err(|e| e.to_string())?;
-        std::fs::write(config_file(), json).map_err(|e| e.to_string())?;
-        Ok(CloudStatus { connected: true, server })
+        keep(server, &token)
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Signs in with an Umi Cloud account (email and password); the token it gets is kept like one
+/// pasted in.
+#[tauri::command]
+pub async fn cloud_login(server: String, email: String, password: String) -> Result<CloudStatus, String> {
+    let server = server.trim().trim_end_matches('/').to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        let token = Client::login(&server, email.trim(), &password).map_err(|e| e.to_string())?;
+        keep(server, &token)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn keep(server: String, token: &str) -> Result<CloudStatus, String> {
+    keyring::Entry::new(KEYCHAIN_SERVICE, "token").and_then(|e| e.set_password(token)).map_err(|e| e.to_string())?;
+    let json = serde_json::to_vec(&CloudConfig { server: Some(server.clone()) }).map_err(|e| e.to_string())?;
+    std::fs::write(config_file(), json).map_err(|e| e.to_string())?;
+    Ok(CloudStatus { connected: true, server })
 }
 
 #[tauri::command]

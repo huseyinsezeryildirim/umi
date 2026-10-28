@@ -805,6 +805,7 @@ pub fn run() {
             screenshot::screenshot_save,
             share::cloud_status,
             share::cloud_connect,
+            share::cloud_login,
             share::cloud_disconnect,
             share::share_state,
             share::share_start,

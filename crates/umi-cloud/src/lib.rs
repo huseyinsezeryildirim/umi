@@ -208,6 +208,20 @@ impl Client {
         Self::read(response)
     }
 
+    /// Signs in with an Umi Cloud account; returns this device's token.
+    pub fn login(base: &str, email: &str, password: &str) -> Result<String, CloudError> {
+        #[derive(Deserialize)]
+        struct Session {
+            token: String,
+        }
+        let url = format!("{}/api/auth/login", base.trim_end_matches('/'));
+        let response = Self::agent()
+            .post(&url)
+            .send_json(serde_json::json!({ "email": email, "password": password }))
+            .map_err(|e| CloudError::Network(e.to_string()))?;
+        Ok(Self::read::<Session>(response)?.token)
+    }
+
     /// Checks the token (lists videos).
     pub fn check(&self) -> Result<(), CloudError> {
         self.send::<serde_json::Value>("GET", "/api/videos", None).map(|_| ())

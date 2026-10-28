@@ -1513,3 +1513,28 @@
   white-space: pre-line;
   font-variant-numeric: tabular-nums;
 }
+
+/* Signing in to Umi Cloud from the share dialog. */
+.ed-share__login {
+  display: contents;
+}
+.ed-share__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 2px;
+}
+.ed-share__links button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--umi-text-2);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.ed-share__links button:hover {
+  color: var(--umi-ink, #0e111e);
+}

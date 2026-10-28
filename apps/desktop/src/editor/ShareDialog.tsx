@@ -48,6 +48,11 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
   const [connected, setConnected] = createSignal<boolean | null>(null);
   const [server, setServer] = createSignal("https://umi.cam");
   const [token, setToken] = createSignal("");
+  const [email, setEmail] = createSignal("");
+  const [secret, setSecret] = createSignal("");
+  /** Signing in with a token (a self-hosted server, scripts) instead of an account. */
+  const [withToken, setWithToken] = createSignal(false);
+  const [signingIn, setSigningIn] = createSignal(false);
   const [video, setVideo] = createSignal<Video | null>(null);
   const [job, setJob] = createSignal<Progress | null>(null);
   const [atTime, setAtTime] = createSignal(false);
@@ -82,12 +87,17 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
   );
 
   const connect = async () => {
+    setSigningIn(true);
     try {
-      await invoke("cloud_connect", { server: server(), token: token() });
+      if (withToken()) await invoke("cloud_connect", { server: server(), token: token() });
+      else await invoke("cloud_login", { server: server(), email: email(), password: secret() });
       setConnected(true);
       setToken("");
+      setSecret("");
     } catch (e) {
       toast(String(e));
+    } finally {
+      setSigningIn(false);
     }
   };
 
@@ -154,16 +164,42 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
         <Switch>
           <Match when={connected() === false}>
             <div class="umi-section__hint" style={{ "margin-top": "-6px" }}>
-              Links are made by Umi Cloud. Recording, editing and exporting stay free on your computer.
+              Sign in to Umi Cloud to get links. Recording, editing and exporting stay free on your computer.
             </div>
-            <div class="umi-field-label">Server</div>
-            <TextField value={server()} onInput={(e) => setServer(e.currentTarget.value)} />
-            <div class="umi-field-label">Access token</div>
-            <TextField value={token()} placeholder="From your Umi Cloud account page" onInput={(e) => setToken(e.currentTarget.value)} type="password" />
+            <Show
+              when={withToken()}
+              fallback={
+                <form
+                  class="ed-share__login"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void connect();
+                  }}
+                >
+                  <div class="umi-field-label">Email</div>
+                  <TextField value={email()} type="email" autocomplete="email" onInput={(e) => setEmail(e.currentTarget.value)} />
+                  <div class="umi-field-label">Password</div>
+                  <TextField value={secret()} type="password" autocomplete="current-password" onInput={(e) => setSecret(e.currentTarget.value)} />
+                  <button type="submit" hidden />
+                </form>
+              }
+            >
+              <div class="umi-field-label">Server</div>
+              <TextField value={server()} onInput={(e) => setServer(e.currentTarget.value)} />
+              <div class="umi-field-label">Access token</div>
+              <TextField value={token()} placeholder="From your Umi Cloud account page" onInput={(e) => setToken(e.currentTarget.value)} type="password" />
+            </Show>
+            <div class="ed-share__links">
+              <Show when={!withToken()}>
+                <button type="button" onClick={() => void openUrl(`${server()}/signup`)}>Create an account</button>
+                <button type="button" onClick={() => void openUrl(`${server()}/forgot`)}>Forgot password?</button>
+              </Show>
+              <button type="button" onClick={() => setWithToken(!withToken())}>{withToken() ? "Sign in with email" : "Use an access token"}</button>
+            </div>
             <div class="ed-export__actions">
               <Button variant="ghost" onClick={props.onClose}>Cancel</Button>
-              <Button variant="ink" disabled={!token().trim()} onClick={() => void connect()}>
-                Connect
+              <Button variant="ink" disabled={signingIn() || (withToken() ? !token().trim() : !email().trim() || !secret())} onClick={() => void connect()}>
+                {signingIn() ? "Signing in…" : withToken() ? "Connect" : "Sign in"}
               </Button>
             </div>
           </Match>
