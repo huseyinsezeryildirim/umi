@@ -116,11 +116,11 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
     await emit("ink:action", { action: "clear" });
     await recorder.hide("ink");
     await emit("ink:mode", { drawing: false });
-    await invoke("record_cancel");
+    await invoke("record_cancel", { trash: true });
     reserved = Promise.resolve(null);
     void invoke("live_cancel");
     await recorder.show("main");
-    toast("Recording discarded");
+    toast("Recording moved to the Trash");
   };
 
   const pause = async () => {

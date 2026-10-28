@@ -691,12 +691,19 @@ impl Recording {
 
     /// Stops and throws the recording away (to the Trash is the app's choice; this removes
     /// the unfinished folder it made).
-    pub fn cancel(mut self) {
+    pub fn cancel(self) {
+        let bundle = self.discard();
+        let _ = std::fs::remove_dir_all(bundle);
+    }
+
+    /// Stops without finishing the bundle and leaves it where it is (the app moves a
+    /// discarded recording to the Trash, so it can still be brought back).
+    pub fn discard(mut self) -> PathBuf {
         self.stop_sources();
         for w in std::mem::take(&mut self.writers) {
             let _ = w.join();
         }
-        let _ = std::fs::remove_dir_all(&self.bundle);
+        std::mem::take(&mut self.bundle)
     }
 }
 

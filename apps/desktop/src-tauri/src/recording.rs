@@ -464,11 +464,21 @@ pub async fn record_stop(app: AppHandle) -> Result<PathBuf, String> {
 
 /// Throws the recording away.
 #[tauri::command]
-pub async fn record_cancel(app: AppHandle) -> Result<(), String> {
+/// `trash`: a recording the person discarded goes to the Trash (not gone for good); one that
+/// never started is just removed.
+pub async fn record_cancel(app: AppHandle, trash: Option<bool>) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
-        if let Some(r) = state.recorder.current.lock().take() {
-            r.cancel();
+        let current = state.recorder.current.lock().take();
+        if let Some(r) = current {
+            if trash == Some(true) {
+                let bundle = r.discard();
+                if trash::delete(&bundle).is_err() {
+                    let _ = std::fs::remove_dir_all(&bundle);
+                }
+            } else {
+                r.cancel();
+            }
         }
         float_over_full_screen_apps(&app, false);
         let _ = app.emit("recording", "cancelled");
