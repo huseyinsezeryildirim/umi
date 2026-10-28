@@ -24,8 +24,6 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
     const settings = await recorder.settings();
     try {
       await recorder.hide("launcher");
-      // Out of the way of what's being recorded.
-      await recorder.hide("main");
       // The bubble is up before the screen capture starts, so it's left out from the first frame
       // (the camera is recorded on its own and added in the editor).
       if (settings.cameraOn || settings.cameraOnly) await recorder.show("bubble");
@@ -57,6 +55,8 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
       // The drawing tools along the bottom, starting with the pointer (clicks go to the apps).
       await emit("ink:pick", { tool: "pointer" });
       await recorder.show("draw");
+      // Out of the way of what's being recorded, once everything else is up (this runs in it).
+      await recorder.hide("main");
     } catch (e) {
       await recorder.hide("countdown");
       await invoke("record_frame", { on: false }).catch(() => {});
