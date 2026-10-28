@@ -185,15 +185,15 @@ impl EditorSession {
     /// Transcribes the voice on device and stores the words as captions (turned on).
     /// `progress` gets (stage, 0…1): "download" for the model's first use, then "transcribe".
     pub fn transcribe(&self, language: Option<String>, progress: &(dyn Fn(&str, f64) + Sync)) -> Result<EditorState, String> {
-        let model = umi_ai::models::Model::WhisperBase.ensure(&|p| progress("download", p)).map_err(|e| e.to_string())?;
-        let (screen, track) = {
+        let model = umi_ai::models::Model::Whisper.ensure(&|p| progress("download", p)).map_err(|e| e.to_string())?;
+        let (screen, track, prompt) = {
             let doc = self.doc();
             let tracks = umi_media::audio_streams(&Bundle::new(&self.bundle).screen()).map(|t| t.len()).unwrap_or(0);
             if tracks == 0 {
                 return Err("This recording has no sound.".into());
             }
             let mic = doc.project.audio.microphone_track.map(|t| t as usize).filter(|t| *t < tracks);
-            (Bundle::new(&self.bundle).screen(), mic.unwrap_or(0))
+            (Bundle::new(&self.bundle).screen(), mic.unwrap_or(0), umi_ai::transcribe::vocabulary(&doc.project.on_screen_names()))
         };
         progress("transcribe", 0.0);
         let samples = umi_ai::transcribe::read_mono_16k(&screen, track).map_err(|e| e.to_string())?;
@@ -201,8 +201,9 @@ impl EditorSession {
         let report = std::sync::Arc::new(parking_lot::Mutex::new(Vec::<i32>::new()));
         let (words, detected) = std::thread::scope(|scope| {
             let sink = report.clone();
-            let job =
-                scope.spawn(move || umi_ai::transcribe::transcribe(&model, &samples, language.as_deref(), move |p| sink.lock().push(p)));
+            let job = scope.spawn(move || {
+                umi_ai::transcribe::transcribe(&model, &samples, language.as_deref(), Some(&prompt), move |p| sink.lock().push(p))
+            });
             // Whisper reports progress on its own thread; relay it from here.
             while !job.is_finished() {
                 if let Some(p) = report.lock().last().copied() {

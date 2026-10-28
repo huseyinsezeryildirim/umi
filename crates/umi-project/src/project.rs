@@ -75,6 +75,21 @@ pub struct RecordingProject {
 }
 
 impl RecordingProject {
+    /// The apps and window titles that were on screen, once each (words the speech model
+    /// should spell as they are).
+    pub fn on_screen_names(&self) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for w in self.windows.iter().flatten() {
+            for name in [&w.app, &w.title] {
+                let name: String = name.trim().chars().take(60).collect();
+                if !name.is_empty() && !out.contains(&name) {
+                    out.push(name);
+                }
+            }
+        }
+        out
+    }
+
     /// The title if there is one, else `fallback` (the folder name).
     pub fn display_name(&self, fallback: String) -> String {
         self.title.clone().filter(|t| !t.trim().is_empty()).unwrap_or(fallback)

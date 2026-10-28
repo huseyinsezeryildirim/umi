@@ -43,12 +43,33 @@ pub fn read_mono_16k(path: &Path, track: usize) -> Result<Vec<f32>, AiError> {
     Ok(out)
 }
 
+/// Words people say in English whatever language they speak, written as such (not "ea",
+/// "fiçırs"): given to Whisper as earlier text, with the names on screen (see [`vocabulary`]).
+const COMMON_TERMS: &str = "Umi, AI, app, features, screen recorder, recording, editor, export, share, link, video, camera, demo, dashboard, browser, Chrome, Safari, Mac, Windows, Linux";
+
+/// What to tell Whisper the recording is about: the common terms and the apps and windows
+/// that were on screen.
+pub fn vocabulary(names: &[String]) -> String {
+    let mut out = COMMON_TERMS.to_string();
+    for name in names {
+        let name = name.trim();
+        if name.is_empty() || out.len() + name.len() > 600 || out.to_lowercase().contains(&name.to_lowercase()) {
+            continue;
+        }
+        out.push_str(", ");
+        out.push_str(name);
+    }
+    out.push('.');
+    out
+}
+
 /// Transcribes `samples` (mono 16 kHz) into words. `language` is a code like "en" or "tr";
-/// `None` detects it. `progress` gets 0…1.
+/// `None` detects it. `prompt`: words likely to come up (see [`vocabulary`]). `progress` gets 0…1.
 pub fn transcribe(
     model: &Path,
     samples: &[f32],
     language: Option<&str>,
+    prompt: Option<&str>,
     progress: impl FnMut(i32) + 'static,
 ) -> Result<(Vec<Word>, String), AiError> {
     whisper_rs::install_logging_hooks();
@@ -62,6 +83,9 @@ pub fn transcribe(
     params.set_print_special(false);
     params.set_print_timestamps(false);
     params.set_suppress_blank(true);
+    if let Some(prompt) = prompt {
+        params.set_initial_prompt(prompt);
+    }
     params.set_n_threads(std::thread::available_parallelism().map(|n| n.get().min(8) as i32).unwrap_or(4));
     params.set_progress_callback_safe(progress);
     state.full(params, samples).map_err(|e| AiError::Model(e.to_string()))?;

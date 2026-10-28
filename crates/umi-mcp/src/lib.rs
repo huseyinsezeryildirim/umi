@@ -102,7 +102,7 @@ fn call(name: &str, args: &Value) -> Result<String, String> {
         "transcribe" => {
             let path = bundle_arg(args)?;
             let mut doc = open(&path)?;
-            let model = umi_ai::models::Model::WhisperBase.ensure(&|_| {}).map_err(|e| e.to_string())?;
+            let model = umi_ai::models::Model::Whisper.ensure(&|_| {}).map_err(|e| e.to_string())?;
             let screen = Bundle::new(&path).screen();
             let tracks = umi_media::audio_streams(&screen).map(|t| t.len()).unwrap_or(0);
             if tracks == 0 {
@@ -111,8 +111,14 @@ fn call(name: &str, args: &Value) -> Result<String, String> {
             let track = doc.project.audio.microphone_track.map(|t| t as usize).filter(|t| *t < tracks).unwrap_or(0);
             let samples = umi_ai::transcribe::read_mono_16k(&screen, track).map_err(|e| e.to_string())?;
             let language = args.get("language").and_then(Value::as_str).map(str::to_string);
-            let (words, detected) =
-                umi_ai::transcribe::transcribe(&model, &samples, language.as_deref(), |_| {}).map_err(|e| e.to_string())?;
+            let (words, detected) = umi_ai::transcribe::transcribe(
+                &model,
+                &samples,
+                language.as_deref(),
+                Some(&umi_ai::transcribe::vocabulary(&doc.project.on_screen_names())),
+                |_| {},
+            )
+            .map_err(|e| e.to_string())?;
             doc.edit.captions.words = words
                 .iter()
                 .map(|w| umi_project::edit::CaptionWord { id: uuid::Uuid::new_v4(), start: w.start, end: w.end, text: w.text.clone() })

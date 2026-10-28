@@ -8,8 +8,9 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Model {
-    /// Whisper base, multilingual (MIT): captions, text-based editing, filler words.
-    WhisperBase,
+    /// Whisper large-v3-turbo, multilingual, 5-bit (MIT): captions, text-based editing, filler
+    /// words. Far better than base at Turkish and at English words inside other languages.
+    Whisper,
     /// Kokoro-82M (Apache-2.0), 8-bit ONNX: natural voiceover from text.
     Kokoro,
     /// Kokoro's voices (style vectors).
@@ -21,11 +22,11 @@ pub enum Model {
 }
 
 impl Model {
-    pub const ALL: [Model; 5] = [Model::WhisperBase, Model::Kokoro, Model::KokoroVoices, Model::Segmentation, Model::FaceDetection];
+    pub const ALL: [Model; 5] = [Model::Whisper, Model::Kokoro, Model::KokoroVoices, Model::Segmentation, Model::FaceDetection];
 
     pub fn url(self) -> &'static str {
         match self {
-            Model::WhisperBase => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+            Model::Whisper => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin",
             Model::Kokoro => "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model_quantized.onnx",
             Model::KokoroVoices => "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/voices/af_heart.bin",
             Model::Segmentation => "https://huggingface.co/onnx-community/mediapipe_selfie_segmentation/resolve/main/onnx/model.onnx",
@@ -37,7 +38,7 @@ impl Model {
 
     pub fn file_name(self) -> &'static str {
         match self {
-            Model::WhisperBase => "ggml-base.bin",
+            Model::Whisper => "ggml-large-v3-turbo-q5_0.bin",
             Model::Kokoro => "kokoro-82m-q8.onnx",
             Model::KokoroVoices => "kokoro-af_heart.bin",
             Model::Segmentation => "selfie-segmentation.onnx",
@@ -48,7 +49,7 @@ impl Model {
     /// What it's for, shown before downloading.
     pub fn purpose(self) -> &'static str {
         match self {
-            Model::WhisperBase => "Captions and editing by text",
+            Model::Whisper => "Captions and editing by text",
             Model::Kokoro | Model::KokoroVoices => "AI voiceover",
             Model::Segmentation => "Camera background blur and removal",
             Model::FaceDetection => "Face tracking for the camera",

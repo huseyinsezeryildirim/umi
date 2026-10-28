@@ -506,7 +506,7 @@ pub fn copy_file_to_clipboard(path: PathBuf) -> Result<(), String> {
 /// Names a new recording from what was said, in the background, when the speech model is
 /// already on this computer (it isn't downloaded just for this). The library refreshes when done.
 fn auto_title(app: AppHandle, bundle: PathBuf) {
-    let model = umi_ai::models::Model::WhisperBase;
+    let model = umi_ai::models::Model::Whisper;
     if !model.is_ready() {
         return;
     }
@@ -520,7 +520,8 @@ fn auto_title(app: AppHandle, bundle: PathBuf) {
         }
         let track = project.audio.microphone_track.map(|t| t as usize).filter(|t| *t < tracks).unwrap_or(0);
         let Ok(samples) = umi_ai::transcribe::read_mono_16k(&screen, track) else { return };
-        let Ok((words, _)) = umi_ai::transcribe::transcribe(&model.path(), &samples, None, |_| {}) else { return };
+        let prompt = umi_ai::transcribe::vocabulary(&project.on_screen_names());
+        let Ok((words, _)) = umi_ai::transcribe::transcribe(&model.path(), &samples, None, Some(&prompt), |_| {}) else { return };
         let words: Vec<umi_project::edit::CaptionWord> = words
             .into_iter()
             .map(|w| umi_project::edit::CaptionWord { id: uuid::Uuid::new_v4(), start: w.start, end: w.end, text: w.text })

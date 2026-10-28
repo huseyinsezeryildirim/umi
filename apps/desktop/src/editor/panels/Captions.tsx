@@ -87,7 +87,7 @@ export function CaptionsSection(props: { editor: Editor; gesture: object }) {
         >
           {(j) => (
             <>
-              <div class="umi-section__hint">{j().stage === "download" ? `Getting the speech model (once, 148 MB)… ${Math.round(j().value * 100)}%` : `Listening… ${Math.round(j().value * 100)}%`}</div>
+              <div class="umi-section__hint">{j().stage === "download" ? `Getting the speech model (once, 570 MB)… ${Math.round(j().value * 100)}%` : `Listening… ${Math.round(j().value * 100)}%`}</div>
               <Progress value={j().value} />
             </>
           )}

@@ -22,23 +22,332 @@ pub struct Insights {
     pub title: String,
     pub summary: String,
     pub chapters: Vec<Chapter>,
+    /// The transcript is Turkish (no English joiners around its title).
+    #[serde(skip)]
+    pub turkish: bool,
 }
 
 /// Common words that say little about the topic (English and Turkish, plus a few
 /// frequent European ones).
 const STOP: &[&str] = &[
-    "a", "an", "the", "and", "or", "but", "if", "so", "to", "of", "in", "on", "at", "for", "with", "by", "from", "as", "is", "are", "was",
-    "were", "be", "been", "it", "its", "this", "that", "these", "those", "i", "you", "we", "they", "he", "she", "me", "my", "your", "our",
-    "their", "them", "us", "do", "does", "did", "have", "has", "had", "can", "will", "would", "should", "could", "just", "really", "very",
-    "like", "then", "there", "here", "what", "which", "who", "how", "when", "where", "why", "not", "no", "yes", "okay", "ok", "all",
-    "some", "any", "more", "most", "about", "into", "out", "up", "down", "now", "also", "too", "going", "gonna", "want", "get", "got",
-    "let", "lets", "let's", "see", "know", "think", "right", "well", "one", "two", "thing", "things", "way", "kind", "bir", "ve", "bu",
-    "şu", "o", "da", "de", "ki", "mi", "mı", "mu", "mü", "için", "ile", "gibi", "çok", "daha", "en", "ne", "nasıl", "neden", "ben", "sen",
-    "biz", "siz", "onlar", "var", "yok", "olarak", "olan", "ama", "fakat", "ya", "yani", "şey", "işte", "evet", "hayır", "şimdi", "sonra",
-    "önce", "kadar", "her", "bunu", "şunu", "onu", "bunlar", "burada", "orada", "bence", "aslında", "zaten", "hani", "tamam", "böyle",
-    "şöyle", "öyle", "bize", "size", "der", "die", "das", "und", "ist", "le", "la", "les", "et", "est", "el", "los", "las", "y", "es",
-    "que", "di", "il", "che",
+    "a",
+    "an",
+    "the",
+    "and",
+    "or",
+    "but",
+    "if",
+    "so",
+    "to",
+    "of",
+    "in",
+    "on",
+    "at",
+    "for",
+    "with",
+    "by",
+    "from",
+    "as",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "it",
+    "its",
+    "this",
+    "that",
+    "these",
+    "those",
+    "i",
+    "you",
+    "we",
+    "they",
+    "he",
+    "she",
+    "me",
+    "my",
+    "your",
+    "our",
+    "their",
+    "them",
+    "us",
+    "do",
+    "does",
+    "did",
+    "have",
+    "has",
+    "had",
+    "can",
+    "will",
+    "would",
+    "should",
+    "could",
+    "just",
+    "really",
+    "very",
+    "like",
+    "then",
+    "there",
+    "here",
+    "what",
+    "which",
+    "who",
+    "how",
+    "when",
+    "where",
+    "why",
+    "not",
+    "no",
+    "yes",
+    "okay",
+    "ok",
+    "all",
+    "some",
+    "any",
+    "more",
+    "most",
+    "about",
+    "into",
+    "out",
+    "up",
+    "down",
+    "now",
+    "also",
+    "too",
+    "going",
+    "gonna",
+    "want",
+    "get",
+    "got",
+    "let",
+    "lets",
+    "let's",
+    "see",
+    "know",
+    "think",
+    "right",
+    "well",
+    "one",
+    "two",
+    "thing",
+    "things",
+    "way",
+    "kind",
+    "bir",
+    "ve",
+    "bu",
+    "şu",
+    "o",
+    "da",
+    "de",
+    "ki",
+    "mi",
+    "mı",
+    "mu",
+    "mü",
+    "için",
+    "ile",
+    "gibi",
+    "çok",
+    "daha",
+    "en",
+    "ne",
+    "nasıl",
+    "neden",
+    "ben",
+    "sen",
+    "biz",
+    "siz",
+    "onlar",
+    "var",
+    "yok",
+    "olarak",
+    "olan",
+    "ama",
+    "fakat",
+    "ya",
+    "yani",
+    "şey",
+    "işte",
+    "evet",
+    "hayır",
+    "şimdi",
+    "sonra",
+    "önce",
+    "kadar",
+    "her",
+    "bunu",
+    "şunu",
+    "onu",
+    "bunlar",
+    "burada",
+    "orada",
+    "bence",
+    "aslında",
+    "zaten",
+    "hani",
+    "tamam",
+    "böyle",
+    "şöyle",
+    "öyle",
+    "bize",
+    "size",
+    "der",
+    "die",
+    "das",
+    "und",
+    "ist",
+    "le",
+    "la",
+    "les",
+    "et",
+    "est",
+    "el",
+    "los",
+    "las",
+    "y",
+    "es",
+    "que",
+    "di",
+    "il",
+    "che",
+    "benim",
+    "senin",
+    "bizim",
+    "onun",
+    "sizin",
+    "kendi",
+    "devam",
+    "ediyorum",
+    "ediyoruz",
+    "yapıyorum",
+    "yapıyoruz",
+    "olacak",
+    "oluyor",
+    "geliyor",
+    "gidiyor",
+    "diyorum",
+    "bakalım",
+    "görüyoruz",
+    "burda",
+    "şurada",
+    "bütün",
+    "tüm",
+    "ilk",
+    "şeyi",
+    "şeyler",
+    "arkadaşlar",
+    "merhaba",
+    "selam",
+    "gerçekten",
+    "biraz",
+    "mesela",
+    "örneğin",
+    "falan",
+    "filan",
+    "değil",
+    "olabilir",
+    "lazım",
+    "gerekiyor",
+    "istiyorum",
+    "sizlere",
+    "bunun",
+    "şunun",
+    "onun",
+    "geldi",
+    "gelecek",
+    "oldu",
+    "olur",
+    "diye",
 ];
+
+/// Words a spoken opening starts with that don't belong in a title.
+const OPENERS: &[&str] = &[
+    "hi",
+    "hello",
+    "hey",
+    "so",
+    "okay",
+    "ok",
+    "alright",
+    "well",
+    "um",
+    "uh",
+    "and",
+    "now",
+    "yes",
+    "yeah",
+    "merhaba",
+    "selam",
+    "arkadaşlar",
+    "evet",
+    "şimdi",
+    "tamam",
+    "evet,",
+    "peki",
+    "şey",
+    "ee",
+    "eee",
+    "hmm",
+    "ve",
+    "yani",
+    "işte",
+    "hani",
+];
+
+/// Whether a transcript is Turkish (its titles then don't use English joiners).
+fn turkish(sentences: &[Sentence]) -> bool {
+    let text: String = sentences.iter().map(|s| s.text.as_str()).collect::<Vec<_>>().join(" ").to_lowercase();
+    let marked = text.chars().filter(|c| "çğıöşü".contains(*c)).count();
+    let common = text.split_whitespace().filter(|w| ["bir", "ve", "bu", "için", "çok", "ile", "da", "de"].contains(w)).count();
+    marked * 40 > text.chars().count().max(1) || common * 12 > text.split_whitespace().count().max(1)
+}
+
+/// A title from the sentence that introduces the topic (early, mid-length, on the main
+/// vocabulary), without the greeting it starts with: "Umi'nin yeni özelliklerini anlatacağım".
+fn topic_sentence(sentences: &[Sentence], ranked: &[(usize, f64)]) -> Option<String> {
+    // Openings say what's coming: "… göstereceğim", "I'll show you …".
+    const INTENT: &[&str] =
+        &["göster", "anlat", "tanıt", "bahsed", "inceley", "show", "walk", "introduc", "demo", "talk about", "explain", "present"];
+    let early = ((sentences.len() as f64 * 0.25).ceil() as usize).max(6);
+    let mut picks: Vec<(usize, f64)> = ranked
+        .iter()
+        .filter(|(i, _)| *i < early)
+        .map(|&(i, score)| {
+            let text = sentences[i].text.to_lowercase();
+            let intent = if INTENT.iter().any(|v| text.contains(v)) { 3.0 } else { 1.0 };
+            (i, (score + 0.05) * intent * (1.5 - i as f64 / early as f64))
+        })
+        .collect();
+    picks.sort_by(|a, b| b.1.total_cmp(&a.1));
+    for (i, _) in picks {
+        let mut words: Vec<&str> = sentences[i].text.split_whitespace().collect();
+        while words.first().is_some_and(|w| OPENERS.contains(&w.trim_matches(|c: char| c.is_ascii_punctuation()).to_lowercase().as_str())) {
+            words.remove(0);
+        }
+        // A short sentence will do when it says what's coming ("Uygulamayı göstereceğim").
+        let intent = INTENT.iter().any(|v| sentences[i].text.to_lowercase().contains(v));
+        if !((if intent { 2 } else { 4 })..=16).contains(&words.len()) {
+            continue;
+        }
+        let mut title = String::new();
+        for w in words {
+            if title.chars().count() + w.chars().count() > 60 {
+                title.push('…');
+                break;
+            }
+            if !title.is_empty() {
+                title.push(' ');
+            }
+            title.push_str(w);
+        }
+        let title = title.trim_end_matches([',', '.', ';', ':', '!']).to_string();
+        return Some(capitalize(&title));
+    }
+    None
+}
 
 fn tokens(text: &str) -> Vec<String> {
     text.split(|c: char| !c.is_alphanumeric() && c != '\'')
@@ -154,16 +463,17 @@ pub fn insights(words: &[CaptionWord]) -> Option<Insights> {
     chosen.sort();
     let summary = chosen.iter().map(|i| clean_sentence(&sentences[*i].text)).collect::<Vec<_>>().join(" ");
 
-    // Title: the top keywords as a short phrase.
+    // Title: the sentence that introduces the topic, else the top keywords as a short phrase.
+    let and = if turkish(&sentences) { "ve" } else { "and" };
     let top = keywords(&sentences, &idf, 3);
-    let title = match top.as_slice() {
+    let title = topic_sentence(&sentences, &ranked).unwrap_or_else(|| match top.as_slice() {
         [] => "Untitled recording".to_string(),
         [a] => capitalize(a),
-        [a, b] => format!("{} and {}", capitalize(a), b),
-        [a, b, c, ..] => format!("{}, {} and {}", capitalize(a), b, c),
-    };
+        [a, b] => format!("{} {and} {}", capitalize(a), b),
+        [a, b, c, ..] => format!("{}, {} {and} {}", capitalize(a), b, c),
+    });
 
-    Some(Insights { title, summary, chapters: chapters(&sentences, &idf) })
+    Some(Insights { title, summary, chapters: chapters(&sentences, &idf), turkish: turkish(&sentences) })
 }
 
 /// Windows that say nothing about the recording: the system's own, and Umi's.
@@ -304,8 +614,11 @@ fn main_app(spans: &[WindowSpan], duration: f64) -> Option<String> {
 pub fn title(words: &[CaptionWord], spans: &[WindowSpan], duration: f64) -> Option<String> {
     match insights(words) {
         Some(found) => Some(match main_app(spans, duration) {
+            // "… in Safari" reads oddly after a Turkish sentence.
             Some(app)
-                if !found.title.to_lowercase().contains(&app.to_lowercase()) && found.title.chars().count() + app.chars().count() <= 60 =>
+                if !found.turkish
+                    && !found.title.to_lowercase().contains(&app.to_lowercase())
+                    && found.title.chars().count() + app.chars().count() <= 60 =>
             {
                 format!("{} in {app}", found.title)
             }
@@ -344,7 +657,7 @@ fn chapters(sentences: &[Sentence], idf: &HashMap<String, f64>) -> Vec<Chapter> 
     for pair in bounds.windows(2) {
         let words = keywords(&sentences[pair[0]..pair[1]], idf, 2);
         let title = match words.as_slice() {
-            [a, b] => format!("{} and {}", capitalize(a), b),
+            [a, b] => format!("{} {} {}", capitalize(a), if turkish(sentences) { "ve" } else { "and" }, b),
             [a] => capitalize(a),
             _ => "Part".into(),
         };
@@ -441,5 +754,20 @@ mod tests {
         ];
         let i = insights(&words(&script)).unwrap();
         assert!(i.title.to_lowercase().contains("kayıt") || i.title.to_lowercase().contains("uygulama"), "{}", i.title);
+    }
+
+    #[test]
+    fn titles_come_from_the_opening_that_says_whats_coming() {
+        let said = "Selamlar. Merhabalar. Bu ekran kaydını yeni aldım. Uygulamayı göstereceğim. Uygulamayı açtığımızda bütün bilgiler cihazında kalıyor. \
+                    Aktivasyon kodu e-postayla geliyor. Aktivasyon kodunu girince uygulama açılıyor. Ayarlardan dili seçebiliyorsun. \
+                    Kayıtlar cihazında saklanıyor. Paylaşmak için link alıyorsun. Bu kadar, teşekkürler.";
+        let words: Vec<CaptionWord> = said
+            .split_whitespace()
+            .enumerate()
+            .map(|(i, w)| CaptionWord { id: uuid::Uuid::new_v4(), start: i as f64 * 0.5, end: i as f64 * 0.5 + 0.4, text: w.into() })
+            .collect();
+        let found = insights(&words).unwrap();
+        assert_eq!(found.title, "Uygulamayı göstereceğim");
+        assert!(found.turkish);
     }
 }
