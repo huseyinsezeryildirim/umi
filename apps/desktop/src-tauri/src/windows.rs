@@ -41,6 +41,22 @@ fn main_display(app: &AppHandle) -> (LogicalPosition<f64>, LogicalSize<f64>) {
         .unwrap_or((LogicalPosition::new(0.0, 0.0), LogicalSize::new(1440.0, 900.0)))
 }
 
+/// Where the drawing tools go: centered, just above the Dock (or the taskbar), whose clicks
+/// would otherwise win over the panel's.
+fn draw_place(app: &AppHandle) -> (f64, f64) {
+    let (origin, display) = main_display(app);
+    let bottom = app
+        .primary_monitor()
+        .ok()
+        .flatten()
+        .map(|m| {
+            let a = m.work_area();
+            (a.position.y as f64 + a.size.height as f64) / m.scale_factor()
+        })
+        .unwrap_or(origin.y + display.height);
+    (origin.x + (display.width - DRAW.size.0) / 2.0, bottom - DRAW.size.1 - 12.0)
+}
+
 /// Shows the window for `spec` (creating it the first time) at `at` (points), or a default
 /// place for that view.
 pub fn show(app: &AppHandle, spec: &Spec, at: Option<(f64, f64)>) -> tauri::Result<WebviewWindow> {
@@ -69,7 +85,7 @@ fn show_window(app: &AppHandle, spec: &Spec, at: Option<(f64, f64)>) -> tauri::R
         "bubble" => (origin.x + 40.0, origin.y + display.height - spec.size.1 - 60.0),
         "controls" => (origin.x + 16.0, origin.y + (display.height - spec.size.1) / 2.0),
         "layouts" => (origin.x + display.width - spec.size.0 - 16.0, origin.y + (display.height - spec.size.1) / 2.0),
-        "draw" => (origin.x + (display.width - spec.size.0) / 2.0, origin.y + display.height - spec.size.1 - 20.0),
+        "draw" => draw_place(app),
         // Just under the menu bar, near the camera, so eyes stay close to the lens.
         "prompter" => (origin.x + (display.width - spec.size.0) / 2.0, origin.y + 34.0),
         "countdown" => (origin.x, origin.y),
@@ -173,7 +189,7 @@ pub fn prepare_recording_windows(app: &AppHandle) {
         (&countdown, (origin.x, origin.y)),
         (&CONTROLS, (origin.x + 16.0, origin.y + (display.height - CONTROLS.size.1) / 2.0)),
         (&LAYOUTS, (origin.x + display.width - LAYOUTS.size.0 - 16.0, origin.y + (display.height - LAYOUTS.size.1) / 2.0)),
-        (&DRAW, (origin.x + (display.width - DRAW.size.0) / 2.0, origin.y + display.height - DRAW.size.1 - 20.0)),
+        (&DRAW, draw_place(app)),
         (&CAMERA_MENU, (origin.x + 16.0, origin.y + 40.0)),
     ] {
         if app.get_webview_window(spec.view).is_none() {
