@@ -138,14 +138,18 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
       openRecording(bundle);
       return;
     }
-    toast("Preparing your video…");
-    const state = await invoke<{ id: string; name: string }>("open_editor", { path: bundle });
-    const destination = await invoke<string>("export_default_path", { name: state.name, extension: "mp4" });
-    const { Channel } = await import("@tauri-apps/api/core");
-    await invoke("editor_export", { id: state.id, request: { format: "mp4", resolution: 1080, fps: 60, destination }, progress: new Channel<number>() });
-    await invoke("copy_file_to_clipboard", { path: destination });
-    toast("Video copied — paste it anywhere");
+    // The recording opens at once; the video is made alongside and copied when it's ready.
     openRecording(bundle);
+    toast("Preparing your video — it's copied when it's ready");
+    // Not awaited: the next recording can start meanwhile.
+    void (async () => {
+      const state = await invoke<{ id: string; name: string }>("open_editor", { path: bundle });
+      const destination = await invoke<string>("export_default_path", { name: state.name, extension: "mp4" });
+      const { Channel } = await import("@tauri-apps/api/core");
+      await invoke("editor_export", { id: state.id, request: { format: "mp4", resolution: 1080, fps: 60, destination }, progress: new Channel<number>() });
+      await invoke("copy_file_to_clipboard", { path: destination });
+      toast("Video copied — paste it anywhere");
+    })().catch((e) => toast(`Couldn't make the video: ${e}`));
   };
 
   void listen("record:start", () => void start());
