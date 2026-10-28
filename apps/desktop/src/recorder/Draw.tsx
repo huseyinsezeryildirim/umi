@@ -1,5 +1,6 @@
+import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
-import { createSignal, For, onCleanup, onMount } from "solid-js";
+import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from "solid-js";
 import { applyTool, INK_COLORS, type InkTool } from "./Ink";
 
 const svg = (d: string) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -25,6 +26,21 @@ export function Draw() {
   const [tool, setTool] = createSignal<InkTool>("pointer");
   const [color, setColor] = createSignal<string>(INK_COLORS[0]);
   const [keep, setKeep] = createSignal(false);
+  // Small (the tool in use and its color) until the pointer comes over it, then every tool.
+  // The website's demo keeps them all out (its tour points at them).
+  const demo = !!import.meta.env.VITE_DEMO;
+  const [open, setOpen] = createSignal(demo);
+  let closing = 0;
+  const grow = () => {
+    clearTimeout(closing);
+    setOpen(true);
+  };
+  const shrink = () => {
+    clearTimeout(closing);
+    if (!demo) closing = window.setTimeout(() => setOpen(false), 700);
+  };
+  createEffect(on(open, (o) => void invoke("window_resize", { width: o ? 600 : 120, height: o ? 68 : 56, grow: "up" }), { defer: true }));
+  onCleanup(() => clearTimeout(closing));
 
   const pick = (t: InkTool) => {
     setTool(t);
@@ -43,31 +59,41 @@ export function Draw() {
   });
 
   return (
-    <div class="draw" data-tauri-drag-region>
-      <For each={TOOLS}>
-        {(t) => (
-          <button type="button" class="draw__btn" data-on={tool() === t.tool ? "true" : "false"} onClick={() => pick(t.tool)} title={`${t.label} · ${t.key}`} aria-label={t.label} innerHTML={t.icon} />
-        )}
-      </For>
-      <i class="draw__line" />
-      <For each={INK_COLORS}>
-        {(c) => <button type="button" class="draw__dot" data-on={color() === c ? "true" : "false"} style={{ background: c }} onClick={() => paint(c)} title="Color" aria-label={`Color ${c}`} />}
-      </For>
-      <i class="draw__line" />
-      <button type="button" class="draw__btn" onClick={() => void emit("ink:action", { action: "undo" })} title="Undo · ⌘Z" aria-label="Undo" innerHTML={UNDO} />
-      <button type="button" class="draw__btn" onClick={() => void emit("ink:action", { action: "clear" })} title="Clear all" aria-label="Clear all" innerHTML={CLEAR} />
-      <button
-        type="button"
-        class="draw__btn"
-        data-on={keep() ? "true" : "false"}
-        onClick={() => {
-          setKeep(!keep());
-          void emit("ink:action", { action: "keep", value: keep() });
-        }}
-        title={keep() ? "Drawings stay (click to let them fade)" : "Drawings fade (click to keep them)"}
-        aria-label="Keep drawings"
-        innerHTML={KEEP}
-      />
+    <div class="draw" data-open={open() ? "true" : "false"} data-tauri-drag-region onMouseEnter={grow} onMouseLeave={shrink}>
+      <Show
+        when={open()}
+        fallback={
+          <>
+            <button type="button" class="draw__btn" data-on={tool() === "pointer" ? "false" : "true"} onClick={grow} title="Drawing tools" aria-label="Drawing tools" innerHTML={(TOOLS.find((t) => t.tool === tool()) ?? TOOLS[0]).icon} />
+            <span class="draw__dot" data-on="false" style={{ background: color() }} />
+          </>
+        }
+      >
+        <For each={TOOLS}>
+          {(t) => (
+            <button type="button" class="draw__btn" data-on={tool() === t.tool ? "true" : "false"} onClick={() => pick(t.tool)} title={`${t.label} · ${t.key}`} aria-label={t.label} innerHTML={t.icon} />
+          )}
+        </For>
+        <i class="draw__line" />
+        <For each={INK_COLORS}>
+          {(c) => <button type="button" class="draw__dot" data-on={color() === c ? "true" : "false"} style={{ background: c }} onClick={() => paint(c)} title="Color" aria-label={`Color ${c}`} />}
+        </For>
+        <i class="draw__line" />
+        <button type="button" class="draw__btn" onClick={() => void emit("ink:action", { action: "undo" })} title="Undo · ⌘Z" aria-label="Undo" innerHTML={UNDO} />
+        <button type="button" class="draw__btn" onClick={() => void emit("ink:action", { action: "clear" })} title="Clear all" aria-label="Clear all" innerHTML={CLEAR} />
+        <button
+          type="button"
+          class="draw__btn"
+          data-on={keep() ? "true" : "false"}
+          onClick={() => {
+            setKeep(!keep());
+            void emit("ink:action", { action: "keep", value: keep() });
+          }}
+          title={keep() ? "Drawings stay (click to let them fade)" : "Drawings fade (click to keep them)"}
+          aria-label="Keep drawings"
+          innerHTML={KEEP}
+        />
+      </Show>
     </div>
   );
 }

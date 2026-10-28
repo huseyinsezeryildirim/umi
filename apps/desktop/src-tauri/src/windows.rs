@@ -19,7 +19,8 @@ pub const CONTROLS: Spec = Spec { view: "controls", size: (72.0, 410.0), transpa
 pub const LAYOUTS: Spec = Spec { view: "layouts", size: (64.0, 236.0), transparent: true, focus: false };
 /// The drawing tools along the bottom while recording (pen, highlighter, arrow, box, spotlight,
 /// colors, undo, clear, keep). Left out of the video; what's drawn (the ink layer) is in it.
-pub const DRAW: Spec = Spec { view: "draw", size: (600.0, 68.0), transparent: true, focus: false };
+/// Small until the pointer comes near; then it grows to all the tools (Draw.tsx).
+pub const DRAW: Spec = Spec { view: "draw", size: (120.0, 56.0), transparent: true, focus: false };
 pub const COUNTDOWN: Spec = Spec { view: "countdown", size: (240.0, 240.0), transparent: true, focus: false };
 pub const SHOT: Spec = Spec { view: "shot", size: (1120.0, 760.0), transparent: false, focus: true };
 /// The camera menu, opened from the bubble's adjust button, next to the bubble.
@@ -54,7 +55,7 @@ fn draw_place(app: &AppHandle) -> (f64, f64) {
             (a.position.y as f64 + a.size.height as f64) / m.scale_factor()
         })
         .unwrap_or(origin.y + display.height);
-    (origin.x + (display.width - DRAW.size.0) / 2.0, bottom - DRAW.size.1 - 12.0)
+    (origin.x + (display.width - DRAW.size.0) / 2.0, bottom - DRAW.size.1 - 28.0)
 }
 
 /// Shows the window for `spec` (creating it the first time) at `at` (points), or a default
@@ -386,8 +387,17 @@ pub fn resize_app_window(app_name: String, title: String, width: f64, height: f6
     }
 }
 
-/// Resizes the calling window (bubble sizes, launcher pages).
+/// Resizes the calling window (bubble sizes, launcher pages). `grow: "up"` keeps its bottom
+/// edge and horizontal center where they are (the drawing tools opening and closing).
 #[tauri::command]
-pub fn window_resize(window: tauri::WebviewWindow, width: f64, height: f64) -> Result<(), String> {
+pub fn window_resize(window: tauri::WebviewWindow, width: f64, height: f64, grow: Option<String>) -> Result<(), String> {
+    if grow.as_deref() == Some("up") {
+        let scale = window.scale_factor().map_err(|e| e.to_string())?;
+        let pos = window.outer_position().map_err(|e| e.to_string())?.to_logical::<f64>(scale);
+        let size = window.outer_size().map_err(|e| e.to_string())?.to_logical::<f64>(scale);
+        let (x, y) = (pos.x + (size.width - width) / 2.0, pos.y + size.height - height);
+        window.set_size(LogicalSize::new(width, height)).map_err(|e| e.to_string())?;
+        return window.set_position(LogicalPosition::new(x, y)).map_err(|e| e.to_string());
+    }
     window.set_size(LogicalSize::new(width, height)).map_err(|e| e.to_string())
 }
