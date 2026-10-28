@@ -24,6 +24,8 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
     const settings = await recorder.settings();
     try {
       await recorder.hide("launcher");
+      // Out of the way of what's being recorded.
+      await recorder.hide("main");
       // The bubble is up before the screen capture starts, so it's left out from the first frame
       // (the camera is recorded on its own and added in the editor).
       if (settings.cameraOn || settings.cameraOnly) await recorder.show("bubble");
@@ -113,6 +115,7 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
     await invoke("record_cancel");
     reserved = Promise.resolve(null);
     void invoke("live_cancel");
+    await recorder.show("main");
     toast("Recording discarded");
   };
 

@@ -216,7 +216,8 @@ pub fn show_launcher(app: &AppHandle, at: Option<(f64, f64)>) -> tauri::Result<W
 
 pub fn hide(app: &AppHandle, view: &str) {
     if let Some(w) = app.get_webview_window(view) {
-        let _ = w.hide();
+        // The recordings window goes down to the Dock (Stop brings it back), the rest away.
+        let _ = if view == "main" { w.minimize() } else { w.hide() };
     }
     // No camera light for a bubble nobody sees.
     if view == "bubble" {
