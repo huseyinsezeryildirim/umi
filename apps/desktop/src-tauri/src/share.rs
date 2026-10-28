@@ -178,7 +178,7 @@ pub async fn share_start(state: State<'_, AppState>, id: String, progress: Chann
         let gif = gif_preview(&mut decoder, info.duration, &folder);
         let media = Media {
             video: &mp4,
-            title: umi_project::Bundle::new(&bundle).name(),
+            title: title_of(&bundle),
             duration_ms: (info.duration * 1000.0) as u64,
             width: info.width,
             height: info.height,
@@ -218,7 +218,7 @@ fn share_recording(client: &Client, bundle: &Path, progress: &Channel<ShareProgr
     let meta = umi_cloud::RawMeta { duration_ms: (info.duration * 1000.0) as u64, width: info.width, height: info.height };
     let read = |name: &str| std::fs::read(bundle.join(name)).ok().and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
     let project = read(umi_project::project::PROJECT_FILE).ok_or("Couldn't read the recording.")?;
-    let title = umi_project::Bundle::new(bundle).name();
+    let title = title_of(bundle);
 
     let link = client.reserve_raw(&title, camera.exists(), Some(meta.duration_ms)).map_err(plan_error)?;
     // Kept (shared) from the start: the plan's limits are checked before anything uploads.
@@ -268,6 +268,25 @@ fn share_recording(client: &Client, bundle: &Path, progress: &Channel<ShareProgr
     remember(bundle, &video);
     send("done", 1.0, Some(video.clone()));
     Ok(video)
+}
+
+/// The recording's title (typed or suggested), else its folder's name.
+fn title_of(bundle: &Path) -> String {
+    let files = umi_project::Bundle::new(bundle);
+    files.read_project().map(|p| p.display_name(files.name())).unwrap_or_else(|_| files.name())
+}
+
+/// The recording was renamed: its link (if it has one) takes the new title.
+pub(crate) fn sync_title(bundle: &Path) {
+    let Some(video) = saved(bundle) else { return };
+    let Ok(client) = client() else { return };
+    let bundle = bundle.to_path_buf();
+    std::thread::spawn(move || {
+        let settings = Settings { title: Some(title_of(&bundle)), ..Default::default() };
+        if let Ok(v) = client.update(&video.id, &settings) {
+            remember(&bundle, &v);
+        }
+    });
 }
 
 fn plan_error(e: umi_cloud::CloudError) -> String {

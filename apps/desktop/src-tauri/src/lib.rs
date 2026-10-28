@@ -100,12 +100,14 @@ fn recording_rename(state: State<'_, AppState>, path: PathBuf, title: String) ->
     if let Ok(editor) = state.editor(&path.to_string_lossy()) {
         let s = editor.apply(editor::Op::SetTitle { title });
         editor.save()?;
+        share::sync_title(&path);
         return Ok(s.name);
     }
     let bundle = umi_project::Bundle::new(&path);
     let mut project = bundle.read_project().map_err(|e| e.to_string())?;
     project.set_title(&title);
     bundle.write_project(&project).map_err(|e| e.to_string())?;
+    share::sync_title(&path);
     Ok(project.display_name(bundle.name()))
 }
 
@@ -125,7 +127,15 @@ async fn open_editor(state: State<'_, AppState>, path: PathBuf) -> Result<Editor
 
 #[tauri::command]
 fn editor_apply(state: State<'_, AppState>, id: String, op: Op) -> Result<EditorState, String> {
-    Ok(state.editor(&id)?.apply(op))
+    let editor = state.editor(&id)?;
+    let renamed = matches!(op, Op::SetTitle { .. });
+    let next = editor.apply(op);
+    if renamed {
+        // The title is saved at once (it isn't part of the edit), and a shared link follows.
+        editor.save()?;
+        share::sync_title(&editor.bundle);
+    }
+    Ok(next)
 }
 
 #[tauri::command]
