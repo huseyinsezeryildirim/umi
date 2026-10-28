@@ -108,7 +108,14 @@ pub struct Sources {
 #[tauri::command]
 pub async fn record_sources() -> Result<Sources, String> {
     tauri::async_runtime::spawn_blocking(|| {
-        let (displays, windows, missing) = match (umi_capture::screen::displays(), umi_capture::screen::windows()) {
+        // Without permission, asking ScreenCaptureKit for the screens shows macOS's prompt, and
+        // the launcher asks on every focus: Deny, focus back, prompt again. Only Start asks.
+        let listed = if screen_allowed() {
+            (umi_capture::screen::displays(), umi_capture::screen::windows())
+        } else {
+            (Err(umi_capture::CaptureError::ScreenPermission), Ok(vec![]))
+        };
+        let (displays, windows, missing) = match listed {
             (Ok(d), Ok(w)) => (d, w, None),
             (Err(umi_capture::CaptureError::ScreenPermission), _) | (_, Err(umi_capture::CaptureError::ScreenPermission)) => {
                 (vec![], vec![], Some("screen".to_string()))
@@ -308,19 +315,30 @@ fn float_over_full_screen_apps(app: &AppHandle, on: bool) {
 /// launcher's permission row then).
 const SCREEN_PERMISSION: &str = "SCREEN_PERMISSION";
 
+#[cfg(target_os = "macos")]
+#[allow(unsafe_code)]
+#[link(name = "CoreGraphics", kind = "framework")]
+unsafe extern "C" {
+    fn CGPreflightScreenCaptureAccess() -> bool;
+    fn CGRequestScreenCaptureAccess() -> bool;
+}
+
+/// Screen recording is allowed, without asking (macOS only sees a new answer after a relaunch).
+#[allow(unsafe_code)]
+fn screen_allowed() -> bool {
+    // SAFETY: a plain CoreGraphics call without arguments.
+    #[cfg(target_os = "macos")]
+    return unsafe { CGPreflightScreenCaptureAccess() };
+    #[cfg(not(target_os = "macos"))]
+    true
+}
+
 /// Screen recording is allowed; if not, macOS's prompt is shown (once per app version).
 #[allow(unsafe_code)]
 fn screen_permission() -> bool {
+    // SAFETY: a plain CoreGraphics call without arguments.
     #[cfg(target_os = "macos")]
-    {
-        #[link(name = "CoreGraphics", kind = "framework")]
-        unsafe extern "C" {
-            fn CGPreflightScreenCaptureAccess() -> bool;
-            fn CGRequestScreenCaptureAccess() -> bool;
-        }
-        // SAFETY: plain CoreGraphics calls without arguments.
-        unsafe { CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() }
-    }
+    return screen_allowed() || unsafe { CGRequestScreenCaptureAccess() };
     #[cfg(not(target_os = "macos"))]
     true
 }

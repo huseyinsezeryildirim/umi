@@ -174,10 +174,15 @@ export function Launcher() {
             <ShieldAlert size={18} />
             <div>
               <strong>Allow screen recording</strong>
-              <p>Turn on Umi in System Settings → Privacy &amp; Security → Screen &amp; System Audio Recording, then reopen Umi.</p>
-              <button type="button" onClick={() => void invoke("open_privacy_settings", { kind: "screen" })}>
-                Open Settings
-              </button>
+              <p>Turn on Umi in System Settings → Privacy &amp; Security → Screen &amp; System Audio Recording, then restart Umi (macOS sees it after a restart).</p>
+              <div class="rec-permission__actions">
+                <button type="button" onClick={() => void invoke("open_privacy_settings", { kind: "screen" })}>
+                  Open Settings
+                </button>
+                <button type="button" data-variant="ghost" onClick={() => void import("@tauri-apps/plugin-process").then((p) => p.relaunch())}>
+                  Restart Umi
+                </button>
+              </div>
             </div>
           </div>
         </Show>
