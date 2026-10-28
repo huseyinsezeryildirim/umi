@@ -78,9 +78,19 @@ fn bare(word: &str) -> String {
     word.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase()
 }
 
-/// Filler words ("um", "uh", "şey"…).
+/// A filler, drawn out too ("eeee", "ıııı", "hmmm").
+fn is_filler(word: &str) -> bool {
+    let w = bare(word);
+    let mut chars = w.chars();
+    let held = |c: char| "eıiaum".contains(c);
+    FILLERS.contains(&w.as_str())
+        || (w.chars().count() >= 2 && chars.next().is_some_and(|first| held(first) && w.chars().all(|c| c == first)))
+        || (w.starts_with('h') && w.chars().count() >= 2 && w.chars().skip(1).all(|c| c == 'ı' || c == 'm'))
+}
+
+/// Filler words ("um", "uh", "eee", "şey"…).
 pub fn filler_words(words: &[CaptionWord]) -> Vec<Uuid> {
-    words.iter().filter(|w| FILLERS.contains(&bare(&w.text).as_str())).map(|w| w.id).collect()
+    words.iter().filter(|w| is_filler(&w.text)).map(|w| w.id).collect()
 }
 
 /// Silences between words longer than `min` seconds, shortened to `keep` seconds (source
@@ -238,6 +248,16 @@ impl Document {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn drawn_out_fillers_count() {
+        for w in ["eee", "Eeee,", "ıııı", "hmm", "hmmm", "hııı", "umm"] {
+            assert!(is_filler(w), "{w}");
+        }
+        for w in ["eve", "ama", "hem", "uygulama"] {
+            assert!(!is_filler(w), "{w}");
+        }
+    }
     use crate::edit::EditSettings;
     use crate::project::{AudioInfo, CursorData, RecordingProject, ScreenInfo};
 

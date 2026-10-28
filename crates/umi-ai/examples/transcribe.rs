@@ -13,7 +13,11 @@ fn main() {
     let samples = umi_ai::transcribe::read_mono_16k(&audio, track).unwrap();
     eprintln!("audio {:.1}s read in {:.2}s", samples.len() as f64 / 16000.0, t.elapsed().as_secs_f64());
     let t = std::time::Instant::now();
-    let (words, language) = umi_ai::transcribe::transcribe(&model, &samples, lang.as_deref(), None, |p| eprint!("\r{p}%")).unwrap();
+    let (words, language) =
+        umi_ai::transcribe::transcribe(&model, &samples, lang.as_deref(), Some(&umi_ai::transcribe::vocabulary(&[])), |p| {
+            eprint!("\r{p}%")
+        })
+        .unwrap();
     eprintln!("\n{} words ({language}) in {:.2}s", words.len(), t.elapsed().as_secs_f64());
     for w in words.iter().take(60) {
         println!("{:6.2}-{:6.2} {}", w.start, w.end, w.text);

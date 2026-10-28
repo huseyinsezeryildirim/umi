@@ -50,7 +50,9 @@ const COMMON_TERMS: &str = "Umi, AI, app, features, screen recorder, recording, 
 /// What to tell Whisper the recording is about: the common terms and the apps and windows
 /// that were on screen.
 pub fn vocabulary(names: &[String]) -> String {
-    let mut out = COMMON_TERMS.to_string();
+    // Whisper leaves hesitations out unless the text before has them: then "eee" and "um"
+    // are written down, and filler removal can cut them.
+    let mut out = format!("Eee, ııı, şey… Umm, uh, hmm. {COMMON_TERMS}");
     for name in names {
         let name = name.trim();
         if name.is_empty() || out.len() + name.len() > 600 || out.to_lowercase().contains(&name.to_lowercase()) {
@@ -73,7 +75,16 @@ pub fn transcribe(
     progress: impl FnMut(i32) + 'static,
 ) -> Result<(Vec<Word>, String), AiError> {
     whisper_rs::install_logging_hooks();
-    let ctx = WhisperContext::new_with_params(model, WhisperContextParameters::default()).map_err(|e| AiError::Model(e.to_string()))?;
+    // Word times from the model's attention (DTW): Whisper's own token times run ahead of the
+    // voice, so highlighted words would lead what's being said.
+    let mut ctx_params = WhisperContextParameters::default();
+    if model.file_name().is_some_and(|n| n.to_string_lossy().contains("large-v3-turbo")) {
+        ctx_params.dtw_parameters(whisper_rs::DtwParameters {
+            mode: whisper_rs::DtwMode::ModelPreset { model_preset: whisper_rs::DtwModelPreset::LargeV3Turbo },
+            ..Default::default()
+        });
+    }
+    let ctx = WhisperContext::new_with_params(model, ctx_params).map_err(|e| AiError::Model(e.to_string()))?;
     let mut state = ctx.create_state().map_err(|e| AiError::Model(e.to_string()))?;
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
     params.set_language(Some(language.unwrap_or("auto")));
@@ -122,7 +133,12 @@ pub fn transcribe(
                 continue;
             }
             let data = token.token_data();
-            let (t0, t1) = (data.t0 as f64 / 100.0, data.t1 as f64 / 100.0);
+            let (mut t0, t1) = (data.t0 as f64 / 100.0, data.t1 as f64 / 100.0);
+            // DTW's time is when the token is heard; it's -1 when there isn't one.
+            // It lands a little after the word's first sound.
+            if data.t_dtw >= 0 {
+                t0 = (data.t_dtw as f64 / 100.0 - 0.1).max(0.0);
+            }
             if bytes.first() == Some(&b' ') || current.is_none() {
                 flush(&mut current, &mut words);
                 current = Some((bytes.to_vec(), t0, t1));
@@ -133,6 +149,17 @@ pub fn transcribe(
         }
         // Segments end on word boundaries.
         flush(&mut current, &mut words);
+    }
+    // DTW gives when a word is heard, not how long it lasts: it lasts about as long as its
+    // letters take to say, until the next one starts (a longer gap is a pause).
+    for i in 0..words.len() {
+        let next = words.get(i + 1).map(|n| n.start);
+        let w = &mut words[i];
+        let spoken = w.start + (w.text.chars().count() as f64 * 0.075).clamp(0.2, 0.9);
+        w.end = match next {
+            Some(n) => spoken.min(n).max(w.start + 0.05),
+            None => spoken.max(w.end),
+        };
     }
     Ok((words, language))
 }
