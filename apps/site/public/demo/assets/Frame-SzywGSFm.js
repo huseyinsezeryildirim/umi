@@ -1,0 +1,1 @@
+import{p as e}from"./web-DO7bYQfM.js";var t=e(`<div class=rec-frame>`);function n(){return t()}export{n as Frame};
