@@ -30,6 +30,21 @@ pub fn caption_lines(words: &[CaptionWord]) -> Vec<Vec<CaptionWord>> {
     lines
 }
 
+/// The words still in the video: one cut out (a filler, a pause, a trim) isn't captioned.
+pub fn kept_words(words: &[CaptionWord], clips: &[Clip]) -> Vec<CaptionWord> {
+    if clips.is_empty() {
+        return words.to_vec();
+    }
+    words
+        .iter()
+        .filter(|w| {
+            let mid = (w.start + w.end) / 2.0;
+            clips.iter().any(|c| mid >= c.start && mid <= c.end)
+        })
+        .cloned()
+        .collect()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SubtitleFormat {
     Srt,
@@ -49,7 +64,7 @@ pub fn subtitles(doc: &Document, format: SubtitleFormat) -> String {
     };
     let mut out = if format == SubtitleFormat::Vtt { "WEBVTT\n\n".to_string() } else { String::new() };
     let mut n = 0;
-    for line in caption_lines(&doc.edit.captions.words) {
+    for line in caption_lines(&kept_words(&doc.edit.captions.words, &doc.edit.clips)) {
         let (Some(first), Some(last)) = (line.first(), line.last()) else { continue };
         let (Some(start), Some(end)) = (doc.output_time(first.start), doc.output_time(last.end).or_else(|| doc.output_time(first.start)))
         else {
@@ -284,6 +299,16 @@ mod tests {
         let mut edit = EditSettings::default();
         edit.captions.words = words;
         Document::new(project, edit, CursorData::default(), 10.0)
+    }
+
+    #[test]
+    fn cut_words_arent_captioned() {
+        let w = |s: f64, t: &str| CaptionWord { id: Uuid::new_v4(), start: s, end: s + 0.4, text: t.into() };
+        let words = vec![w(0.0, "Eee,"), w(1.0, "web"), w(1.5, "sitemizden")];
+        let clips = vec![Clip { start: 0.6, end: 3.0, speed: 1.0 }];
+        let kept: Vec<String> = kept_words(&words, &clips).into_iter().map(|w| w.text).collect();
+        assert_eq!(kept, ["web", "sitemizden"]);
+        assert_eq!(kept_words(&words, &[]).len(), 3);
     }
 
     #[test]

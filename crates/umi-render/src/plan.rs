@@ -730,7 +730,7 @@ impl FramePlanner {
         if !c.enabled || c.words.is_empty() {
             return;
         }
-        let lines = caption_lines(&c.words);
+        let lines = caption_lines(&umi_project::captions::kept_words(&c.words, &self.settings.clips));
         let Some(line) = lines.iter().find(|l| t >= l[0].start - 0.05 && t <= l[l.len() - 1].end + 0.4) else { return };
         let active = if c.highlight_active_word { line.iter().position(|w| t >= w.start && t < w.end) } else { None };
         let words: Vec<String> = line.iter().map(|w| w.text.clone()).collect();
