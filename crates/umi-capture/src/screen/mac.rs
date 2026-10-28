@@ -46,22 +46,22 @@ fn content() -> Result<SCShareableContent, CaptureError> {
     })
 }
 
+/// Every display, the main one (with the menu bar, at the origin) first: ScreenCaptureKit's own
+/// order can put another one first.
 pub fn displays() -> Result<Vec<Display>, CaptureError> {
-    Ok(content()?
-        .displays()
-        .iter()
+    let mut list: Vec<_> = content()?.displays().iter().map(|d| (d.display_id(), d.frame())).collect();
+    list.sort_by_key(|(_, f)| !(f.origin.x == 0.0 && f.origin.y == 0.0));
+    Ok(list
+        .into_iter()
         .enumerate()
-        .map(|(i, d)| {
-            let f = d.frame();
-            Display {
-                id: d.display_id(),
-                name: if i == 0 { "Main display".into() } else { format!("Display {}", i + 1) },
-                width: f.size.width,
-                height: f.size.height,
-                scale: pixel_scale(d.display_id()),
-                x: f.origin.x,
-                y: f.origin.y,
-            }
+        .map(|(i, (id, f))| Display {
+            id,
+            name: if i == 0 { "Main display".into() } else { format!("Display {}", i + 1) },
+            width: f.size.width,
+            height: f.size.height,
+            scale: pixel_scale(id),
+            x: f.origin.x,
+            y: f.origin.y,
         })
         .collect())
 }
@@ -192,6 +192,8 @@ struct Session {
     /// The display being recorded and the options, to build the filter again.
     display: Option<u32>,
     options: ScreenOptions,
+    /// Recording part of a display (a source rectangle a switch has to drop).
+    cropped: bool,
 }
 
 // SAFETY: SCStream is a reference to an Objective-C object whose methods are thread-safe;
@@ -209,6 +211,41 @@ impl ScreenSession for Session {
 
     fn size(&self) -> (u32, u32) {
         self.size
+    }
+
+    fn switch(&mut self, target: &Target) -> Result<(), CaptureError> {
+        // The same stream, a new filter: the video keeps its size (the new source is fitted in)
+        // and system sound carries on. Part of a display has a source rectangle the stream
+        // can't drop before macOS 14: the recorder starts a new session then.
+        if self.cropped {
+            return Err(CaptureError::Unsupported);
+        }
+        let content = content()?;
+        let err = |e: SCError| CaptureError::Other(e.to_string());
+        let filter = match target {
+            Target::Display { id } => {
+                let display = content
+                    .displays()
+                    .into_iter()
+                    .find(|d| d.display_id() == *id)
+                    .ok_or_else(|| CaptureError::NotFound("That display".into()))?;
+                let own = left_out_windows(&all_content().unwrap_or_else(|_| content.clone()), &self.options);
+                let refs: Vec<&SCWindow> = own.iter().collect();
+                self.display = Some(*id);
+                SCContentFilter::create().with_display(&display).with_excluding_windows(&refs).build().map_err(err)?
+            }
+            Target::Window { id } => {
+                let window = content
+                    .windows()
+                    .into_iter()
+                    .find(|w| w.window_id() == *id)
+                    .ok_or_else(|| CaptureError::NotFound("That window".into()))?;
+                self.display = None;
+                SCContentFilter::create().with_window(&window).build().map_err(err)?
+            }
+            _ => return Err(CaptureError::Unsupported),
+        };
+        self.stream.update_content_filter(&filter).map_err(err)
     }
 
     fn refresh_exclusions(&self) {
@@ -292,17 +329,7 @@ pub fn start(
         }
     };
     let size = fit(points.0 * scale, points.1 * scale, options.max_size);
-    let mut config = SCStreamConfiguration::new()
-        .with_width(size.0)
-        .with_height(size.1)
-        .with_pixel_format(PixelFormat::YCbCr_420v)
-        .with_shows_cursor(options.show_cursor)
-        .with_minimum_frame_interval(&CMTime::new(1, options.fps.max(1) as i32))
-        .with_queue_depth(8)
-        .with_captures_audio(options.system_audio)
-        .with_sample_rate(48_000)
-        .with_channel_count(2)
-        .with_excludes_current_process_audio(true);
+    let mut config = configuration(options, size);
     if let Some(rect) = source {
         config = config.with_source_rect(rect);
     }
@@ -319,7 +346,23 @@ pub fn start(
         Target::Display { id } | Target::Area { display: id, .. } => Some(*id),
         _ => None,
     };
-    Ok(Box::new(Session { stream, size, running: true, display, options: options.clone() }))
+    Ok(Box::new(Session { stream, size, running: true, display, options: options.clone(), cropped: source.is_some() }))
+}
+
+fn configuration(options: &ScreenOptions, size: (u32, u32)) -> SCStreamConfiguration {
+    SCStreamConfiguration::new()
+        .with_width(size.0)
+        .with_height(size.1)
+        .with_pixel_format(PixelFormat::YCbCr_420v)
+        .with_shows_cursor(options.show_cursor)
+        .with_minimum_frame_interval(&CMTime::new(1, options.fps.max(1) as i32))
+        // A source switched to while recording is fitted into the video's size.
+        .with_scales_to_fit(true)
+        .with_queue_depth(8)
+        .with_captures_audio(options.system_audio)
+        .with_sample_rate(48_000)
+        .with_channel_count(2)
+        .with_excludes_current_process_audio(true)
 }
 
 #[cfg(test)]

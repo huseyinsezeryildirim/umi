@@ -77,6 +77,12 @@ pub trait ScreenSession: Send {
     /// Looks again for our own windows to leave out (ones opened after the recording
     /// started, like the control bar). Display recordings only.
     fn refresh_exclusions(&self) {}
+    /// Records `target` from now on, in place (macOS). Elsewhere the recorder starts a new
+    /// session instead.
+    fn switch(&mut self, target: &Target) -> Result<(), CaptureError> {
+        let _ = target;
+        Err(CaptureError::Unsupported)
+    }
 }
 
 pub fn displays() -> Result<Vec<Display>, CaptureError> {

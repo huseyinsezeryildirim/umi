@@ -402,6 +402,50 @@ pub fn record_layout(app: AppHandle, state: State<'_, AppState>, layout: umi_pro
     Ok(())
 }
 
+/// Records another display or window from now on, without stopping; a frame shows it briefly.
+#[tauri::command]
+pub async fn record_switch(app: AppHandle, target: Target) -> Result<(), String> {
+    let rect = umi_capture::screen::geometry(&target).ok().map(|g| g.0);
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = handle.state::<AppState>();
+        let current = state.recorder.current.lock();
+        let r = current.as_ref().ok_or("Not recording")?;
+        r.switch_target(&target).map_err(|e| e.to_string())?;
+        r.refresh_exclusions();
+        Ok::<_, String>(())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    flash_frame(&app, rect);
+    Ok(())
+}
+
+/// The frame around what's recorded, for a moment. Linux can't leave it out of the video.
+fn flash_frame(app: &AppHandle, rect: Option<(f64, f64, f64, f64)>) {
+    if cfg!(target_os = "linux") {
+        return;
+    }
+    crate::windows::frame(app, rect);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(1400));
+        crate::windows::frame(&app, None);
+    });
+}
+
+/// The frame around what the coming recording records (during the countdown), or none.
+#[tauri::command]
+pub fn record_frame(app: AppHandle, on: bool) -> Result<(), String> {
+    if !on || cfg!(target_os = "linux") {
+        crate::windows::frame(&app, None);
+        return Ok(());
+    }
+    let target = options(&load_settings())?.target;
+    crate::windows::frame(&app, umi_capture::screen::geometry(&target).ok().map(|g| g.0));
+    Ok(())
+}
+
 /// Stops and returns the new recording's bundle.
 #[tauri::command]
 pub async fn record_stop(app: AppHandle) -> Result<PathBuf, String> {

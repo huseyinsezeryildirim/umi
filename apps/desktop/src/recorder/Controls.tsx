@@ -1,6 +1,6 @@
 import { emit } from "@tauri-apps/api/event";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
-import { Camera, CameraOff, Pause, Play, RotateCcw, Trash2 } from "lucide-solid";
+import { Camera, CameraOff, MonitorUp, Pause, Play, RotateCcw, Trash2 } from "lucide-solid";
 import { formatClock, recorder } from "./api";
 
 /** The bar while recording, a column on the left like the web recorder's, in groups: stop and
@@ -63,6 +63,9 @@ export function Controls() {
           <RotateCcw size={19} />
         </button>
         <i class="controls__line" />
+        <button type="button" class="controls__btn" onClick={() => void recorder.show("sources")} title="Record another screen or window">
+          <MonitorUp size={19} />
+        </button>
         <Show when={hasCamera()}>
           <button
             type="button"

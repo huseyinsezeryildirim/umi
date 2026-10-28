@@ -55,6 +55,8 @@ void ready.then(async () => {
     countdown: () => import("./recorder/Countdown").then((m) => m.Countdown),
     area: () => import("./recorder/AreaPicker").then((m) => m.AreaPicker),
     prompter: () => import("./recorder/Prompter").then((m) => m.Prompter),
+    sources: () => import("./recorder/Sources").then((m) => m.Sources),
+    frame: () => import("./recorder/Frame").then((m) => m.Frame),
     ink: () => import("./recorder/Ink").then((m) => m.Ink),
     shot: () => import("./recorder/ScreenshotEditor").then((m) => m.ScreenshotEditor),
   } as const;

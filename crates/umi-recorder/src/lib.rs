@@ -139,6 +139,84 @@ impl VideoSink for Tee {
     }
 }
 
+/// A source switched to while recording, fitted into the video's size (black bars around it)
+/// where the capture can't do that itself.
+struct Fit {
+    inner: Arc<dyn VideoSink>,
+    size: (u32, u32),
+    canvas: parking_lot::Mutex<Vec<u8>>,
+}
+
+impl VideoSink for Fit {
+    fn frame(&self, frame: Frame, t: f64) {
+        let (w, h) = frame.size();
+        let (cw, ch) = self.size;
+        if (w, h) == (cw, ch) || w == 0 || h == 0 {
+            return self.inner.frame(frame, t);
+        }
+        let k = (cw as f64 / w as f64).min(ch as f64 / h as f64);
+        let (dw, dh) = (((w as f64 * k) as u32).min(cw), ((h as f64 * k) as u32).min(ch));
+        let (ox, oy) = ((cw - dw) / 2, (ch - dh) / 2);
+        // Where a canvas pixel (inside the picture) comes from.
+        let col = |x: u32| (((x - ox) as f64 / k) as usize).min(w as usize - 1);
+        let row = |y: u32| (((y - oy) as f64 / k) as usize).min(h as usize - 1);
+        let mut canvas = self.canvas.lock();
+        match frame {
+            Frame::Bgra { data, stride, .. } | Frame::Rgba { data, stride, .. } => {
+                let rgba = matches!(frame, Frame::Rgba { .. });
+                let out_stride = cw as usize * 4;
+                // Opaque black bars.
+                canvas.clear();
+                canvas.extend(std::iter::repeat_n([0, 0, 0, 255], cw as usize * ch as usize).flatten());
+                for y in oy..oy + dh {
+                    let line = &data[row(y) * stride..];
+                    let out = &mut canvas[y as usize * out_stride..];
+                    for x in ox..ox + dw {
+                        let s = col(x) * 4;
+                        let d = x as usize * 4;
+                        out[d..d + 4].copy_from_slice(&line[s..s + 4]);
+                    }
+                }
+                let data = &canvas[..];
+                let f = if rgba {
+                    Frame::Rgba { width: cw, height: ch, data, stride: out_stride }
+                } else {
+                    Frame::Bgra { width: cw, height: ch, data, stride: out_stride }
+                };
+                self.inner.frame(f, t);
+            }
+            Frame::Nv12 { y: luma, y_stride, uv, uv_stride, .. } => {
+                let (ys, uvs) = (cw as usize, cw as usize);
+                let y_len = ys * ch as usize;
+                canvas.clear();
+                // Black: luma 16, chroma 128.
+                canvas.resize(y_len, 16);
+                canvas.resize(y_len + uvs * (ch as usize / 2), 128);
+                let (out_y, out_uv) = canvas.split_at_mut(y_len);
+                for y in oy..oy + dh {
+                    let line = &luma[row(y) * y_stride..];
+                    let out = &mut out_y[y as usize * ys..];
+                    for x in ox..ox + dw {
+                        out[x as usize] = line[col(x)];
+                    }
+                }
+                for y in (oy / 2)..((oy + dh) / 2) {
+                    let line = &uv[(row(y * 2) / 2) * uv_stride..];
+                    let out = &mut out_uv[y as usize * uvs..];
+                    for x in (ox / 2)..((ox + dw) / 2) {
+                        let s = (col(x * 2) / 2) * 2;
+                        let d = x as usize * 2;
+                        out[d] = line[s];
+                        out[d + 1] = line[s + 1];
+                    }
+                }
+                let (out_y, out_uv) = canvas.split_at(y_len);
+                self.inner.frame(Frame::Nv12 { width: cw, height: ch, y: out_y, y_stride: ys, uv: out_uv, uv_stride: uvs }, t);
+            }
+        }
+    }
+}
+
 /// An audio source's track in a feed.
 struct Track(Arc<Feed>, usize);
 
@@ -223,7 +301,10 @@ pub struct Recording {
     clock: Clock,
     options: Options,
     started: chrono::DateTime<chrono::Utc>,
-    screen: Option<Box<dyn ScreenSession>>,
+    screen: parking_lot::Mutex<Option<Box<dyn ScreenSession>>>,
+    /// To start the screen again on another source (where it can't switch in place).
+    screen_options: ScreenOptions,
+    system: parking_lot::Mutex<Option<Arc<dyn AudioSink>>>,
     mic: Option<umi_capture::audio::MicSession>,
     camera: Option<umi_capture::camera::CameraSession>,
     input: parking_lot::Mutex<Option<InputRecorder>>,
@@ -271,6 +352,15 @@ impl WindowWatch {
         self.stop.store(true, std::sync::atomic::Ordering::Relaxed);
         self.thread.join().unwrap_or_default()
     }
+}
+
+/// The area (global points) the whole video shows once `source` is fitted into a video first
+/// made of `first`: the pointer is stored relative to it, so it lands on the picture.
+fn area_in_video(first: (f64, f64, f64, f64), source: (f64, f64, f64, f64)) -> Area {
+    let (w0, h0) = (first.2.max(1.0), first.3.max(1.0));
+    let k = (w0 / source.2.max(1.0)).min(h0 / source.3.max(1.0));
+    let (w, h) = (w0 / k, h0 / k);
+    Area { x: source.0 + (source.2 - w) / 2.0, y: source.1 + (source.3 - h) / 2.0, width: w, height: h }
 }
 
 /// "Umi 2026-10-25 at 10.41.07.umi" in `library` (made unique).
@@ -354,7 +444,9 @@ impl Recording {
             clock: clock.clone(),
             options: options.clone(),
             started: chrono::Utc::now(),
-            screen: None,
+            screen: parking_lot::Mutex::new(None),
+            screen_options: screen_options.clone(),
+            system: parking_lot::Mutex::new(None),
             mic: None,
             camera: None,
             input: parking_lot::Mutex::new(None),
@@ -375,7 +467,9 @@ impl Recording {
             match device {
                 Some(decoder) => recording.device = Some(device_thread(decoder, clock.clone(), screen_feed.clone())),
                 None => {
-                    recording.screen = Some(screen::start(&options.target, &screen_options, clock.clone(), screen_feed.clone(), system)?)
+                    *recording.screen.get_mut() =
+                        Some(screen::start(&options.target, &screen_options, clock.clone(), screen_feed.clone(), system.clone())?);
+                    *recording.system.get_mut() = system;
                 }
             }
             if let (Some(id), Some(track)) = (&options.microphone, audio.microphone_track) {
@@ -446,9 +540,33 @@ impl Recording {
     /// Leaves out our windows that appeared after the recording started (the control bar,
     /// the camera bubble coming back).
     pub fn refresh_exclusions(&self) {
-        if let Some(s) = self.screen.as_ref() {
+        if let Some(s) = self.screen.lock().as_ref() {
             s.refresh_exclusions();
         }
+    }
+
+    /// Records `target` from now on, without stopping: the video keeps its size and the new
+    /// source is fitted in; the pointer follows it.
+    pub fn switch_target(&self, target: &Target) -> Result<(), RecordError> {
+        if self.device.is_some() || matches!(target, Target::Device { .. }) {
+            return Err(CaptureError::Unsupported.into());
+        }
+        let (rect, _) = screen::geometry(target)?;
+        let mut session = self.screen.lock();
+        let switched = session.as_mut().map(|s| s.switch(target));
+        if !matches!(switched, Some(Ok(()))) {
+            // Start again on the new source, into the same file.
+            let feed = self.screen_feed.clone().ok_or(CaptureError::Unsupported)?;
+            if let Some(mut old) = session.take() {
+                let _ = old.stop();
+            }
+            let sink: Arc<dyn VideoSink> = Arc::new(Fit { inner: feed, size: self.size, canvas: Default::default() });
+            *session = Some(screen::start(target, &self.screen_options, self.clock.clone(), sink, self.system.lock().clone())?);
+        }
+        if let Some(input) = self.input.lock().as_ref() {
+            input.set_area(area_in_video(self.capture_rect, rect));
+        }
+        Ok(())
     }
 
     /// The video's layout from now: screen and bubble, side by side, camera only or screen only.
@@ -494,9 +612,10 @@ impl Recording {
     }
 
     fn stop_sources(&mut self) -> umi_project::CursorData {
-        if let Some(mut s) = self.screen.take() {
+        if let Some(mut s) = self.screen.lock().take() {
             let _ = s.stop();
         }
+        self.system.lock().take();
         if let Some((stop, thread)) = self.device.take() {
             stop.store(true, std::sync::atomic::Ordering::Relaxed);
             let _ = thread.join();
@@ -671,4 +790,41 @@ pub fn recover(library: &Path) -> Vec<PathBuf> {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_pointer_follows_a_switched_source() {
+        // The same size: the source itself.
+        let a = area_in_video((0.0, 0.0, 1600.0, 900.0), (100.0, 50.0, 1600.0, 900.0));
+        assert_eq!((a.x, a.y, a.width, a.height), (100.0, 50.0, 1600.0, 900.0));
+        // A narrower window, fitted by height: bars left and right.
+        let a = area_in_video((0.0, 0.0, 1600.0, 900.0), (200.0, 100.0, 800.0, 900.0));
+        assert_eq!((a.x, a.y, a.width, a.height), (-200.0, 100.0, 1600.0, 900.0));
+    }
+
+    struct Last(parking_lot::Mutex<Option<(u32, u32, Vec<u8>)>>);
+    impl VideoSink for Last {
+        fn frame(&self, frame: Frame, _t: f64) {
+            if let Frame::Bgra { width, height, data, .. } = frame {
+                *self.0.lock() = Some((width, height, data.to_vec()));
+            }
+        }
+    }
+
+    #[test]
+    fn fits_a_smaller_source_with_black_bars() {
+        let last = Arc::new(Last(Default::default()));
+        let fit = Fit { inner: last.clone(), size: (4, 2), canvas: Default::default() };
+        // A white 2×2 picture into 4×2: columns 1 and 2 white, the sides black.
+        fit.frame(Frame::Bgra { width: 2, height: 2, data: &[255; 16], stride: 8 }, 0.0);
+        let (w, h, data) = last.0.lock().take().unwrap();
+        assert_eq!((w, h), (4, 2));
+        assert_eq!(&data[0..4], &[0, 0, 0, 255]);
+        assert_eq!(&data[4..8], &[255; 4]);
+        assert_eq!(&data[12..16], &[0, 0, 0, 255]);
+    }
 }

@@ -13,7 +13,7 @@ pub struct Spec {
 pub const LAUNCHER: Spec = Spec { view: "launcher", size: (360.0, 560.0), transparent: true, focus: true };
 pub const BUBBLE: Spec = Spec { view: "bubble", size: (240.0, 240.0), transparent: true, focus: false };
 /// A column on the left, like Loom's: stop, time, sound, pen, pause, start over, discard.
-pub const CONTROLS: Spec = Spec { view: "controls", size: (72.0, 410.0), transparent: true, focus: false };
+pub const CONTROLS: Spec = Spec { view: "controls", size: (72.0, 460.0), transparent: true, focus: false };
 /// The layout column on the right while recording: screen and bubble, side by side, camera
 /// only, screen only. Left out of the video like every Umi window.
 pub const LAYOUTS: Spec = Spec { view: "layouts", size: (64.0, 236.0), transparent: true, focus: false };
@@ -24,6 +24,10 @@ pub const DRAW: Spec = Spec { view: "draw", size: (120.0, 56.0), transparent: tr
 pub const COUNTDOWN: Spec = Spec { view: "countdown", size: (240.0, 240.0), transparent: true, focus: false };
 pub const SHOT: Spec = Spec { view: "shot", size: (1120.0, 760.0), transparent: false, focus: true };
 /// The camera menu, opened from the bubble's adjust button, next to the bubble.
+/// What to record, picked while recording (next to the control bar).
+pub const SOURCES: Spec = Spec { view: "sources", size: (300.0, 420.0), transparent: true, focus: true };
+/// A frame around what's about to be recorded (the countdown) or was just switched to.
+pub const FRAME: Spec = Spec { view: "frame", size: (400.0, 300.0), transparent: true, focus: false };
 pub const CAMERA_MENU: Spec = Spec { view: "camera", size: (280.0, 300.0), transparent: true, focus: true };
 pub const PROMPTER: Spec = Spec { view: "prompter", size: (520.0, 220.0), transparent: true, focus: true };
 
@@ -180,12 +184,27 @@ pub fn float_over_full_screen(window: &WebviewWindow, level: isize) {
     }
 }
 
+/// Shows the frame around `rect` (global points), or hides it.
+pub fn frame(app: &AppHandle, rect: Option<(f64, f64, f64, f64)>) {
+    let Some((x, y, w, h)) = rect else {
+        hide(app, "frame");
+        return;
+    };
+    // Like every floating window, it's left out of the recording.
+    let Ok(window) = show(app, &FRAME, Some((x, y))) else { return };
+    let _ = window.set_size(LogicalSize::new(w, h));
+    let _ = window.set_position(LogicalPosition::new(x, y));
+    let _ = window.set_ignore_cursor_events(true);
+}
+
 /// Puts the floating windows that are up in front again, over every Space and full-screen app
 /// (on the main thread, after the app became an accessory).
 #[allow(unexpected_cfgs, unsafe_code)]
 pub fn refloat(app: &AppHandle) {
     #[cfg(target_os = "macos")]
-    for (label, level) in [("bubble", 25), ("controls", 25), ("layouts", 25), ("draw", 25), ("prompter", 25), ("ink", 24)] {
+    for (label, level) in
+        [("bubble", 25), ("controls", 25), ("layouts", 25), ("draw", 25), ("prompter", 25), ("sources", 25), ("frame", 25), ("ink", 24)]
+    {
         use objc::{msg_send, sel, sel_impl};
         let Some(w) = app.get_webview_window(label) else { continue };
         if !w.is_visible().unwrap_or(false) {
@@ -217,10 +236,12 @@ pub fn prepare_recording_windows(app: &AppHandle) {
         (&LAYOUTS, (origin.x + display.width - LAYOUTS.size.0 - 16.0, origin.y + (display.height - LAYOUTS.size.1) / 2.0)),
         (&DRAW, draw_place(app)),
         (&CAMERA_MENU, (origin.x + 16.0, origin.y + 40.0)),
+        (&SOURCES, (origin.x + 96.0, origin.y + (display.height - SOURCES.size.1) / 2.0)),
+        (&FRAME, (origin.x, origin.y)),
     ] {
         if app.get_webview_window(spec.view).is_none() {
             if let Ok(w) = build(app, spec, place, false) {
-                if spec.view == "countdown" {
+                if spec.view == "countdown" || spec.view == "frame" {
                     let _ = w.set_ignore_cursor_events(true);
                 }
             }
@@ -349,6 +370,16 @@ pub fn window_show(app: AppHandle, view: String, x: Option<f64>, y: Option<f64>)
         "layouts" => show(&app, &LAYOUTS, at).map(|_| ()),
         "draw" => show(&app, &DRAW, at).map(|_| ()),
         "prompter" => show(&app, &PROMPTER, at).map(|_| ()),
+        "sources" => {
+            // To the right of the control bar.
+            let place = app.get_webview_window("controls").and_then(|c| {
+                let scale = c.scale_factor().ok()?;
+                let pos = c.outer_position().ok()?.to_logical::<f64>(scale);
+                let size = c.outer_size().ok()?.to_logical::<f64>(scale);
+                Some((pos.x + size.width + 8.0, pos.y + (size.height - SOURCES.size.1) / 2.0))
+            });
+            show(&app, &SOURCES, at.or(place)).map(|_| ())
+        }
         "camera" => {
             // Beside the bubble: to its right, or its left near the screen's right edge.
             let place = app.get_webview_window("bubble").and_then(|b| {

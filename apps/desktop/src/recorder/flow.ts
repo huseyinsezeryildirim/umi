@@ -30,6 +30,8 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
       // (the camera is recorded on its own and added in the editor).
       if (settings.cameraOn || settings.cameraOnly) await recorder.show("bubble");
       if (settings.notesOn) await recorder.show("prompter");
+      // A frame around what's recorded, so a wrong screen or window shows before it starts.
+      await invoke("record_frame", { on: true }).catch(() => {});
       // The countdown starts at once; the screen, camera and microphone warm up meanwhile.
       let failed: unknown = null;
       const prepared = invoke("record_prepare").catch((e) => {
@@ -47,6 +49,7 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
       await prepared;
       if (failed) throw failed;
       await invoke("record_begin");
+      setTimeout(() => void invoke("record_frame", { on: false }), 400);
       reserved = invoke<string | null>("live_start", { camera: !!(settings.cameraOn || settings.cameraOnly) }).catch(() => null);
       await recorder.show("controls");
       // With the camera: the layout column on the right (screen and bubble, side by side…).
@@ -56,6 +59,7 @@ export function installRecordingFlow(openRecording: (bundle: string) => void) {
       await recorder.show("draw");
     } catch (e) {
       await recorder.hide("countdown");
+      await invoke("record_frame", { on: false }).catch(() => {});
       await invoke("record_cancel").catch(() => {});
       if (String(e).includes("SCREEN_PERMISSION")) {
         // Back to the launcher, which shows how to allow it.
