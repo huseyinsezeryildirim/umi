@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
-import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { applyTool, INK_COLORS, type InkTool } from "./Ink";
 
 const svg = (d: string) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -29,17 +29,31 @@ export function Draw() {
   // Small (the tool in use and its color) until the pointer comes over it, then every tool.
   // The website's demo keeps them all out (its tour points at them).
   const demo = !!import.meta.env.VITE_DEMO;
+  // `wide`: the window has room for every tool; `open`: the pill has grown into it (CSS
+  // animates between the two). Opening makes the room first, closing gives it back after.
+  const [wide, setWide] = createSignal(demo);
   const [open, setOpen] = createSignal(demo);
   let closing = 0;
-  const grow = () => {
+  const resize = (big: boolean) => invoke("window_resize", { width: big ? 600 : 120, height: big ? 68 : 56, grow: "up" });
+  const grow = async () => {
     clearTimeout(closing);
-    setOpen(true);
+    if (!wide()) {
+      await resize(true);
+      setWide(true);
+    }
+    requestAnimationFrame(() => setOpen(true));
   };
   const shrink = () => {
     clearTimeout(closing);
-    if (!demo) closing = window.setTimeout(() => setOpen(false), 700);
+    if (demo) return;
+    closing = window.setTimeout(() => {
+      setOpen(false);
+      closing = window.setTimeout(() => {
+        setWide(false);
+        void resize(false);
+      }, 260);
+    }, 600);
   };
-  createEffect(on(open, (o) => void invoke("window_resize", { width: o ? 600 : 120, height: o ? 68 : 56, grow: "up" }), { defer: true }));
   onCleanup(() => clearTimeout(closing));
 
   const pick = (t: InkTool) => {
@@ -59,12 +73,12 @@ export function Draw() {
   });
 
   return (
-    <div class="draw" data-open={open() ? "true" : "false"} data-tauri-drag-region onMouseEnter={grow} onMouseLeave={shrink}>
+    <div class="draw" data-open={open() ? "true" : "false"} data-tauri-drag-region onMouseEnter={() => void grow()} onMouseLeave={shrink}>
       <Show
-        when={open()}
+        when={wide()}
         fallback={
           <>
-            <button type="button" class="draw__btn" data-on={tool() === "pointer" ? "false" : "true"} onClick={grow} title="Drawing tools" aria-label="Drawing tools" innerHTML={(TOOLS.find((t) => t.tool === tool()) ?? TOOLS[0]).icon} />
+            <button type="button" class="draw__btn" data-on={tool() === "pointer" ? "false" : "true"} onClick={() => void grow()} title="Drawing tools" aria-label="Drawing tools" innerHTML={(TOOLS.find((t) => t.tool === tool()) ?? TOOLS[0]).icon} />
             <span class="draw__dot" data-on="false" style={{ background: color() }} />
           </>
         }

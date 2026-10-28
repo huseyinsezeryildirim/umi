@@ -305,19 +305,32 @@ html.umi-overlay body {
 /* ───── Control bar ───── */
 /* A column on the left of the screen, the same as the web recorder's bar. */
 /* The drawing tools along the bottom while recording. */
+/* The window is only a few points bigger than the pill, so the shadow stays small (a big one
+   would be cut off square at the window's edge). The pill grows from its middle. */
 .draw {
   position: fixed;
-  inset: 6px;
+  left: 50%;
+  bottom: 6px;
+  width: 108px;
+  height: 44px;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 2px;
   padding: 0 7px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 1px rgba(17, 24, 39, 0.08), 0 10px 30px rgba(17, 24, 39, 0.18);
+  overflow: hidden;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 0 0 1px rgba(17, 24, 39, 0.08), 0 1px 4px rgba(17, 24, 39, 0.1);
   backdrop-filter: blur(16px);
   cursor: grab;
+  transition: width 0.26s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.26s cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 0.26s;
+}
+.draw[data-open="true"] {
+  width: 588px;
+  height: 56px;
+  border-radius: 20px;
 }
 .draw__btn {
   display: grid;
@@ -376,8 +389,8 @@ html.umi-overlay body {
   gap: 8px;
   padding: 8px 0;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 0 0 1px rgba(17, 24, 39, 0.08), 0 10px 30px rgba(17, 24, 39, 0.16);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 0 0 1px rgba(17, 24, 39, 0.08), 0 1px 4px rgba(17, 24, 39, 0.1);
   backdrop-filter: blur(16px);
   cursor: grab;
 }
