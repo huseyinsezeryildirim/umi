@@ -180,6 +180,31 @@ pub fn float_over_full_screen(window: &WebviewWindow, level: isize) {
     }
 }
 
+/// Puts the floating windows that are up in front again, over every Space and full-screen app
+/// (on the main thread, after the app became an accessory).
+#[allow(unexpected_cfgs, unsafe_code)]
+pub fn refloat(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    for (label, level) in [("bubble", 25), ("controls", 25), ("layouts", 25), ("draw", 25), ("prompter", 25), ("ink", 24)] {
+        use objc::{msg_send, sel, sel_impl};
+        let Some(w) = app.get_webview_window(label) else { continue };
+        if !w.is_visible().unwrap_or(false) {
+            continue;
+        }
+        let Ok(ns_window) = w.ns_window() else { continue };
+        let ns_window = ns_window as *mut objc::runtime::Object;
+        let behavior: usize = (1 << 0) | (1 << 4) | (1 << 8);
+        // SAFETY: the window's own NSWindow; the caller is on the main thread.
+        unsafe {
+            let _: () = msg_send![ns_window, setCollectionBehavior: behavior];
+            let _: () = msg_send![ns_window, setLevel: level as isize];
+            let _: () = msg_send![ns_window, orderFrontRegardless];
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
 /// Makes the windows that show up while recording (countdown, control bar, layouts, drawing tools, camera menu) now,
 /// unseen: the countdown shows the moment Start is pressed (a window's first load takes a
 /// moment), and the recording leaves them out from its first frame (they already exist).

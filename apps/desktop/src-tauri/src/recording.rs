@@ -305,6 +305,11 @@ fn float_over_full_screen_apps(app: &AppHandle, on: bool) {
         let _ = app.run_on_main_thread(move || {
             let policy = if on { tauri::ActivationPolicy::Accessory } else { tauri::ActivationPolicy::Regular };
             let _ = handle.set_activation_policy(policy);
+            // macOS only lets the windows that were already up into another app's full-screen
+            // Space once they're put in front again under the new policy.
+            if on {
+                crate::windows::refloat(&handle);
+            }
         });
     }
     #[cfg(not(target_os = "macos"))]
