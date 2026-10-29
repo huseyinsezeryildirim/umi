@@ -104,25 +104,32 @@ function useBeat(ref: React.RefObject<HTMLElement | null>, steps: number[]) {
 
 /** A plain app window: its buttons (traffic lights, or Windows' on the right) and grey content. */
 function Win({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  const windows = useWindows();
   return (
     <div className={`relative overflow-hidden rounded-[10px] bg-white shadow-[0_0_0_0.5px_rgb(0_0_0/0.12),0_12px_30px_-10px_rgb(20_40_90/0.3)] ${className}`}>
-      <div className={`flex border-b border-black/5 px-2.5 py-2 ${windows ? "justify-end gap-2" : "gap-[5px]"}`}>
-        {windows ? (
-          <>
-            <i className="h-px w-[7px] self-center bg-black/45" />
-            <i className="size-[7px] rounded-[1.5px] border border-black/45" />
-            <i className="relative size-[7px] before:absolute before:top-1/2 before:left-0 before:h-px before:w-full before:rotate-45 before:bg-black/45 after:absolute after:top-1/2 after:left-0 after:h-px after:w-full after:-rotate-45 after:bg-black/45" />
-          </>
-        ) : (
-          <>
-            <i className="size-[7px] rounded-full bg-[#ff5f57]" />
-            <i className="size-[7px] rounded-full bg-[#febc2e]" />
-            <i className="size-[7px] rounded-full bg-[#28c840]" />
-          </>
-        )}
-      </div>
+      <TitleBar dot={7} className="px-2.5 py-2" />
       {children ?? <Skeleton />}
+    </div>
+  );
+}
+/** A pictured window's title bar: traffic lights, or Windows' buttons on the right for Windows visitors. */
+function TitleBar({ dot, className }: { dot: number; className: string }) {
+  const windows = useWindows();
+  const d = { width: dot, height: dot };
+  return (
+    <div className={`flex border-b border-black/5 ${className} ${windows ? "justify-end" : ""}`} style={{ gap: windows ? dot + 1 : dot - 2 }}>
+      {windows ? (
+        <>
+          <i className="h-px self-center bg-black/45" style={{ width: dot }} />
+          <i className="rounded-[1.5px] border border-black/45" style={d} />
+          <i className="relative before:absolute before:top-1/2 before:left-0 before:h-px before:w-full before:rotate-45 before:bg-black/45 after:absolute after:top-1/2 after:left-0 after:h-px after:w-full after:-rotate-45 after:bg-black/45" style={d} />
+        </>
+      ) : (
+        <>
+          <i className="rounded-full bg-[#ff5f57]" style={d} />
+          <i className="rounded-full bg-[#febc2e]" style={d} />
+          <i className="rounded-full bg-[#28c840]" style={d} />
+        </>
+      )}
     </div>
   );
 }
@@ -431,11 +438,7 @@ function ZoomScene() {
         {/* The whole picture zooms toward the click, like the export does. */}
         <motion.div className="absolute inset-0 p-[7%]" style={{ transformOrigin: "84% 26%" }} animate={{ scale: i === 1 ? 1.6 : 1 }} transition={{ duration: 0.9, ease: EASE }}>
           <div className="relative h-full overflow-hidden rounded-[8px] bg-white shadow-[0_0_0_0.5px_rgb(0_0_0/0.12),0_10px_24px_-10px_rgb(20_40_90/0.35)]">
-            <div className="flex gap-[4px] border-b border-black/5 px-2 py-1.5">
-              <i className="size-[6px] rounded-full bg-[#ff5f57]" />
-              <i className="size-[6px] rounded-full bg-[#febc2e]" />
-              <i className="size-[6px] rounded-full bg-[#28c840]" />
-            </div>
+            <TitleBar dot={6} className="px-2 py-1.5" />
             <div className="grid gap-1.5 p-2.5">
               <div className="flex items-center gap-2">
                 <i className="h-2 w-1/3 rounded bg-ink/20" />

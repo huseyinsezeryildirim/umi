@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useInView } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { AppleIcon, LinuxIcon, LoomIcon, WindowsIcon } from "./icons";
 import { PLATFORMS } from "./Download";
-import { CopyButton, Mark, WindowButtons } from "./ui";
+import { CopyButton, Mark, WindowButtons, useWindows } from "./ui";
 
 const EASE = [0.25, 1, 0.5, 1] as const;
 
@@ -547,6 +547,10 @@ const KIT = [
   { dot: "#f4b77f", title: "You stay in charge", text: "It edits and exports. It never records you or uploads anything on its own.", cmd: "list · describe · transcribe · edit · export" },
 ];
 
+// Where the app is, written for the visitor's computer (Windows installs to Program Files).
+const MAC_APP = "/Applications/Umi.app/Contents/MacOS/umi-desktop";
+const forWindows = (text: string, json: boolean) => text.replaceAll(MAC_APP, json ? "C:\\\\Program Files\\\\Umi\\\\umi-desktop.exe" : '"C:\\Program Files\\Umi\\umi-desktop.exe"');
+
 const KIT_TABS = {
   MCP: ['describe_recording { "recording": "Dashboard walkthrough" }', 'edit { "recording": …, "operations": [{ "op": "remove_fillers" }] }', 'export { "recording": …, "format": "mp4" }'],
   Config: ['"mcpServers": {', '  "umi": {', '    "command": "/Applications/Umi.app/Contents/MacOS/umi-desktop",', '    "args": ["--mcp"]', '  }', "}"],
@@ -554,6 +558,8 @@ const KIT_TABS = {
 
 export function AgentKit() {
   const [tab, setTab] = useState<keyof typeof KIT_TABS>("MCP");
+  const windows = useWindows();
+  const path = (text: string, json = false) => (windows ? forWindows(text, json) : text);
   return (
     <section className="px-3 pt-6 sm:px-4">
       <div className="mx-auto grid max-w-[1400px] gap-3 lg:grid-cols-[1fr_1fr_1.25fr]">
@@ -568,9 +574,9 @@ export function AgentKit() {
                   {/* Long commands wrap onto a second line (anywhere, so they take two lines, not three). */}
                   <span className="min-w-0 flex-1 py-1.5 text-[12px] leading-relaxed break-all">
                     <span className="text-faint">{k.cmd.slice(0, 2).trim() === "$" || k.cmd.startsWith("→") ? k.cmd.slice(0, 2) : ""}</span>
-                    {k.cmd.startsWith("$ ") || k.cmd.startsWith("→ ") ? k.cmd.slice(2) : k.cmd}
+                    {path(k.cmd.startsWith("$ ") || k.cmd.startsWith("→ ") ? k.cmd.slice(2) : k.cmd)}
                   </span>
-                  {k.cmd.startsWith("$ ") && <CopyButton text={k.cmd.slice(2)} />}
+                  {k.cmd.startsWith("$ ") && <CopyButton text={path(k.cmd.slice(2))} />}
                 </div>
               </div>
             </Rise>
@@ -587,13 +593,13 @@ export function AgentKit() {
               ))}
             </div>
             <div className="relative mt-5 min-h-36 rounded-2xl bg-[#0f1115] p-5 pr-12 font-mono text-[13px] leading-7 text-white/85">
-              {tab === "Config" && <CopyButton dark className="absolute top-3 right-3" text={'{\n  "mcpServers": {\n    "umi": {\n      "command": "/Applications/Umi.app/Contents/MacOS/umi-desktop",\n      "args": ["--mcp"]\n    }\n  }\n}'} />}
+              {tab === "Config" && <CopyButton dark className="absolute top-3 right-3" text={path('{\n  "mcpServers": {\n    "umi": {\n      "command": "/Applications/Umi.app/Contents/MacOS/umi-desktop",\n      "args": ["--mcp"]\n    }\n  }\n}', true)} />}
               <AnimatePresence mode="wait">
                 <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
                   {KIT_TABS[tab].map((l) => (
                     <p key={l} className="break-words whitespace-pre-wrap">
                       {tab === "MCP" && <span className="text-white/35">→ </span>}
-                      {l}
+                      {path(l, true)}
                     </p>
                   ))}
                 </motion.div>
