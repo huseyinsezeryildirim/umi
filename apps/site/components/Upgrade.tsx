@@ -10,7 +10,7 @@ const PRICE: Record<Cycle, string> = { monthly: "$12 a month", yearly: "$96 a ye
 // Prices are before tax: where the buyer's country has VAT or sales tax, Paddle adds it at checkout.
 
 /**
- * /upgrade?cycle=yearly: signs in if needed, then opens Paddle's checkout. Paddle tells Umi Cloud
+ * /upgrade?cycle=yearly: signs in if needed, shows the terms, and opens Paddle's checkout on the button. Paddle tells Umi Cloud
  * about the payment, so after paying we wait for the account to turn Pro.
  */
 export function Upgrade() {
@@ -38,8 +38,8 @@ export function Upgrade() {
       if (!a) return location.replace(`/signup?next=${encodeURIComponent(`/upgrade?cycle=${c}`)}`);
       setAccount(a);
       if (a.plan !== "free") return setState("already");
+      // The terms below are read before paying: checkout opens on the button, not by itself.
       setState("ready");
-      void start(c, a);
     })();
   }, []);
 
@@ -99,7 +99,7 @@ export function Upgrade() {
       </Shell>
     );
   return (
-    <Shell title="Upgrade to Umi Pro" lead={`${PRICE[cycle]}, plus local tax where it applies. Links that stay up, 200 GB, insights and passwords. Cancel any time; full refund within 14 days.`}>
+    <Shell title="Upgrade to Umi Pro" lead={`${PRICE[cycle]}, plus local tax where it applies. Links that stay up, 200 GB, insights and passwords.`}>
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <button type="button" disabled={!account} onClick={() => account && void start(cycle, account)} className="btn-dark inline-flex disabled:opacity-60">
           Continue to payment
@@ -109,8 +109,15 @@ export function Upgrade() {
         </button>
       </div>
       {error && <p className="mt-3 text-[14px] text-[#b42318]">{error}</p>}
-      <p className="mt-6 text-[12px] text-faint">
-        Payments are handled by Paddle, our reseller. See the <a className="underline" href="/terms">Terms</a> and <a className="underline" href="/refunds">Refund Policy</a>.
+      <ul className="mt-6 list-disc space-y-1 pl-5 text-[13px] text-muted">
+        <li>Renews automatically every {cycle === "yearly" ? "year" : "month"} at the same price until you cancel.</li>
+        <li>Cancel any time from Manage subscription; Pro stays on until the end of the period you paid for.</li>
+        <li>Changed your mind? A full refund within 14 days of a payment, no questions asked.</li>
+      </ul>
+      <p className="mt-4 text-[12px] text-faint">
+        Payments are handled by Paddle, our reseller, who sends the receipt and handles tax. By continuing you agree to the{" "}
+        <a className="underline" href="/terms">Terms</a>, <a className="underline" href="/refunds">Refund Policy</a> and{" "}
+        <a className="underline" href="/privacy">Privacy Policy</a>.
       </p>
     </Shell>
   );

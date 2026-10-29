@@ -3,8 +3,9 @@
 // The runtime and the small model (~250 KB) load on first use.
 import { FilesetResolver, ImageSegmenter } from "@mediapipe/tasks-vision";
 
-const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/wasm";
-const MODEL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite";
+// Served from Umi's own site (copied at build, see vite.config.ts), so no other server sees viewers.
+const WASM = `${import.meta.env.BASE_URL}mediapipe`;
+const MODEL = new URL("./models/selfie_segmenter.tflite", import.meta.url).href;
 
 let loading: Promise<ImageSegmenter> | null = null;
 let ready: ImageSegmenter | null = null;

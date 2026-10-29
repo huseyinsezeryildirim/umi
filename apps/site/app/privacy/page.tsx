@@ -33,7 +33,7 @@ export default function Page() {
   return (
     <LegalPage
       title="Privacy Policy"
-      updated="October 26, 2026"
+      updated="October 29, 2026"
       intro={
         <>
           <p>
@@ -98,10 +98,17 @@ export default function Page() {
             <p>We use these service providers (processors), bound by contracts to process data only on our instructions:</p>
             <ul className="list-disc space-y-1 pl-6">
               <li>Cloudflare, Inc. (USA) — hosting, storage of shared videos and our database, network security;</li>
-              <li>Resend, Inc. (USA) — sending account emails;</li>
-              <li>our payment provider (named at checkout) — payments, as merchant of record and an independent controller for the purchase;</li>
+              <li>Cloudflare, Inc. (USA) also sends our account emails; Resend, Inc. (USA) sends them when Cloudflare can’t;</li>
+              <li>Paddle.com Market Ltd (United Kingdom) and its affiliates — payments, as our reseller and merchant of record. Paddle collects your name,
+                email, country, payment details and IP address at checkout under its own privacy policy, as an independent controller for the purchase;</li>
               <li>GitHub, Inc. (USA) — distributing app downloads and updates (your app requests update information from GitHub).</li>
             </ul>
+            <p>
+              Some features download files from other services the first time you use them, which then see your IP address like any website you visit:
+              on-device AI models (captions, voice, camera effects in the desktop apps, and captions and voice in the web app) come from Hugging Face, Inc.
+              (USA) and GitHub, Inc. (USA), the web app’s AI runtime from jsDelivr (a public CDN), and tracks from the music library come from the Internet Archive (USA). Nothing about you or your recordings is
+              sent with these downloads. Everything else, including fonts and the camera effects in the web app and the video player, is served by Umi.
+            </p>
             <p>
               Anyone with a share link can see the video, its title, comments and reactions, unless you protect it with a password or delete it. We disclose
               data to authorities only when required by law.

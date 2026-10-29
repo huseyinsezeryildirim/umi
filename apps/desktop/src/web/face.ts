@@ -4,8 +4,9 @@
 import { FaceDetector, FilesetResolver } from "@mediapipe/tasks-vision";
 import { ALL_FORMATS, BlobSource, CanvasSink, Input } from "mediabunny";
 
-const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/wasm";
-const MODEL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite";
+// Served from Umi's own site (copied at build, see vite.config.ts), so no other server sees viewers.
+const WASM = `${import.meta.env.BASE_URL}mediapipe`;
+const MODEL = new URL("./models/blaze_face_short_range.tflite", import.meta.url).href;
 
 export type FaceKey = { t: number; x: number; y: number; size: number };
 
