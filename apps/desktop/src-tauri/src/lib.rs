@@ -731,51 +731,51 @@ pub fn run() {
             // recording windows too. The editor handles Ctrl+Z itself.
             #[cfg(target_os = "macos")]
             {
-            let handle = app.handle();
-            let app_menu = Submenu::with_items(
-                handle,
-                "Umi",
-                true,
-                &[
-                    &PredefinedMenuItem::about(handle, Some("About Umi"), None)?,
-                    &PredefinedMenuItem::separator(handle)?,
-                    &PredefinedMenuItem::hide(handle, None)?,
-                    &PredefinedMenuItem::hide_others(handle, None)?,
-                    &PredefinedMenuItem::separator(handle)?,
-                    &PredefinedMenuItem::quit(handle, None)?,
-                ],
-            )?;
-            let edit_menu = Submenu::with_items(
-                handle,
-                "Edit",
-                true,
-                &[
-                    &MenuItem::with_id(handle, "undo", "Undo", true, Some("CmdOrCtrl+Z"))?,
-                    &MenuItem::with_id(handle, "redo", "Redo", true, Some("Shift+CmdOrCtrl+Z"))?,
-                    &PredefinedMenuItem::separator(handle)?,
-                    &PredefinedMenuItem::cut(handle, None)?,
-                    &PredefinedMenuItem::copy(handle, None)?,
-                    &PredefinedMenuItem::paste(handle, None)?,
-                    &PredefinedMenuItem::select_all(handle, None)?,
-                ],
-            )?;
-            let window_menu = Submenu::with_items(
-                handle,
-                "Window",
-                true,
-                &[
-                    &PredefinedMenuItem::minimize(handle, None)?,
-                    &PredefinedMenuItem::maximize(handle, None)?,
-                    &PredefinedMenuItem::close_window(handle, None)?,
-                ],
-            )?;
-            app.set_menu(Menu::with_items(handle, &[&app_menu, &edit_menu, &window_menu])?)?;
-            app.on_menu_event(|app, event| {
-                let id = event.id().as_ref();
-                if id == "undo" || id == "redo" {
-                    let _ = app.emit("menu", id);
-                }
-            });
+                let handle = app.handle();
+                let app_menu = Submenu::with_items(
+                    handle,
+                    "Umi",
+                    true,
+                    &[
+                        &PredefinedMenuItem::about(handle, Some("About Umi"), None)?,
+                        &PredefinedMenuItem::separator(handle)?,
+                        &PredefinedMenuItem::hide(handle, None)?,
+                        &PredefinedMenuItem::hide_others(handle, None)?,
+                        &PredefinedMenuItem::separator(handle)?,
+                        &PredefinedMenuItem::quit(handle, None)?,
+                    ],
+                )?;
+                let edit_menu = Submenu::with_items(
+                    handle,
+                    "Edit",
+                    true,
+                    &[
+                        &MenuItem::with_id(handle, "undo", "Undo", true, Some("CmdOrCtrl+Z"))?,
+                        &MenuItem::with_id(handle, "redo", "Redo", true, Some("Shift+CmdOrCtrl+Z"))?,
+                        &PredefinedMenuItem::separator(handle)?,
+                        &PredefinedMenuItem::cut(handle, None)?,
+                        &PredefinedMenuItem::copy(handle, None)?,
+                        &PredefinedMenuItem::paste(handle, None)?,
+                        &PredefinedMenuItem::select_all(handle, None)?,
+                    ],
+                )?;
+                let window_menu = Submenu::with_items(
+                    handle,
+                    "Window",
+                    true,
+                    &[
+                        &PredefinedMenuItem::minimize(handle, None)?,
+                        &PredefinedMenuItem::maximize(handle, None)?,
+                        &PredefinedMenuItem::close_window(handle, None)?,
+                    ],
+                )?;
+                app.set_menu(Menu::with_items(handle, &[&app_menu, &edit_menu, &window_menu])?)?;
+                app.on_menu_event(|app, event| {
+                    let id = event.id().as_ref();
+                    if id == "undo" || id == "redo" {
+                        let _ = app.emit("menu", id);
+                    }
+                });
             }
 
             tray::install(app.handle())?;
