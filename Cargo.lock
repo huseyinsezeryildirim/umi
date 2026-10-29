@@ -6713,7 +6713,7 @@ dependencies = [
 
 [[package]]
 name = "umi-ai"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "dirs 6.0.0",
  "image",
@@ -6731,7 +6731,7 @@ dependencies = [
 
 [[package]]
 name = "umi-capture"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "cpal",
  "crossbeam-channel",
@@ -6752,7 +6752,7 @@ dependencies = [
 
 [[package]]
 name = "umi-cloud"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "serde",
  "serde_json",
@@ -6762,7 +6762,7 @@ dependencies = [
 
 [[package]]
 name = "umi-desktop"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "arboard",
  "base64 0.22.1",
@@ -6801,7 +6801,7 @@ dependencies = [
 
 [[package]]
 name = "umi-editor"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "serde",
  "serde_json",
@@ -6811,7 +6811,7 @@ dependencies = [
 
 [[package]]
 name = "umi-engine"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "crossbeam-channel",
  "image",
@@ -6830,7 +6830,7 @@ dependencies = [
 
 [[package]]
 name = "umi-mcp"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "dirs 6.0.0",
  "serde",
@@ -6845,7 +6845,7 @@ dependencies = [
 
 [[package]]
 name = "umi-media"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "color_quant",
  "ffmpeg-next",
@@ -6859,7 +6859,7 @@ dependencies = [
 
 [[package]]
 name = "umi-project"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "chrono",
  "serde",
@@ -6870,7 +6870,7 @@ dependencies = [
 
 [[package]]
 name = "umi-recorder"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "chrono",
  "crossbeam-channel",
@@ -6884,7 +6884,7 @@ dependencies = [
 
 [[package]]
 name = "umi-render"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "bytemuck",
  "cosmic-text",
@@ -6901,7 +6901,7 @@ dependencies = [
 
 [[package]]
 name = "umi-web"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "getrandom 0.4.3",
  "gif",

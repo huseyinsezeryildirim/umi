@@ -5,6 +5,9 @@ import { IconButton, Kbd, Menu, Segmented, Toaster, toast, type MenuEntry } from
 import { AppWindow, Smartphone, Camera, CameraOff, ChevronDown, Crop, Film, Maximize2, Mic, MicOff, Monitor, MoreHorizontal, ScrollText, ShieldAlert, UserSquare2, Volume2, VolumeX } from "lucide-solid";
 import { recorder, type RecordSettings, type Sources, type Target } from "./api";
 
+/** Shortcuts are written the Mac way (⌥⇧L) on a Mac and spelled out (Alt+Shift+L) elsewhere. */
+const MAC = navigator.platform.toLowerCase().includes("mac");
+
 /** The recorder: what to record, camera, microphone, sound, and Start. */
 export function Launcher() {
   let card!: HTMLDivElement;
@@ -142,7 +145,7 @@ export function Launcher() {
 
   const moreMenu = (): MenuEntry[] => [
     { label: "3-second countdown", checked: settings()?.countdown, onSelect: () => update((s) => (s.countdown = !s.countdown)) },
-    ...(navigator.platform.toLowerCase().includes("mac")
+    ...(MAC
       ? [{ label: "Hide desktop icons", checked: !!settings()?.hideDesktopIcons, onSelect: () => update((s) => (s.hideDesktopIcons = !s.hideDesktopIcons)) }]
       : []),
     { kind: "separator" },
@@ -150,7 +153,7 @@ export function Launcher() {
     ...(["native", "1080p", "720p"] as const).map((r) => ({ label: r === "native" ? "Native resolution" : r, checked: settings()?.resolution === r, onSelect: () => update((s) => (s.resolution = r)) })),
     ...[60, 30].map((f) => ({ label: `${f} fps`, checked: settings()?.fps === f, onSelect: () => update((s) => (s.fps = f)) })),
     { kind: "separator" },
-    { label: "Take a screenshot", shortcut: "⌥⇧4", icon: <Camera size={15} />, onSelect: () => void invoke("area_pick", { mode: "screenshot" }) },
+    { label: "Take a screenshot", shortcut: MAC ? "⌥⇧4" : "Alt+Shift+4", icon: <Camera size={15} />, onSelect: () => void invoke("area_pick", { mode: "screenshot" }) },
     { label: "Open library", icon: <Film size={15} />, onSelect: () => void recorder.show("main") },
     { label: "Keyboard shortcuts…", onSelect: () => void recorder.show("main").then(() => emit("open-shortcuts")) },
     { label: "Quit Umi", onSelect: () => void invoke("app_quit") },
@@ -219,7 +222,7 @@ export function Launcher() {
           <footer class="rec-footer">
             <span>No time limit · Free forever</span>
             <span>
-              <Kbd>⌥⇧L</Kbd> to start
+              <Kbd>{MAC ? "⌥⇧L" : "Alt+Shift+L"}</Kbd> to start
             </span>
           </footer>
         </Show>

@@ -22,6 +22,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use tauri::ipc::Response;
+#[cfg(target_os = "macos")]
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{Emitter, Manager, State};
 use umi_render::Gpu;
@@ -724,8 +725,12 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .manage(AppState::default())
         .setup(|app| {
-            // Our own menu: Undo/Redo go to the editor (the default Edit menu would swallow
-            // ⌘Z before the page sees it); cut/copy/paste stay native for text fields.
+            // Our own menu on macOS: Undo/Redo go to the editor (the default Edit menu would swallow
+            // ⌘Z before the page sees it); cut/copy/paste stay native for text fields. Windows and
+            // Linux have no app menu: there it would be a menu bar inside every window, the
+            // recording windows too. The editor handles Ctrl+Z itself.
+            #[cfg(target_os = "macos")]
+            {
             let handle = app.handle();
             let app_menu = Submenu::with_items(
                 handle,
@@ -771,6 +776,7 @@ pub fn run() {
                     let _ = app.emit("menu", id);
                 }
             });
+            }
 
             tray::install(app.handle())?;
             // The countdown, control bar and camera menu, made ahead (unseen) so they show at

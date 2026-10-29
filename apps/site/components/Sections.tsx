@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useInView } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { AppleIcon, LinuxIcon, LoomIcon, WindowsIcon } from "./icons";
 import { PLATFORMS } from "./Download";
-import { CopyButton, Mark } from "./ui";
+import { CopyButton, Mark, WindowButtons } from "./ui";
 
 const EASE = [0.25, 1, 0.5, 1] as const;
 
@@ -196,11 +196,7 @@ export function Ai() {
               <img src="/photos/dawn.jpg" alt="" className="absolute inset-0 size-full object-cover" />
               <div className="relative overflow-hidden rounded-xl bg-white shadow-[0_0_0_0.5px_rgb(0_0_0/0.15),0_24px_50px_-20px_rgb(0_0_0/0.4)]">
                 <div className="flex items-center gap-3 border-b border-black/5 bg-[#f6f6f6] px-4 py-2.5">
-                  <span className="mac-lights">
-                    <i />
-                    <i />
-                    <i />
-                  </span>
+                  <WindowButtons />
                   <span className="mx-auto min-w-0 truncate rounded-md bg-black/5 px-3 py-0.5 text-[11px] text-black/50 sm:px-10">umi.cam/v/dashboard-walkthrough</span>
                 </div>
                 <div className="grid gap-4 p-4 md:grid-cols-[1.35fr_1fr]">
@@ -425,11 +421,7 @@ function BrowserScene() {
   return (
     <div ref={ref} className="relative overflow-hidden rounded-xl bg-white shadow-[0_0_0_0.5px_rgb(0_0_0/0.12),0_16px_36px_-16px_rgb(20_40_90/0.35)]">
       <div className="flex items-center gap-2 border-b border-black/5 bg-[#f1f3f6] px-3 py-2">
-        <span className="mac-lights [&_i]:size-2.5">
-          <i />
-          <i />
-          <i />
-        </span>
+        <WindowButtons small />
         <span className="flex h-4 flex-1 items-center gap-1 rounded-md bg-white px-2 text-[9px] text-muted">
           {rec && <i className="size-1.5 animate-pulse rounded-full bg-record" />}
           umi.cam/app
@@ -492,11 +484,7 @@ export function Agents() {
         <div ref={ref} className="grid gap-6 rounded-[36px] bg-[#111216] p-5 sm:p-8 lg:grid-cols-[1fr_1fr]">
           <div className="rounded-[22px] bg-[#17181d] p-5 font-mono text-[13px] leading-6 text-white/80 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.06)]">
             <div className="mb-4 flex items-center gap-3 border-b border-white/10 pb-3">
-              <span className="mac-lights">
-                <i />
-                <i />
-                <i />
-              </span>
+              <WindowButtons dark />
               <span className="text-[11px] tracking-[0.12em] text-white/40 uppercase">Agent session · ~/videos</span>
             </div>
             {SESSION.slice(0, shown).map((l, i) => (
@@ -538,11 +526,7 @@ export function Agents() {
               transition={{ duration: 0.7, ease: EASE }}
             >
               <div className="flex items-center gap-3 px-3 py-2 text-[11px] text-white/60">
-                <span className="mac-lights [&_i]:size-2.5">
-                  <i />
-                  <i />
-                  <i />
-                </span>
+                <WindowButtons small dark />
                 <span className="mx-auto">Dashboard walkthrough.mp4</span>
               </div>
               <video src="/media/after.mp4" poster="/media/after-poster.jpg" autoPlay muted loop playsInline className="block w-full" />

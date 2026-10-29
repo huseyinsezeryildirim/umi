@@ -28,6 +28,7 @@ import { Preview } from "./Preview";
 import { formatTime, type Editor as EditorModel } from "./store";
 import { Timeline } from "./Timeline";
 import "./editor.css";
+import { onWeb } from "../platform";
 
 export function Editor(props: { editor: EditorModel; onBack: () => void }) {
   const ed = props.editor;
@@ -99,9 +100,10 @@ export function Editor(props: { editor: EditorModel; onBack: () => void }) {
       const target = e.target as HTMLElement;
       if (target.closest("input, textarea, [contenteditable]")) return;
       const mod = e.metaKey || e.ctrlKey;
-      // ⌘Z is handled by the menu on macOS; Ctrl+Z (Windows/Linux, or Ctrl on a Mac) here.
-      const mac = navigator.platform.toLowerCase().includes("mac");
-      if (mac && e.ctrlKey && !e.metaKey && e.key.toLowerCase() === "z") {
+      // ⌘Z comes from the Mac app's menu; everywhere else (Windows, Linux, the browser, and Ctrl
+      // on a Mac) undo and redo are handled here.
+      const menu = navigator.platform.toLowerCase().includes("mac") && !onWeb;
+      if (e.key.toLowerCase() === "z" && (menu ? e.ctrlKey && !e.metaKey : mod)) {
         void (e.shiftKey ? ed.redo() : ed.undo());
       } else if (e.ctrlKey && !e.metaKey && e.key.toLowerCase() === "y") {
         void ed.redo();

@@ -4,6 +4,9 @@ import "./app.css";
 import "./recorder/recorder.css";
 import { App } from "./App";
 
+// Windows and Linux draw the window's own title bar: no room to leave for the Mac's traffic lights.
+if (!import.meta.env.VITE_WEB && !import.meta.env.VITE_DEMO && !navigator.platform.toLowerCase().includes("mac")) document.documentElement.dataset.titlebar = "native";
+
 /** Which window this is: the library/editor (main) or one of the recording windows. */
 const view = new URLSearchParams(location.search).get("view") ?? "main";
 

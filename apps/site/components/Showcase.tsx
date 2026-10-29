@@ -3,7 +3,7 @@
 import { motion, useInView } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { CapIcon, LoomIcon } from "./icons";
-import { Mark } from "./ui";
+import { Mark, useWindows } from "./ui";
 import { Rise } from "./Sections";
 
 const EASE = [0.25, 1, 0.5, 1] as const;
@@ -102,14 +102,25 @@ function useBeat(ref: React.RefObject<HTMLElement | null>, steps: number[]) {
   return i;
 }
 
-/** A plain app window: traffic lights and grey content. */
+/** A plain app window: its buttons (traffic lights, or Windows' on the right) and grey content. */
 function Win({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
+  const windows = useWindows();
   return (
     <div className={`relative overflow-hidden rounded-[10px] bg-white shadow-[0_0_0_0.5px_rgb(0_0_0/0.12),0_12px_30px_-10px_rgb(20_40_90/0.3)] ${className}`}>
-      <div className="flex gap-[5px] border-b border-black/5 px-2.5 py-2">
-        <i className="size-[7px] rounded-full bg-[#ff5f57]" />
-        <i className="size-[7px] rounded-full bg-[#febc2e]" />
-        <i className="size-[7px] rounded-full bg-[#28c840]" />
+      <div className={`flex border-b border-black/5 px-2.5 py-2 ${windows ? "justify-end gap-2" : "gap-[5px]"}`}>
+        {windows ? (
+          <>
+            <i className="h-px w-[7px] self-center bg-black/45" />
+            <i className="size-[7px] rounded-[1.5px] border border-black/45" />
+            <i className="relative size-[7px] before:absolute before:top-1/2 before:left-0 before:h-px before:w-full before:rotate-45 before:bg-black/45 after:absolute after:top-1/2 after:left-0 after:h-px after:w-full after:-rotate-45 after:bg-black/45" />
+          </>
+        ) : (
+          <>
+            <i className="size-[7px] rounded-full bg-[#ff5f57]" />
+            <i className="size-[7px] rounded-full bg-[#febc2e]" />
+            <i className="size-[7px] rounded-full bg-[#28c840]" />
+          </>
+        )}
       </div>
       {children ?? <Skeleton />}
     </div>

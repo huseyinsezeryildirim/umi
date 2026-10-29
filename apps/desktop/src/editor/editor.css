@@ -1538,3 +1538,8 @@
 .ed-share__links button:hover {
   color: var(--umi-ink, #0e111e);
 }
+
+/* Windows and Linux: the system draws the title bar, so no room for traffic lights. */
+:root[data-titlebar="native"] .ed-topbar {
+  padding-left: 14px;
+}

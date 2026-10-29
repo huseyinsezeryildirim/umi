@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { DownloadButton } from "./Download";
 import { Rise } from "./Sections";
-import { Mark } from "./ui";
+import { Mark, WindowButtons } from "./ui";
 
 const EASE = [0.25, 1, 0.5, 1] as const;
 
@@ -32,11 +32,7 @@ export function Privacy() {
           <Rise className="mx-auto mt-14 max-w-xl text-left text-ink" delay={0.15}>
             <div className="overflow-hidden rounded-t-2xl bg-[#ececec]/95 shadow-[0_0_0_0.5px_rgb(0_0_0/0.3),0_30px_80px_rgb(0_0_0/0.5)] backdrop-blur-xl">
               <div className="relative flex items-center justify-center border-b border-black/10 py-2.5 text-[13px] font-semibold">
-                <span className="mac-lights absolute left-4">
-                  <i />
-                  <i />
-                  <i />
-                </span>
+                <WindowButtons absolute />
                 Privacy
               </div>
               <div className="p-5 pb-8">

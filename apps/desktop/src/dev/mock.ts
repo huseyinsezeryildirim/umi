@@ -11,6 +11,7 @@ import screenB from "./screen-b.jpg";
 import cameraFace from "./camera.jpg";
 import cameraClip from "./camera.mp4";
 import { GRADIENTS } from "../editor/panels/Background";
+import { windowsDesk } from "./os";
 import fixture from "./state.json";
 import music from "../../src-tauri/resources/music.json";
 import { maskRectAt, sourceTimeAt, type Clip, type EditorState, type EditSettings, type Selection } from "../editor/types";
@@ -717,10 +718,10 @@ mockIPC(
             { id: 12, title: "Inbox", app: "Mail", x: 0, y: 0, width: 1200, height: 800 },
           ],
           microphones: [
-            { id: "mbp", name: "MacBook Pro Microphone", isDefault: true },
+            { id: "mbp", name: windowsDesk ? "Microphone (Realtek Audio)" : "MacBook Pro Microphone", isDefault: true },
             { id: "usb", name: "USB Microphone", isDefault: false },
           ],
-          cameras: [{ id: "0", name: "FaceTime HD Camera" }],
+          cameras: [{ id: "0", name: windowsDesk ? "Integrated Camera" : "FaceTime HD Camera" }],
           missingPermission: null,
         };
       case "record_camera":

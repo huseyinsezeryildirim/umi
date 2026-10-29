@@ -86,6 +86,8 @@ fn show_window(app: &AppHandle, spec: &Spec, at: Option<(f64, f64)>) -> tauri::R
     let full = Spec { view: spec.view, size: (display.width, display.height), transparent: spec.transparent, focus: spec.focus };
     let spec = if spec.view == "countdown" { &full } else { spec };
     let place = at.unwrap_or_else(|| match spec.view {
+        // Under the tray: the menu bar's on a Mac, the taskbar's (at the bottom) on Windows.
+        "launcher" if cfg!(windows) => (origin.x + display.width - spec.size.0 - 16.0, origin.y + display.height - spec.size.1 - 60.0),
         "launcher" => (origin.x + display.width - spec.size.0 - 16.0, origin.y + 36.0),
         "bubble" => (origin.x + 40.0, origin.y + display.height - spec.size.1 - 60.0),
         "controls" => (origin.x + 16.0, origin.y + (display.height - spec.size.1) / 2.0),

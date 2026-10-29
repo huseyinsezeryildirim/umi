@@ -271,3 +271,93 @@
   opacity: 0;
   transform: scale(0.6);
 }
+
+/* Windows: no menu bar or Dock; a taskbar along the bottom with Umi in the tray. */
+.desk[data-os="windows"] {
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+}
+.desk__taskbar {
+  position: absolute;
+  inset: auto 0 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: rgba(238, 241, 246, 0.82);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(30px) saturate(1.5);
+  z-index: 5;
+}
+.desk__start {
+  width: 22px;
+  height: 22px;
+  margin: 0 9px;
+}
+.desk__task {
+  width: 26px;
+  height: 26px;
+  margin: 0 7px;
+  border-radius: 6px;
+}
+.desk__tray {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.desk__clock {
+  font-size: 12px;
+  line-height: 16px;
+  text-align: right;
+  color: rgba(0, 0, 0, 0.85);
+}
+.desk[data-os="windows"] .desk__umi {
+  width: 32px;
+  height: 32px;
+}
+/* The tray's flyout opens upward from the taskbar. */
+.desk[data-os="windows"] .desk__launcher {
+  top: auto;
+  bottom: 56px;
+  right: 10px;
+}
+.desk[data-os="windows"] .desk__app {
+  top: 9%;
+  border-radius: 8px;
+}
+/* On Windows the pictured window gets a Windows title bar over the picture's Mac one (the top 4%;
+   the picture's content starts below 8%): a title on the left, the buttons on the right. */
+.desk__winbar {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 7%;
+  display: flex;
+  align-items: stretch;
+  background: #f3f3f3;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.75);
+}
+.desk__winbar b {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding-left: 14px;
+  font-weight: 400;
+}
+.desk__winbar span {
+  width: 46px;
+  display: grid;
+  place-items: center;
+}
+.desk__winbar svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.75);
+  stroke-width: 1;
+}
+/* The tray's light background: Umi's mark in dark grey so it shows. */
+.desk[data-os="windows"] .desk__umi img {
+  filter: brightness(0) opacity(0.7);
+}

@@ -1,8 +1,9 @@
-// The website's guided demo (demo build, `?tour`): first a recording on a Mac desktop
+// The website's guided demo (demo build, `?tour`): first a recording on a Mac or Windows desktop
 // (`?view=desktop`), then the real editor (`?open&from=N` continues the tour there).
 // A small card suggests the next thing and rings it; doing it moves on, and Back/Next are
 // always there. Nothing is dimmed or blocked: visitors can click around the app freely.
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { windowsDesk } from "./os";
 import "./tour.css";
 
 type Chapter = "Record" | "Look" | "Captions" | "Share";
@@ -19,7 +20,7 @@ const byText = (selector: string, text: string) => () => [...document.querySelec
 const sel = (selector: string) => () => document.querySelector(selector);
 
 const STEPS: Step[] = [
-  { chapter: "Record", text: "Click Umi in the menu bar.", target: sel("#demo-umi") },
+  { chapter: "Record", text: windowsDesk ? "Click Umi in the taskbar." : "Click Umi in the menu bar.", target: sel("#demo-umi") },
   { chapter: "Record", text: "Turn on your camera to be in the video too.", target: () => document.querySelectorAll(".rec-row")[1] ?? null },
   { chapter: "Record", text: "Press Start recording.", target: sel(".rec-start") },
   { chapter: "Record", text: "Umi records your screen, camera and voice. Clicks are kept for the edit.", target: null, wait: 4200 },
@@ -145,7 +146,7 @@ export function Tour() {
   };
 
   return (
-    <div class="demo-tour">
+    <div class="demo-tour" data-taskbar={windowsDesk && onDesktop ? "true" : undefined}>
       <Show when={!done() && index() >= 0}>
         {/* A ring around the suggestion; the rest of the app stays as it is. */}
         <Show when={rect()}>

@@ -1,4 +1,4 @@
-// The website demo's first chapter: a Mac desktop where Umi records. The recorder card, the
+// The website demo's first chapter: a desktop (Mac, or Windows for visitors on Windows) where Umi records. The recorder card, the
 // control bar, the layout column, the drawing tools and the ink layer are the app's own
 // components; the rest of the desktop is scenery. A small card shows what viewers will see as
 // the layout changes.
@@ -24,6 +24,7 @@ const keep = (key: string, value: string | null) => {
   }
 };
 import { tourIndex } from "./tour";
+import { windowsDesk } from "./os";
 import wallpaper from "./wallpaper.jpg";
 import screen from "./screen-a.jpg";
 import "./desktop.css";
@@ -173,24 +174,41 @@ export function DesktopDemo() {
   const ring = () => CLICKS.find((c) => t() >= c && t() < c + 0.6);
 
   return (
-    <div class="desk" style={{ "background-image": `url(${wallpaper})` }}>
+    <div class="desk" data-os={windowsDesk ? "windows" : "mac"} style={{ "background-image": `url(${wallpaper})` }}>
+      <Show when={!windowsDesk}>
       <header class="desk__menubar">
-        <svg viewBox="0 0 24 24" class="desk__apple" aria-hidden="true">
-          <path fill="currentColor" d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.8-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3.9-1.3 1.3-2.6 1.3-2.6s-2.5-1-2.5-3.8ZM14.1 5.8c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1.1.1 2.1-.5 2.7-1.3Z" />
-        </svg>
-        <b>Finder</b>
-        <For each={["File", "Edit", "View", "Go", "Window", "Help"]}>{(m) => <span>{m}</span>}</For>
-        <span class="desk__spacer" />
-        <button type="button" id="demo-umi" class="desk__umi" data-on={launcher() ? "true" : "false"} aria-label="Umi">
-          <Show when={recording()} fallback={<img src="/umi-mark.svg" alt="" />}>
-            <i class="desk__rec" />
-          </Show>
-        </button>
-        <span>Sat 9:41</span>
-      </header>
+          <svg viewBox="0 0 24 24" class="desk__apple" aria-hidden="true">
+            <path fill="currentColor" d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.8-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3.9-1.3 1.3-2.6 1.3-2.6s-2.5-1-2.5-3.8ZM14.1 5.8c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1.1.1 2.1-.5 2.7-1.3Z" />
+          </svg>
+          <b>Finder</b>
+          <For each={["File", "Edit", "View", "Go", "Window", "Help"]}>{(m) => <span>{m}</span>}</For>
+          <span class="desk__spacer" />
+          <button type="button" id="demo-umi" class="desk__umi" data-on={launcher() ? "true" : "false"} aria-label="Umi">
+            <Show when={recording()} fallback={<img src="/umi-mark.svg" alt="" />}>
+              <i class="desk__rec" />
+            </Show>
+          </button>
+          <span>Sat 9:41</span>
+        </header>
+      </Show>
 
       <div class="desk__app" ref={app}>
         <img src={screen} alt="" />
+        {/* The picture is a Mac window: on Windows its title bar gets Windows' buttons instead. */}
+        <Show when={windowsDesk}>
+          <div class="desk__winbar">
+            <b>Dashboard</b>
+            <span>
+              <svg viewBox="0 0 10 10"><path d="M0 5.5h10" /></svg>
+            </span>
+            <span>
+              <svg viewBox="0 0 10 10"><rect x="0.5" y="0.5" width="9" height="9" rx="1.5" /></svg>
+            </span>
+            <span>
+              <svg viewBox="0 0 10 10"><path d="M0.5 0.5l9 9M9.5 0.5l-9 9" /></svg>
+            </span>
+          </div>
+        </Show>
         <Show when={recording()}>
           <svg viewBox="0 0 24 24" class="desk__cursor" style={{ left: `${cursor()[0]}%`, top: `${cursor()[1]}%` }}>
             <path d="M5 3l14 7.5-6.2 1.6L10 18.5z" fill="#000" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" />
@@ -242,12 +260,36 @@ export function DesktopDemo() {
         </figure>
       </Show>
 
+      <Show when={windowsDesk} fallback={
       <div class="desk__dock">
         <For each={["#2f8cff", "#13d18e", "#ffb020", "#ff5f57", "#7a5af8"]}>{(c) => <i style={{ background: `linear-gradient(160deg, ${c}, ${c}cc)` }} />}</For>
         <i class="desk__dock-umi">
           <img src="/umi-mark.svg" alt="" />
         </i>
       </div>
+      }>
+      {/* Windows: the taskbar along the bottom, Umi's icon in the tray by the clock. */}
+      <footer class="desk__taskbar">
+        <span class="desk__spacer" />
+        <svg viewBox="0 0 24 24" class="desk__start" aria-hidden="true">
+          <path fill="#0078d4" d="M3 3h8.5v8.5H3zM12.5 3H21v8.5h-8.5zM3 12.5h8.5V21H3zM12.5 12.5H21V21h-8.5z" />
+        </svg>
+        <For each={["#2f8cff", "#13d18e", "#ffb020", "#7a5af8"]}>{(c) => <i class="desk__task" style={{ background: `linear-gradient(160deg, ${c}, ${c}cc)` }} />}</For>
+        <span class="desk__spacer" />
+        <span class="desk__tray">
+          <button type="button" id="demo-umi" class="desk__umi" data-on={launcher() ? "true" : "false"} aria-label="Umi">
+            <Show when={recording()} fallback={<img src="/umi-mark.svg" alt="" />}>
+              <i class="desk__rec" />
+            </Show>
+          </button>
+          <span class="desk__clock">
+            9:41 AM
+            <br />
+            10/29/2026
+          </span>
+        </span>
+      </footer>
+      </Show>
     </div>
   );
 }

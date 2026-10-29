@@ -1,0 +1,1 @@
+var e=new URLSearchParams(location.search).get(`os`),t=e?e===`windows`:/Windows/.test(navigator.userAgent);export{t};

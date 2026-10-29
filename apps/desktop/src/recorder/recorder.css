@@ -890,3 +890,7 @@ html.umi-overlay body {
     transform: scale(1.01);
   }
 }
+
+:root[data-titlebar="native"] .shot__bar {
+  padding-left: 14px;
+}

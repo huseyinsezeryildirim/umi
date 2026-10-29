@@ -11,6 +11,9 @@
   align-items: center;
   padding-left: 60px;
 }
+:root[data-titlebar="native"] .lib__header {
+  padding-left: 0;
+}
 .lib__header h1 {
   margin: 0;
   font-size: var(--umi-text-xl);

@@ -256,3 +256,7 @@
     transform: scaleX(1);
   }
 }
+/* Above the Windows desktop's taskbar. */
+.demo-tour[data-taskbar="true"] .demo-tour__bar {
+  bottom: 62px;
+}
