@@ -42,6 +42,7 @@ const MODES = [
 const CYCLE = 6000;
 
 export function Modes() {
+  const windows = useWindows();
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { amount: 0.4 });
   const [active, setActive] = useState(0);
@@ -75,7 +76,7 @@ export function Modes() {
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.5, ease: EASE }}
                     >
-                      <span className="block pt-1.5">{m.line}</span>
+                      <span className="block pt-1.5">{windows ? m.line.replace("⌥⇧4", "Alt+Shift+4") : m.line}</span>
                     </motion.span>
                   )}
                 </AnimatePresence>

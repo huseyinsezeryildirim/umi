@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { DownloadButton } from "./Download";
 import { Rise } from "./Sections";
-import { Mark, WindowButtons } from "./ui";
+import { Mark, WindowButtons, useWindows } from "./ui";
 
 const EASE = [0.25, 1, 0.5, 1] as const;
 
@@ -106,6 +106,8 @@ export function Faq() {
 }
 
 export function Ending() {
+  // The shortcut as the visitor's keyboard writes it.
+  const windows = useWindows();
   return (
     <section id="download" className="px-3 pt-32 pb-6 sm:px-4">
       <div className="relative mx-auto max-w-[1400px] overflow-hidden rounded-[40px] px-6 py-32 text-center">
@@ -115,9 +117,9 @@ export function Ending() {
           <h2 className="h-display text-[clamp(40px,6.4vw,72px)]">
             Press{" "}
             <span className="keys">
-              {["⌥", "⇧", "L"].map((k, i) => (
+              {(windows ? ["Alt", "Shift", "L"] : ["⌥", "⇧", "L"]).map((k, i) => (
                 <span key={k} className="keycap" style={{ animationDelay: `${i * 0.16}s` }}>
-                  <span className="keycap__g">{k}</span>
+                  <span className="keycap__g" style={k.length > 1 ? { fontSize: "0.42em" } : undefined}>{k}</span>
                 </span>
               ))}
             </span>
