@@ -233,8 +233,24 @@ fn share_recording(client: &Client, bundle: &Path, progress: &Channel<ShareProgr
         if let Some(jpeg) = poster(&mut decoder, info.duration) {
             let _ = client.put_raw_poster(&link, &jpeg);
         }
-        let files: Vec<(&str, &Path)> =
-            [("screen", screen.as_path()), ("camera", camera.as_path())].into_iter().filter(|(_, p)| p.exists()).collect();
+        // Recordings are written in fragments; repackaged with their index up front, a browser
+        // opens them at once (a fragmented file is read fragment by fragment first).
+        let packed: Vec<(&str, std::path::PathBuf)> = [("screen", &screen), ("camera", &camera)]
+            .into_iter()
+            .filter(|(_, p)| p.exists())
+            .map(|(kind, p)| {
+                let out = std::env::temp_dir().join(format!("umi-{}-{kind}.mp4", link.video.id));
+                match umi_media::faststart(p, &out) {
+                    Ok(()) => (kind, out),
+                    Err(_) => {
+                        let _ = std::fs::remove_file(&out);
+                        (kind, p.clone())
+                    }
+                }
+            })
+            .collect();
+        let _cleanup = Temp(packed.iter().map(|(_, p)| p.clone()).filter(|p| p.starts_with(std::env::temp_dir())).collect());
+        let files: Vec<(&str, &Path)> = packed.iter().map(|(kind, p)| (*kind, p.as_path())).collect();
         let total: u64 = files.iter().map(|(_, p)| std::fs::metadata(p).map(|m| m.len()).unwrap_or(0)).sum::<u64>().max(1);
         let sent: Vec<std::sync::atomic::AtomicU64> = files.iter().map(|_| std::sync::atomic::AtomicU64::new(0)).collect();
         let report = || {
@@ -268,6 +284,17 @@ fn share_recording(client: &Client, bundle: &Path, progress: &Channel<ShareProgr
     remember(bundle, &video);
     send("done", 1.0, Some(video.clone()));
     Ok(video)
+}
+
+/// Repackaged copies of a recording, removed once they're uploaded (or the upload failed).
+struct Temp(Vec<std::path::PathBuf>);
+
+impl Drop for Temp {
+    fn drop(&mut self) {
+        for p in &self.0 {
+            let _ = std::fs::remove_file(p);
+        }
+    }
 }
 
 /// The recording's title (typed or suggested), else its folder's name.

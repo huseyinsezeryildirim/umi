@@ -168,3 +168,33 @@ fn writes_a_recording_as_it_happens() {
         }
     }
 }
+
+#[test]
+fn faststart_puts_the_index_first_and_keeps_every_stream() {
+    let path = Path::new(BUNDLE).join("screen.mov");
+    if !path.exists() {
+        return;
+    }
+    let out = std::env::temp_dir().join("umi-faststart-test.mp4");
+    faststart(&path, &out).unwrap();
+    // Top-level boxes: the index (moov) before the media, and no fragments.
+    let bytes = std::fs::read(&out).unwrap();
+    let mut boxes = vec![];
+    let mut at = 0usize;
+    while at + 8 <= bytes.len() {
+        let mut size = u32::from_be_bytes(bytes[at..at + 4].try_into().unwrap()) as usize;
+        if size == 1 {
+            size = u64::from_be_bytes(bytes[at + 8..at + 16].try_into().unwrap()) as usize;
+        }
+        boxes.push(String::from_utf8_lossy(&bytes[at + 4..at + 8]).to_string());
+        at += size.max(8);
+    }
+    let moov = boxes.iter().position(|b| b == "moov").expect("moov");
+    let mdat = boxes.iter().position(|b| b == "mdat").expect("mdat");
+    assert!(moov < mdat, "{boxes:?}");
+    assert!(!boxes.iter().any(|b| b == "moof"), "{boxes:?}");
+    assert_eq!(audio_streams(&out).unwrap().len(), audio_streams(&path).unwrap().len());
+    let (a, b) = (VideoDecoder::open(&path, false).unwrap().info(), VideoDecoder::open(&out, false).unwrap().info());
+    assert!((a.duration - b.duration).abs() < 0.1 && a.width == b.width);
+    let _ = std::fs::remove_file(out);
+}

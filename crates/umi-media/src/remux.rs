@@ -70,3 +70,41 @@ pub fn remux(inputs: &[&Path], output: &Path) -> Result<(), MediaError> {
     out.write_trailer()?;
     Ok(())
 }
+
+/// Copies every stream of `input` into an MP4 at `output` with its index up front. A recording
+/// written in fragments (so it could be read while recording) makes a browser fetch it fragment by
+/// fragment before it shows anything; this one opens at once.
+pub fn faststart(input: &Path, output: &Path) -> Result<(), MediaError> {
+    init();
+    let mut source = ff::format::input(input).map_err(|e| MediaError::open(input, e))?;
+    let mut out = ff::format::output_as(output, "mp4").map_err(|e| MediaError::open(output, e))?;
+    let mut routes: Vec<Option<(usize, ff::Rational)>> = vec![];
+    for stream in source.streams() {
+        let medium = stream.parameters().medium();
+        if medium != ff::media::Type::Video && medium != ff::media::Type::Audio {
+            routes.push(None);
+            continue;
+        }
+        let mut target = out.add_stream(ff::encoder::find(ff::codec::Id::None))?;
+        target.set_parameters(stream.parameters());
+        // SAFETY: plain field write on the stream's own codec parameters.
+        #[allow(unsafe_code)]
+        unsafe {
+            (*target.parameters().as_mut_ptr()).codec_tag = 0;
+        }
+        routes.push(Some((target.index(), stream.time_base())));
+    }
+    let mut opts = ff::Dictionary::new();
+    opts.set("movflags", "+faststart");
+    out.write_header_with(opts)?;
+    let out_tb: Vec<Option<ff::Rational>> = routes.iter().map(|r| r.and_then(|(i, _)| out.stream(i).map(|s| s.time_base()))).collect();
+    for (stream, mut packet) in source.packets() {
+        let (Some((index, tb)), Some(to)) = (routes[stream.index()], out_tb[stream.index()]) else { continue };
+        packet.rescale_ts(tb, to);
+        packet.set_stream(index);
+        packet.set_position(-1);
+        packet.write_interleaved(&mut out)?;
+    }
+    out.write_trailer()?;
+    Ok(())
+}

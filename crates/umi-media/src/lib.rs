@@ -15,7 +15,7 @@ pub use decode::{ColorInfo, DecodedFrame, FrameFormat, VideoDecoder, VideoInfo, 
 pub use encode::{Container, Encoder, EncoderSettings, VideoCodec};
 pub use gif::GifWriter;
 pub use record::{Pixels, StreamWriter, WriterSettings};
-pub use remux::remux;
+pub use remux::{faststart, remux};
 
 use ffmpeg_next as ff;
 use std::path::{Path, PathBuf};
