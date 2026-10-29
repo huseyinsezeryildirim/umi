@@ -260,3 +260,10 @@
 .demo-tour[data-taskbar="true"] .demo-tour__bar {
   bottom: 62px;
 }
+/* The suggestion card stays clickable where it meets the bar. */
+.demo-tour__hint {
+  z-index: 2;
+}
+.demo-tour__bar {
+  z-index: 1;
+}

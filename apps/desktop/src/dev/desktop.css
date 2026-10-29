@@ -361,3 +361,10 @@
 .desk[data-os="windows"] .desk__umi img {
   filter: brightness(0) opacity(0.7);
 }
+/* Above the taskbar and the tour's bar over it. */
+.desk[data-os="windows"] .desk__draw {
+  bottom: 116px;
+}
+.desk[data-os="windows"] .desk__bubble {
+  bottom: 116px;
+}
