@@ -227,6 +227,12 @@ impl Client {
         self.send::<serde_json::Value>("GET", "/api/videos", None).map(|_| ())
     }
 
+    /// Whether the account's plan has share links (servers that don't say: yes).
+    pub fn can_share(&self) -> Result<bool, CloudError> {
+        let me: serde_json::Value = self.send("GET", "/api/auth/me", None)?;
+        Ok(me["account"]["entitlements"]["cloudLinks"].as_bool().unwrap_or(true))
+    }
+
     pub fn video(&self, id: &str) -> Result<Video, CloudError> {
         Ok(self.send::<VideoBody>("GET", &format!("/api/videos/{id}"), None)?.video)
     }

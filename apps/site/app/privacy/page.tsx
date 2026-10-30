@@ -33,7 +33,7 @@ export default function Page() {
   return (
     <LegalPage
       title="Privacy Policy"
-      updated="October 29, 2026"
+      updated="October 30, 2026"
       intro={
         <>
           <p>
@@ -126,8 +126,7 @@ export default function Page() {
         [
           "How long we keep data",
           <ul className="list-disc space-y-1 pl-6">
-            <li>Free share links: 7 days, plus up to 7 days in which you can restore them by upgrading; then the files are deleted.</li>
-            <li>Paid share links: until you delete them, or 30 days after your paid plan ends.</li>
+                        <li>Paid share links: until you delete them, or 30 days after your paid plan ends.</li>
             <li>When you delete a video or your account, the files are deleted at once and the remaining records within 30 days (backups roll over within 30 days).</li>
             <li>Rate-limit counters: up to 2 days. Reports: as long as needed to handle them and for up to 2 years afterwards, to deal with repeat abuse and legal claims, unless the video’s owner deletes their account first.</li>
             <li>Invoices and billing records: 10 years, as required by Turkish commercial and tax law.</li>

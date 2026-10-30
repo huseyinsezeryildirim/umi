@@ -76,13 +76,13 @@ export function Upgrade() {
     );
   if (state === "off")
     return (
-      <Shell title="Umi Pro is coming soon" lead="Until then, everything on your computer is free, and so are 3 share links at a time.">
+      <Shell title="Umi Pro is coming soon" lead="Until then, everything on your computer is free.">
         <a href="/app" className="btn-dark mt-6 inline-flex">Open Umi</a>
       </Shell>
     );
   if (state === "already")
     return (
-      <Shell title="You’re on Pro" lead="Your links stay up and insights are on. You can cancel or change your card any time.">
+      <Shell title="You’re on Pro" lead="Share links and insights are on. You can cancel or change your card any time.">
         <div className="mt-6 flex flex-wrap gap-2">
           <a href="/app" className="btn-dark inline-flex">Open Umi</a>
           <button type="button" onClick={() => void openPortal().catch((e) => setError(e.message))} className="h-11 rounded-xl px-4 text-[15px] font-medium shadow-[0_0_0_1px_rgb(17_24_39/0.12)]">
@@ -94,12 +94,12 @@ export function Upgrade() {
     );
   if (state === "paying" || state === "done")
     return (
-      <Shell title={state === "done" ? "Welcome to Umi Pro" : "Finishing up…"} lead={state === "done" ? "Thanks! Your links now stay up, with insights and passwords. A receipt is on its way from Paddle." : "Payment received. Turning on Pro for your account."}>
+      <Shell title={state === "done" ? "Welcome to Umi Pro" : "Finishing up…"} lead={state === "done" ? "Thanks! Share links are on, with insights and passwords. A receipt is on its way from Paddle." : "Payment received. Turning on Pro for your account."}>
         {state === "done" && <a href="/app" className="btn-dark mt-6 inline-flex">Open Umi</a>}
       </Shell>
     );
   return (
-    <Shell title="Upgrade to Umi Pro" lead={`${PRICE[cycle]}, plus local tax where it applies. Links that stay up, 200 GB, insights and passwords.`}>
+    <Shell title="Upgrade to Umi Pro" lead={`${PRICE[cycle]}, plus local tax where it applies. Share links, 200 GB, insights and passwords.`}>
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <button type="button" disabled={!account} onClick={() => account && void start(cycle, account)} className="btn-dark inline-flex disabled:opacity-60">
           Continue to payment

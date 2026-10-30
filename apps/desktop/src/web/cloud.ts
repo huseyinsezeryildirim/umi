@@ -49,6 +49,13 @@ const saved = (id: string): Video | null => {
 
 export const cloudStatus = () => ({ connected: !!sessionToken(), server: apiBase() });
 
+/** Whether the plan has share links (yes when Umi Cloud can't be asked: it checks anyway). */
+export const cloudCanShare = () =>
+  call<{ account: { entitlements?: { cloudLinks?: boolean } } }>("GET", "/api/auth/me").then(
+    (r) => r.account.entitlements?.cloudLinks !== false,
+    () => true,
+  );
+
 /** The recording's link, refreshed from Umi Cloud (null when it was never shared or is gone). */
 export async function shareState(id: string): Promise<Video | null> {
   const video = saved(id);

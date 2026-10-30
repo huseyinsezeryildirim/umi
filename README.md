@@ -53,7 +53,7 @@ and titles all run on your device. You only pay when we host things for you.
 | Recording, editing, 4K and GIF export | ✓ unlimited | ✓ unlimited |
 | On-device AI (captions, voiceover, clean-up) | ✓ | ✓ |
 | Commercial use, no watermark | ✓ | ✓ |
-| Share links | 3 at a time, up to 5 min, kept 7 days | unlimited, up to 4 hours each, 200 GB |
+| Share links | | unlimited, up to 4 hours each, 200 GB |
 | Viewer insights, passwords, your own domain | | ✓ |
 
 ## Get started

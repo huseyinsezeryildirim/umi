@@ -6,14 +6,14 @@ import { billingConfig } from "@/lib/billing";
 import { DownloadButton } from "./Download";
 import { Rise } from "./Sections";
 
-// Pricing: Free forever for everything on your computer; Pro, a strip under it, for links that stay up.
+// Pricing: Free forever for everything on your computer; Pro, a strip under it, for share links.
 
 type Billing = "monthly" | "yearly";
 const PRICE = { monthly: 12, yearly: 8 } as const;
 const SAVE = Math.round((1 - PRICE.yearly / PRICE.monthly) * 100);
 
-const FREE = ["Unlimited recordings, no watermark", "The whole editor, 4K and GIF export", "Captions, voiceover and clean-up on your computer", "Import from Loom", "3 share links at a time, up to 5 minutes, kept a week", "Commercial use included"];
-const PRO = ["Links that stay up, up to 4 hours each", "200 GB of cloud storage", "Who watched, and for how long", "Passwords and expiry dates on links"];
+const FREE = ["Unlimited recordings, no watermark", "The whole editor, 4K and GIF export", "Captions, voiceover and clean-up on your computer", "Import from Loom", "Commercial use included"];
+const PRO = ["Share links anyone can watch, up to 4 hours each", "200 GB of cloud storage", "Who watched, and for how long", "Passwords and expiry dates on links"];
 
 function Toggle({ billing, onChange, dark = false }: { billing: Billing; onChange: (b: Billing) => void; dark?: boolean }) {
   return (
@@ -90,7 +90,7 @@ function Strip({ billing, setBilling }: { billing: Billing; setBilling: (b: Bill
         <div className="flex flex-col gap-5 border-t border-line bg-panel/70 p-8 sm:px-10 md:flex-row md:items-center">
           <div className="flex-1">
             <p className="text-lg font-semibold">
-              Need links that stay up? <span className="text-accent">Umi Pro</span>
+              Need share links? <span className="text-accent">Umi Pro</span>
               {!onSale && <span className="ml-2 align-middle text-[12px] font-medium text-muted">launching soon</span>}
             </p>
             <p className="mt-1 text-[14px] text-muted">{PRO.join(" · ")}</p>

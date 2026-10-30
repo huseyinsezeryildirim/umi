@@ -1,7 +1,7 @@
 // The Mac app's Rust side, in the browser: the same editor UI talks to this through the same
 // commands. Editing and drawing are the same Rust code (umi-web, WebAssembly + WebGPU);
 // recordings live in this browser (IndexedDB) and never leave it.
-import { cloudStatus, shareDelete, shareInsights, shareStart, shareState, shareUpdate, syncEdit } from "./cloud";
+import { cloudCanShare, cloudStatus, shareDelete, shareInsights, shareStart, shareState, shareUpdate, syncEdit } from "./cloud";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { ALL_FORMATS, BlobSource, CanvasSink, Input } from "mediabunny";
 import music from "../../src-tauri/resources/music.json";
@@ -585,6 +585,8 @@ async function handle(cmd: string, p: Args): Promise<unknown> {
       return [];
     case "cloud_status":
       return cloudStatus();
+    case "cloud_can_share":
+      return cloudCanShare();
     case "share_state":
       return shareState(String(p.id));
     case "share_insights":

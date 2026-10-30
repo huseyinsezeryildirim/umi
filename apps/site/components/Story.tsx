@@ -66,7 +66,7 @@ export function Privacy() {
 // ───── Pricing, questions, ending ─────
 
 const QUESTIONS: [string, string][] = [
-  ["Is it really free?", "Yes. Recording, editing, exporting and everything that runs on your computer is free, with no time limit or watermark, for personal and commercial use. Share links are free for a week (3 at a time, up to 5 minutes); keeping them and longer videos are Umi Pro."],
+  ["Is it really free?", "Yes. Recording, editing, exporting and everything that runs on your computer is free, with no time limit or watermark, for personal and commercial use. Share links, which anyone can watch in their browser, are Umi Pro."],
   ["Does my video leave my computer?", "Only if you share a link. Captions, voiceover, noise removal and background removal all run locally."],
   ["Which computers does it run on?", "macOS 13 or later on Apple silicon and Intel, Windows 10 and 11, and most Linux distributions. You can also record and edit right in your browser, nothing to install."],
   ["Can I bring my Loom videos?", "Paste your Loom links and they become Umi projects you can edit. It’s free."],

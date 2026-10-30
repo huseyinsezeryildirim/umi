@@ -656,6 +656,8 @@ mockIPC(
         return frames[0][1];
       case "cloud_status":
         return { connected: true, server: "https://umi.cam" };
+      case "cloud_can_share":
+        return true;
       case "share_state":
       case "share_update":
         return { durationMs: 192000, id: "s2Zty2QoHiLz", url: "https://umi.cam/v/s2Zty2QoHiLz", title: "Product demo", status: "ready", allowDownload: true, hasPassword: false, allowComments: true, expiresAt: null };

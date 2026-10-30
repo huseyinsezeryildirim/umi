@@ -10,7 +10,7 @@ export default function Page() {
   return (
     <LegalPage
       title="Terms of Service"
-      updated="October 26, 2026"
+      updated="October 30, 2026"
       intro={
         <>
           <p>
@@ -119,12 +119,11 @@ export default function Page() {
           "Plans, limits and fair use",
           <>
             <p>
-              Free share links are limited in number, length and how long they stay available, as described on our pricing page. Paid plans include the
-              storage and limits stated there. To keep the Service sustainable, we apply rate limits and may slow or stop activity that places an
+              Share links are part of the paid plans, which include the storage and limits stated on our pricing page. To keep the Service sustainable, we apply rate limits and may slow or stop activity that places an
               unreasonable load on it; we will contact you first where we reasonably can.
             </p>
             <p>
-              When a paid plan ends or is downgraded to Free, share links that exceed the Free plan remain available for 30 days and are then deleted,
+              When a paid plan ends or is downgraded to Free, its share links remain available for 30 days and are then deleted,
               unless you renew. Export anything you want to keep.
             </p>
           </>,

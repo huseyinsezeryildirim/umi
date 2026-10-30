@@ -71,6 +71,16 @@ pub fn cloud_status() -> CloudStatus {
     CloudStatus { connected: token().is_some(), server: server() }
 }
 
+/// What the app says when the plan has no share links (the dialog offers Pro on it).
+const NEEDS_PRO: &str = "Share links are part of Umi Pro.";
+
+/// Whether this account can make links; true when the server can't be asked (it checks anyway).
+#[tauri::command]
+pub async fn cloud_can_share() -> bool {
+    let Ok(client) = client() else { return true };
+    tauri::async_runtime::spawn_blocking(move || client.can_share().unwrap_or(true)).await.unwrap_or(true)
+}
+
 /// Checks the token with the server, then keeps it in the keychain.
 #[tauri::command]
 pub async fn cloud_connect(server: String, token: String) -> Result<CloudStatus, String> {
@@ -153,6 +163,11 @@ pub async fn share_start(state: State<'_, AppState>, id: String, progress: Chann
     let gpu = state.gpu()?;
     let bundle = editor.bundle.clone();
     let client = client()?;
+    // Before anything is exported or uploaded.
+    let allowed = client.clone();
+    if !tauri::async_runtime::spawn_blocking(move || allowed.can_share().unwrap_or(true)).await.unwrap_or(true) {
+        return Err(NEEDS_PRO.into());
+    }
     // Like Loom: the link right away, the recording's own files uploading behind it, the edit
     // applied in the viewer's browser. Nothing is rendered here.
     if plays_from_recording(&editor.doc().edit) {
@@ -195,8 +210,7 @@ pub async fn share_start(state: State<'_, AppState>, id: String, progress: Chann
             &|p| send("upload", p, None),
         );
         let _ = std::fs::remove_dir_all(&folder);
-        let video =
-            result.map_err(|e| if e.needs_plan() { "Sharing links needs an Umi Cloud plan.".to_string() } else { e.to_string() })?;
+        let video = result.map_err(plan_error)?;
         remember(&bundle, &video);
         send("done", 1.0, Some(video.clone()));
         Ok(video)
@@ -317,7 +331,12 @@ pub(crate) fn sync_title(bundle: &Path) {
 }
 
 fn plan_error(e: umi_cloud::CloudError) -> String {
-    if e.needs_plan() { "Sharing links needs an Umi Cloud plan.".to_string() } else { e.to_string() }
+    // Other plan limits (length, storage) say what to do in their own words.
+    if matches!(&e, umi_cloud::CloudError::Server { code, .. } if code == "payment_required") {
+        NEEDS_PRO.to_string()
+    } else {
+        e.to_string()
+    }
 }
 
 /// A JPEG of the video at 1 s (or its middle if shorter).

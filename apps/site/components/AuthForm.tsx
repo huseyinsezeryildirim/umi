@@ -121,7 +121,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         forPro
           ? `${signup ? "Create" : "Sign in to"} your Umi account first. Paying for Pro comes right after.`
           : signup
-            ? "Record in your browser and share with a link."
+            ? "Record and edit in your browser."
             : "Sign in to record and edit."
       }
     >

@@ -4,7 +4,7 @@ import { createEffect, createSignal, For, Match, on, Show, Switch } from "solid-
 import { Button, Dialog, Progress, Segmented, SwitchRow, TextField, toast } from "@umi/ui";
 import { Check, Copy, ExternalLink, Link2, Lock, Trash2 } from "lucide-solid";
 import type { Editor } from "./store";
-import { teamsEnabled } from "../platform";
+import { onWeb, teamsEnabled } from "../platform";
 
 interface Video {
   id: string;
@@ -61,6 +61,8 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
   const [copied, setCopied] = createSignal<string | null>(null);
   const [insights, setInsights] = createSignal<Insights | null>(null);
   const [teams, setTeams] = createSignal<{ id: string; name: string }[]>([]);
+  /** False on Free: links are Pro. */
+  const [canShare, setCanShare] = createSignal(true);
 
   createEffect(
     on(
@@ -70,6 +72,7 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
         const status = await invoke<{ connected: boolean; server: string }>("cloud_status");
         setConnected(status.connected);
         setServer(status.server);
+        if (status.connected) invoke<boolean>("cloud_can_share").then(setCanShare, () => {});
         let shared = await invoke<Video | null>("share_state", { id: ed.state().id });
         // Made while recording: the link is already there; opening Share keeps it.
         if (shared?.kind === "raw" && shared.shared === false) {
@@ -114,7 +117,8 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
     try {
       setVideo(await invoke<Video>("share_start", { id: ed.state().id, progress: channel }));
     } catch (e) {
-      toast(String(e));
+      if (String(e).includes("Share links are part of Umi Pro")) setCanShare(false);
+      else toast(String(e));
     } finally {
       setJob(null);
     }
@@ -223,6 +227,17 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
               </>
             )}
           </Match>
+          <Match when={connected() && !video() && !canShare()}>
+            <div class="umi-section__hint" style={{ "margin-top": "-6px" }}>
+              Share links are part of Umi Pro: a link anyone can watch in their browser, up to 4 hours, with who watched and for how long. Recording, editing and exporting stay free on your computer.
+            </div>
+            <div class="ed-export__actions">
+              <Button variant="ghost" onClick={props.onClose}>Cancel</Button>
+              <Button variant="ink" onClick={() => void openUrl(onWeb ? `${location.origin}/upgrade` : `${server()}/upgrade`)}>
+                Get Umi Pro
+              </Button>
+            </div>
+          </Match>
           <Match when={connected() && !video()}>
             <div class="umi-section__hint" style={{ "margin-top": "-6px" }}>
               Uploads this video and copies a link anyone can watch in their browser, no account needed.
@@ -271,7 +286,7 @@ export function ShareDialog(props: { editor: Editor; open: boolean; onClose: () 
                 <Show when={v().keptByUpgrade && v().expiresAt}>
                   <div class="ed-share__free">
                     <span>
-                      Free links stay up for 7 days: this one is deleted {new Date(v().expiresAt!).toLocaleDateString(undefined, { day: "numeric", month: "long" })}.
+                      On Free, this link is deleted {new Date(v().expiresAt!).toLocaleDateString(undefined, { day: "numeric", month: "long" })}.
                     </span>
                     <Button onClick={() => void openUrl("https://umi.cam/#pricing")}>
                       Keep it with Pro

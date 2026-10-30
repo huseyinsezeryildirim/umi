@@ -8,7 +8,7 @@ const STEPS: { icon: () => JSX.Element; title: string; text: string }[] = [
   { icon: () => <Circle size={34} fill="#ff4d4d" stroke="none" />, title: "Start a recording", text: `Click the Umi icon in the menu bar (or press ${pretty("Alt+Shift+L")}). Pick the screen, a window or an area, your camera and microphone, then Start.` },
   { icon: () => <MousePointerClick size={34} />, title: "It edits itself", text: "Umi zooms in where you click, smooths your cursor and frames your camera. Change anything later; nothing is baked in." },
   { icon: () => <Captions size={34} />, title: "Captions and cleanup", text: "Get captions in your language, cut the video by deleting words, remove “um”s and background noise in one click." },
-  { icon: () => <Link2 size={34} />, title: "Share or export", text: "Export MP4, MOV or GIF up to 4K for free, or share a link with Umi Cloud. That's it — happy recording!" },
+  { icon: () => <Link2 size={34} />, title: "Share or export", text: "Export MP4, MOV or GIF up to 4K for free, or share a link with Umi Pro. That's it — happy recording!" },
 ];
 
 const KEY = "umi.toured";
