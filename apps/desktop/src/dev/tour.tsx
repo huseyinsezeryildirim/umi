@@ -34,9 +34,9 @@ const STEPS: Step[] = [
   { chapter: "Captions", text: "Open Captions.", target: sel('[aria-label="Captions & transcript"]') },
   { chapter: "Captions", text: "Transcribe the voice. It runs on your computer.", target: byText(".ed-inspector button", "Generate captions") },
   { chapter: "Captions", text: "Captions are in. Press play to watch them.", target: sel(".ed-play") },
-  { chapter: "Share", text: "Click Share to get a link.", target: byText(".ed-topbar button", "Share") },
+  { chapter: "Share", text: "Click Share to get a link (Umi Pro).", target: byText(".ed-topbar button", "Share") },
   { chapter: "Share", text: "Copy it. People watch in their browser and you see who did.", target: byText("[role=dialog] button", "Copy") },
-  { chapter: "Share", text: "Or export a file: MP4, MOV or GIF, up to 4K.", target: byText(".ed-topbar button", "Export") },
+  { chapter: "Share", text: "Or export a file, free: MP4, MOV or GIF, up to 4K.", target: byText(".ed-topbar button", "Export") },
 ];
 const CHAPTERS: { name: Chapter; color: string; tint: string }[] = [
   { name: "Record", color: "#d92d20", tint: "#fee4e2" },

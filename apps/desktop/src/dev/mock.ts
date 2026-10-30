@@ -214,12 +214,58 @@ const history: EditSettings[] = [];
 const future: EditSettings[] = [];
 const uuid = () => crypto.randomUUID().toUpperCase();
 
+/** A window's title bar over the screen: traffic lights, Windows' buttons, or a browser's address bar. */
+function drawTitleBar(g: OffscreenCanvasRenderingContext2D, frame: string, x: number, y: number, w: number, bar: number, radius: number, alpha: number) {
+  g.save();
+  g.globalAlpha = alpha;
+  g.beginPath();
+  g.roundRect(x, y, w, bar, [radius, radius, 0, 0]);
+  g.fillStyle = frame === "windows" ? "#f3f3f3" : frame === "browser" ? "#e8eaed" : "#ececec";
+  g.fill();
+  const mid = y + bar / 2;
+  const r = bar * 0.16;
+  if (frame === "windows") {
+    // Minimise, maximise, close on the right.
+    g.strokeStyle = "#333";
+    g.lineWidth = Math.max(1, bar * 0.04);
+    const s = bar * 0.16;
+    const cx = [x + w - bar * 2.6, x + w - bar * 1.6, x + w - bar * 0.6];
+    g.beginPath();
+    g.moveTo(cx[0] - s, mid);
+    g.lineTo(cx[0] + s, mid);
+    g.rect(cx[1] - s, mid - s, s * 2, s * 2);
+    g.moveTo(cx[2] - s, mid - s);
+    g.lineTo(cx[2] + s, mid + s);
+    g.moveTo(cx[2] + s, mid - s);
+    g.lineTo(cx[2] - s, mid + s);
+    g.stroke();
+  } else {
+    ["#ff5f57", "#febc2e", "#28c840"].forEach((c, i) => {
+      g.beginPath();
+      g.arc(x + bar * 0.5 + i * r * 3.2, mid, r, 0, Math.PI * 2);
+      g.fillStyle = c;
+      g.fill();
+    });
+    if (frame === "browser") {
+      g.beginPath();
+      g.roundRect(x + w * 0.25, mid - bar * 0.28, w * 0.5, bar * 0.56, bar * 0.28);
+      g.fillStyle = "#fff";
+      g.fill();
+    }
+  }
+  g.restore();
+}
+
 /**
  * A small stand-in renderer: the sample screen on the edit's background with its padding,
  * corners, shadow, zooms and cursor, so changes in the demo show up at once.
  */
-function frameAt(output: number, width: number, height: number): ArrayBuffer {
+function frameAt(output: number, boxWidth: number, boxHeight: number): ArrayBuffer {
   const edit = state.edit;
+  // The canvas' shape (Auto: the recording's 16:10), as large as fits the stage.
+  const ratio = ({ wide: 16 / 9, vertical: 9 / 16, square: 1, classic: 4 / 3, portrait: 4 / 5 } as Record<string, number>)[edit.aspect] ?? 1.6;
+  const width = Math.round(Math.min(boxWidth, boxHeight * ratio));
+  const height = Math.round(Math.min(boxHeight, boxWidth / ratio));
   // Everything below is in recording time, like the Rust renderer.
   const time = sourceTimeAt(state.placements, output);
   const canvas = new OffscreenCanvas(width, height);
@@ -255,8 +301,12 @@ function frameAt(output: number, width: number, height: number): ArrayBuffer {
     h = height - pad * 2;
     w = h * 1.6;
   }
+  // A window frame adds a title bar above the screen (the Mac, Windows or a browser's).
+  const barK = edit.frame === "macOS" || edit.frame === "windows" || edit.frame === "browser" ? 0.07 : 0;
+  w /= 1 + barK;
+  h /= 1 + barK;
   let x = (width - w) / 2;
-  let y = (height - h) / 2;
+  let y = (height - h * (1 + barK)) / 2 + h * barK;
   const radius = edit.cornerRadius * Math.min(w, h) * 0.9;
 
   // A scene (side by side, camera only, screen only) eases in and out over its transition.
@@ -293,20 +343,22 @@ function frameAt(output: number, width: number, height: number): ArrayBuffer {
     if (seg.focus) [fx, fy] = seg.focus;
   }
 
+  const bar = h * barK;
   g.save();
   g.globalAlpha = screenAlpha;
   g.shadowColor = `rgba(0,0,0,${0.45 * edit.shadow})`;
   g.shadowBlur = 50 * edit.shadow;
   g.shadowOffsetY = 18 * edit.shadow;
   g.beginPath();
-  g.roundRect(x, y, w, h, radius);
+  g.roundRect(x, y - bar, w, h + bar, radius);
   g.fillStyle = "#fff";
   g.fill();
   g.restore();
+  if (bar) drawTitleBar(g, edit.frame, x, y - bar, w, bar, radius, screenAlpha);
   g.save();
   g.globalAlpha = screenAlpha;
   g.beginPath();
-  g.roundRect(x, y, w, h, radius);
+  g.roundRect(x, y, w, h, bar ? [0, 0, radius, radius] : radius);
   g.clip();
   // Keep the zoomed view inside the screen's edges.
   const vw = w / scale;
